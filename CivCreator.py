@@ -134,14 +134,26 @@ def open_txt_file():
                     elif status == "ResearchRequired":
                         currentCiv.units[currentUnit] = 3
 
-            # DEBUG
-            print(civilisations[9].name)
-            for key, value in civilisations[9].units.items():
-                print(f"{key}: {value}")
-
             # Update the dropdown with the new values
             dropdown['values'] = dropdown_values
             dropdown.current(0)
+
+            # Function to print the units of the selected civilization when a new item is selected in the dropdown
+            def on_dropdown_change(event):
+                selected_civ_name = dropdown.get()  # Get the selected item from the dropdown
+
+                # Find the corresponding Civilisation object in the civilisations list
+                selected_civ = next((civ for civ in civilisations if civ.name == selected_civ_name), None)
+
+                if selected_civ:
+                    print(f"Units for {selected_civ.name}:")
+                    for unit, status in selected_civ.units.items():
+                        print(f"  {unit}: {status}")
+                else:
+                    print(f"No civilization found for {selected_civ_name}")
+
+            # Bind the dropdown selection event to the function
+            dropdown.bind("<<ComboboxSelected>>", on_dropdown_change)
         
     except Exception as e:
         print(f"Error: {e}")
