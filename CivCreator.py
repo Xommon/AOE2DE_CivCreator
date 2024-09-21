@@ -5,15 +5,12 @@ from tkinter import Tk, Menu, Label, ttk, Canvas, Toplevel, Entry
 from tkinter.filedialog import askdirectory, askopenfilename
 from tkinter import messagebox
 import sys
-from cryptography.fernet import Fernet
+import json
+import string
 
 # Global variables to store the selected AoE2DE folder path and mod save path
 selected_folder_path = None
 mod_save_path = None
-
-# Generate a key for encryption/decryption (In a real application, store this securely)
-encryption_key = Fernet.generate_key()
-cipher_suite = Fernet(encryption_key)
 
 # Function to count files in specified folders and files
 def count_files_in_specified_items(folder_path, items_to_copy):
@@ -55,50 +52,74 @@ def copy_specified_items_with_progress(src_base_folder, items_to_copy, dst_base_
         progress_label.config(text=f"Saving: {progress_percentage:.2f}%")
         progress_window.update_idletasks()  # Update the UI
 
-# Function to save a .a2cp file inside the mod folder
-def save_a2cp_file(project_name, original_path, mod_path):
+# Function to save a .txt file inside the mod folder
+def save_txt_file(project_name, original_path, mod_path):
     try:
-        a2cp_content = f"{original_path};{mod_path}"
-        encrypted_content = cipher_suite.encrypt(a2cp_content.encode())
+        txt_content = f"{original_path}\n{mod_path}"
         
-        # Save the .a2cp file inside the project folder with the same name as the project
-        a2cp_file_path = os.path.join(mod_save_path, f"{project_name}.a2cp")
-        with open(a2cp_file_path, 'wb') as file:
-            file.write(encrypted_content)
+        # Save the .txt file inside the project folder with the same name as the project
+        txt_file_path = os.path.join(mod_save_path, f"{project_name}.txt")
+        with open(txt_file_path, 'w') as file:
+            file.write(txt_content)
         
-        messagebox.showinfo("Success", f"{project_name}.a2cp file saved successfully!")
+        messagebox.showinfo("Success", f"{project_name}.txt file saved successfully!")
     except Exception as e:
-        messagebox.showerror("Error", f"Failed to save .a2cp file: {e}")
+        messagebox.showerror("Error", f"Failed to save .txt file: {e}")
 
-# Function to open a .a2cp file and decrypt it
-def open_a2cp_file():
-    a2cp_file_path = askopenfilename(filetypes=[("A2CP files", "*.a2cp")])
-    if not a2cp_file_path:
+# Function to open a .txt file and read it
+def open_txt_file():
+    global current_txt_file_path  # Declare global to store the file path
+    txt_file_path = askopenfilename(filetypes=[("Text files", "*.txt")])
+
+    if not txt_file_path:
         return  # User canceled file selection
 
     try:
-        # Read and decrypt the .a2cp file
-        with open(a2cp_file_path, 'rb') as file:
-            encrypted_data = file.read()
-        decrypted_content = cipher_suite.decrypt(encrypted_data).decode()
+        # Debug: Print file path
+        print(f"Opening file: {txt_file_path}")
 
-        # The .a2cp content is in the format: original_path;mod_path
-        original_path, mod_path = decrypted_content.split(';')
+        # Read the .txt file
+        with open(txt_file_path, 'r') as file:
+            txt_content = file.read()
+
+        # Debug: Check if file read was successful
+        print(f"File read successfully, length: {len(txt_content)} characters")
+
+        # The .txt content is in the format: original_path\nmod_path
+        original_path, mod_path = txt_content.split('\n')
 
         # Check if both paths exist
         if not os.path.exists(original_path) or not os.path.exists(mod_path):
             messagebox.showerror("Error", "One or both of the paths no longer exist.")
             sys.exit("Error: Missing paths.")
 
-        # Update the title of the main window with the project name (without .a2cp)
-        project_name = os.path.basename(a2cp_file_path).replace(".a2cp", "")
+        # Store the path of the opened .txt file
+        current_txt_file_path = txt_file_path
+
+        # Update the title of the main window with the project name (without .txt)
+        project_name = os.path.basename(txt_file_path).replace(".txt", "")
         root.title(f"{original_title} - {project_name}")
 
-        messagebox.showinfo("Success", f"Project '{project_name}' opened successfully!")
+        # Import tech trees
+        techTrees = ''
+        with open(f'{mod_path}/resources/_common/dat/civTechTrees.json', 'r') as file:
+            techTrees = file.read()
+            dropdown_values = []  # Temporary list to store civ names
+            for line in techTrees.splitlines():
+                if 'civ_id' in line:
+                    newCiv = line[16:].translate(str.maketrans('', '', string.punctuation))
+                    # Correct usage of .lower() and appending the civ name
+                    formatted_civ = newCiv[0].upper() + newCiv[1:].lower()  # Capitalize first letter
+                    dropdown_values.append(formatted_civ)  # Add to temporary list
+
+            # Update the dropdown with the new values
+            dropdown['values'] = dropdown_values
+            dropdown.current(0)
         
     except Exception as e:
-        messagebox.showerror("Error", f"Failed to open .a2cp file: {e}")
-        sys.exit("Error: Failed to open .a2cp file.")
+        print(f"Error: {e}")
+        messagebox.showerror("Error", f"Failed to open .txt file: {e}")
+        sys.exit("Error: Failed to open .txt file.")
 
 # Function to open the file explorer and validate the AoE2DE folder
 def selectAoE2DEFolder(entry_field):
@@ -134,8 +155,22 @@ def selectModPathway(entry_field, project_name):
     entry_field.insert(0, new_mod_path)
     entry_field.config(state="readonly")
 
-# Function to create the new project with specified folders/files
-# Function to create the new project with specified folders/files
+# Function to center a window relative to the main window
+def center_window(window, width, height):
+    # Get the dimensions of the main window (root)
+    root.update_idletasks()  # Ensure root has been fully rendered
+    root_width = root.winfo_width()
+    root_height = root.winfo_height()
+    root_x = root.winfo_x()
+    root_y = root.winfo_y()
+
+    # Calculate the position to center the new window
+    x = root_x + (root_width // 2) - (width // 2)
+    y = root_y + (root_height // 2) - (height // 2)
+
+    # Set the geometry of the new window
+    window.geometry(f"{width}x{height}+{x}+{y}")
+
 # Function to create the new project with specified folders/files
 def createNewProject(project_name):
     global mod_save_path
@@ -178,7 +213,7 @@ def createNewProject(project_name):
         # Create a new window for progress bar
         progress_window = Toplevel(root)
         progress_window.title("Saving Mod...")
-        progress_window.geometry("400x150")
+        center_window(progress_window, 400, 150)  # Center the progress window
 
         # Create a progress bar inside the popup window
         progress_bar = ttk.Progressbar(progress_window, orient="horizontal", length=300, mode="determinate")
@@ -207,8 +242,8 @@ def createNewProject(project_name):
         progress_label.config(text="Save Completed!")
         messagebox.showinfo("Success", f"Mod successfully saved to '{mod_save_path}'!")
 
-        # Save the .a2cp file
-        save_a2cp_file(project_name, selected_folder_path, mod_save_path)
+        # Save the .txt file
+        save_txt_file(project_name, selected_folder_path, mod_save_path)
 
         # Close the popup window after the saving is complete
         progress_window.after(1000, progress_window.destroy)
@@ -238,6 +273,7 @@ def new_project_flow():
     
     project_creation_window.geometry("500x350")
     project_creation_window.title("New Project")
+    center_window(project_creation_window, 500, 350)  # Center the project creation window
 
     # Project name label and entry
     Label(project_creation_window, text="Project Name").pack(pady=10)
@@ -277,7 +313,7 @@ def on_close_project_window():
 
 # Main application window
 root = Tk()
-original_title = "Age of Empires II: Definitive Edition Civilization Editor"
+original_title = "Age of Empires II: Definitive Edition Civ Editor"
 root.title(original_title)
 root.geometry("800x500")
 
@@ -289,7 +325,7 @@ root.config(menu=menuBar)
 fileMenu = Menu(menuBar, tearoff=0)
 menuBar.add_cascade(label="File", menu=fileMenu)
 fileMenu.add_command(label="New Project", command=new_project_flow, accelerator="Ctrl + N")
-fileMenu.add_command(label="Open Project...", command=open_a2cp_file, accelerator="Ctrl + O")
+fileMenu.add_command(label="Open Project...", command=open_txt_file, accelerator="Ctrl + O")
 fileMenu.add_separator()
 
 # Create a separator (line) between the menu bar and the rest of the program
