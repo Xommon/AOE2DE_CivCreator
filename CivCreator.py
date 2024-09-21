@@ -8,6 +8,12 @@ import sys
 import json
 import string
 
+# Civilisation object
+class Civilisation:
+    def __init__(self, name):
+        self.name = name
+        self.units = {}
+
 # Global variables to store the selected AoE2DE folder path and mod save path
 selected_folder_path = None
 mod_save_path = None
@@ -102,15 +108,36 @@ def open_txt_file():
 
         # Import tech trees
         techTrees = ''
+        currentCiv = None
+        currentUnit = ''
+        civilisations = []
         with open(f'{mod_path}/resources/_common/dat/civTechTrees.json', 'r') as file:
             techTrees = file.read()
-            dropdown_values = []  # Temporary list to store civ names
+            dropdown_values = []
             for line in techTrees.splitlines():
-                if 'civ_id' in line:
-                    newCiv = line[16:].translate(str.maketrans('', '', string.punctuation))
-                    # Correct usage of .lower() and appending the civ name
-                    formatted_civ = newCiv[0].upper() + newCiv[1:].lower()  # Capitalize first letter
-                    dropdown_values.append(formatted_civ)  # Add to temporary list
+                if '\"civ_id\":' in line:
+                    # Enter new civilisation
+                    newCiv = line[16:].replace('"', '').replace(',', '')
+                    formatted_civ = newCiv[0].upper() + newCiv[1:].lower()
+                    dropdown_values.append(formatted_civ)
+                    currentCiv = Civilisation(formatted_civ)
+                    civilisations.append(currentCiv)
+                elif '\"Name\":' in line:
+                    # Enter new unit name
+                    currentUnit = line[18:].replace('"', '').replace(',', '')
+                elif '\"Node Status\":' in line:
+                    status = line[25:].replace('"', '').replace(',', '')
+                    if status == "ResearchedCompleted":
+                        currentCiv.units[currentUnit] = 1
+                    elif status == "NotAvailable":
+                        currentCiv.units[currentUnit] = 2
+                    elif status == "ResearchRequired":
+                        currentCiv.units[currentUnit] = 3
+
+            # DEBUG
+            print(civilisations[9].name)
+            for key, value in civilisations[9].units.items():
+                print(f"{key}: {value}")
 
             # Update the dropdown with the new values
             dropdown['values'] = dropdown_values
