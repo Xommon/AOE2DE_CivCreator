@@ -7,6 +7,7 @@ from tkinter import messagebox
 import sys
 import json
 import string
+import re
 
 # Civilisation object
 class Civilisation:
@@ -17,6 +18,8 @@ class Civilisation:
 # Global variables to store the selected AoE2DE folder path and mod save path
 selected_folder_path = None
 mod_save_path = None
+mod_path = ''
+civilisations = []
 
 # Function to count files in specified folders and files
 def count_files_in_specified_items(folder_path, items_to_copy):
@@ -72,8 +75,57 @@ def save_txt_file(project_name, original_path, mod_path):
     except Exception as e:
         messagebox.showerror("Error", f"Failed to save .txt file: {e}")
 
+# Save project file
+def save_project_file():
+    try:
+        # Get path for civTechTree.json
+        new_path = ''
+        with open(current_txt_file_path, 'r') as file:
+            lines = file.readlines()  # Read all lines into a list
+            new_path = lines[1].strip() + r'\resources\_common\dat\civTechTrees.json'
+
+        with open(new_path, 'r+') as file:
+            lines = file.read().splitlines()  # Read all lines
+            
+            currentUnit = ''
+            for i, line in enumerate(lines):
+                if '\"civ_id\":' in line:
+                    civ_id = line[16:].replace('"', '').replace(',', '')
+                    civObject = next((civ for civ in civilisations if civ.name.lower() == civ_id.lower()), None)
+                elif '\"Name\":' in line:
+                    currentUnit = line[18:].replace('"', '').replace(',', '')
+                elif '\"Node Status\":' in line:
+                    unit_status = ''
+                    if civObject and currentUnit in civObject.units:
+                        if civObject.units[currentUnit] == 1:
+                            unit_status = 'ResearchedCompleted'
+                        elif civObject.units[currentUnit] == 2:
+                            unit_status = 'NotAvailable'
+                        elif civObject.units[currentUnit] == 3:
+                            unit_status = 'ResearchRequired'
+                    
+                    # Update the line in lines
+                    lines[i] = re.sub(r'("Node Status":\s*")(.*?)(")', r'\1' + unit_status + r'\3', line)
+
+            json_to_save = '\n'.join(lines)
+
+            # Move the file pointer to the beginning of the file for overwriting
+            file.seek(0)
+
+            # Write the updated content back to the file
+            file.write(json_to_save)
+
+            # Truncate the file to remove any remaining old content
+            file.truncate()
+
+        messagebox.showinfo("Success", "Project file saved successfully!")
+
+    except Exception as e:
+        print(f"Error saving project file: {e}")
+        messagebox.showerror("Error", f"Failed to save project file: {e}")
+
 # Function to open a .txt file and read it
-def open_txt_file():
+def open_project_file():
     global current_txt_file_path  # Declare global to store the file path
     txt_file_path = askopenfilename(filetypes=[("Text files", "*.txt")])
 
@@ -81,15 +133,12 @@ def open_txt_file():
         return  # User canceled file selection
 
     try:
-        # Debug: Print file path
-        print(f"Opening file: {txt_file_path}")
-
         # Read the .txt file
         with open(txt_file_path, 'r') as file:
             txt_content = file.read()
-
-        # Debug: Check if file read was successful
-        print(f"File read successfully, length: {len(txt_content)} characters")
+            for lines in file:
+                original_path = lines[0].strip()  # First line
+                mod_path = lines[1].strip()        # Second line
 
         # The .txt content is in the format: original_path\nmod_path
         original_path, mod_path = txt_content.split('\n')
@@ -110,7 +159,6 @@ def open_txt_file():
         techTrees = ''
         currentCiv = None
         currentUnit = ''
-        civilisations = []
         with open(f'{mod_path}/resources/_common/dat/civTechTrees.json', 'r') as file:
             techTrees = file.read()
             dropdown_values = []
@@ -137,6 +185,8 @@ def open_txt_file():
             # Update the dropdown with the new values
             dropdown['values'] = dropdown_values
             dropdown.current(0)
+
+            civilisations[0].units['Archery Range'] = 2
 
             # Function to print the units of the selected civilization when a new item is selected in the dropdown
             def on_dropdown_change(event):
@@ -364,8 +414,14 @@ root.config(menu=menuBar)
 fileMenu = Menu(menuBar, tearoff=0)
 menuBar.add_cascade(label="File", menu=fileMenu)
 fileMenu.add_command(label="New Project", command=new_project_flow, accelerator="Ctrl + N")
-fileMenu.add_command(label="Open Project...", command=open_txt_file, accelerator="Ctrl + O")
+fileMenu.add_command(label="Open Project...", command=open_project_file, accelerator="Ctrl + O")
 fileMenu.add_separator()
+fileMenu.add_command(label="Save", command=save_project_file, accelerator="Ctrl + S")
+
+# Hotkeys
+root.bind("<Control-s>", lambda event: save_project_file())
+root.bind("<Control-n>", lambda event: new_project_flow())
+root.bind("<Control-o>", lambda event: open_project_file())
 
 # Create a separator (line) between the menu bar and the rest of the program
 separator = ttk.Separator(root, orient='horizontal')
@@ -376,9 +432,9 @@ dropdown = ttk.Combobox(root, values=[])
 dropdown.place(x=10, y=10)
 
 # Create a grey circle next to the dropdown
-canvas = Canvas(root, width=104, height=104, bg="black", highlightthickness=0)
-canvas.place(x=150, y=10)
-canvas.create_oval(2, 2, 102, 102, fill="grey")
+#canvas = Canvas(root, width=104, height=104, bg="black", highlightthickness=0)
+#canvas.place(x=150, y=10)
+#canvas.create_oval(2, 2, 102, 102, fill="grey")
 
 # Run the GUI main loop
 root.mainloop()
