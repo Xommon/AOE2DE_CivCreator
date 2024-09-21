@@ -70,8 +70,9 @@ def save_txt_file(project_name, original_path, mod_path):
         txt_file_path = os.path.join(mod_save_path, f"{project_name}.txt")
         with open(txt_file_path, 'w') as file:
             file.write(txt_content)
+
+        open_project_file(f"{mod_path}/{project_name}.txt")
         
-        messagebox.showinfo("Success", f"{project_name}.txt file saved successfully!")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to save .txt file: {e}")
 
@@ -186,7 +187,83 @@ def open_project_file():
             dropdown['values'] = dropdown_values
             dropdown.current(0)
 
-            civilisations[0].units['Archery Range'] = 2
+            # Function to print the units of the selected civilization when a new item is selected in the dropdown
+            def on_dropdown_change(event):
+                selected_civ_name = dropdown.get()  # Get the selected item from the dropdown
+
+                # Find the corresponding Civilisation object in the civilisations list
+                selected_civ = next((civ for civ in civilisations if civ.name == selected_civ_name), None)
+
+                if selected_civ:
+                    print(f"Units for {selected_civ.name}:")
+                    for unit, status in selected_civ.units.items():
+                        print(f"  {unit}: {status}")
+                else:
+                    print(f"No civilization found for {selected_civ_name}")
+
+            # Bind the dropdown selection event to the function
+            dropdown.bind("<<ComboboxSelected>>", on_dropdown_change)
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        messagebox.showerror("Error", f"Failed to open .txt file: {e}")
+        sys.exit("Error: Failed to open .txt file.")
+
+# Function to open a .txt file and read it
+def open_project_file(file_to_open):
+    try:
+        # Read the .txt file
+        with open(file_to_open, 'r') as file:
+            txt_content = file.read()
+            for lines in file:
+                original_path = lines[0].strip()  # First line
+                mod_path = lines[1].strip()        # Second line
+
+        # The .txt content is in the format: original_path\nmod_path
+        original_path, mod_path = txt_content.split('\n')
+
+        # Check if both paths exist
+        if not os.path.exists(original_path) or not os.path.exists(mod_path):
+            messagebox.showerror("Error", "One or both of the paths no longer exist.")
+            sys.exit("Error: Missing paths.")
+
+        # Store the path of the opened .txt file
+        current_txt_file_path = file_to_open
+
+        # Update the title of the main window with the project name (without .txt)
+        project_name = os.path.basename(file_to_open).replace(".txt", "")
+        root.title(f"{original_title} - {project_name}")
+
+        # Import tech trees
+        techTrees = ''
+        currentCiv = None
+        currentUnit = ''
+        with open(f'{mod_path}/resources/_common/dat/civTechTrees.json', 'r') as file:
+            techTrees = file.read()
+            dropdown_values = []
+            for line in techTrees.splitlines():
+                if '\"civ_id\":' in line:
+                    # Enter new civilisation
+                    newCiv = line[16:].replace('"', '').replace(',', '')
+                    formatted_civ = newCiv[0].upper() + newCiv[1:].lower()
+                    dropdown_values.append(formatted_civ)
+                    currentCiv = Civilisation(formatted_civ)
+                    civilisations.append(currentCiv)
+                elif '\"Name\":' in line:
+                    # Enter new unit name
+                    currentUnit = line[18:].replace('"', '').replace(',', '')
+                elif '\"Node Status\":' in line:
+                    status = line[25:].replace('"', '').replace(',', '')
+                    if status == "ResearchedCompleted":
+                        currentCiv.units[currentUnit] = 1
+                    elif status == "NotAvailable":
+                        currentCiv.units[currentUnit] = 2
+                    elif status == "ResearchRequired":
+                        currentCiv.units[currentUnit] = 3
+
+            # Update the dropdown with the new values
+            dropdown['values'] = dropdown_values
+            dropdown.current(0)
 
             # Function to print the units of the selected civilization when a new item is selected in the dropdown
             def on_dropdown_change(event):
@@ -328,8 +405,7 @@ def createNewProject(project_name):
             progress_bar, total_files, progress_window, progress_label
         )
 
-        progress_label.config(text="Save Completed!")
-        messagebox.showinfo("Success", f"Mod successfully saved to '{mod_save_path}'!")
+        progress_label.config(text="New Project Created!")
 
         # Save the .txt file
         save_txt_file(project_name, selected_folder_path, mod_save_path)
