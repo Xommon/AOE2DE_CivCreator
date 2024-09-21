@@ -337,7 +337,9 @@ def center_window(window, width, height):
     # Set the geometry of the new window
     window.geometry(f"{width}x{height}+{x}+{y}")
 
-# Function to create the new project with specified folders/files
+import os
+import shutil
+
 def createNewProject(project_name):
     global mod_save_path
     
@@ -353,57 +355,78 @@ def createNewProject(project_name):
         messagebox.showerror("Error", "You must select both the original pathway and mod pathway.")
         return
 
-    # Check if the values are still the default placeholders, and allow them if true
+    # Check if the values are still the default placeholders
     if original_path == r"C:\Program Files (x86)\Steam\steamapps\common\AoE2DE" and mod_path == r"C:\Users\Micheal Q\Games\Age of Empires 2 DE\76561198021486964\mods\local":
         selected_folder_path = original_path
         mod_save_path = mod_path
 
     # Create the project folder inside the mod path (with the project name)
     mod_save_path = os.path.join(mod_path, project_name)
-    if not os.path.exists(mod_save_path):
-        os.makedirs(mod_save_path)
+    os.makedirs(mod_save_path, exist_ok=True)
 
-    # Specify which folders and files you want to copy
-    resources_items_to_copy = ['_common/dat/civilizations.json', '_common/dat/civTechTrees.json', '_common/wpfg/resources/civ_techtree', '_common/wpfg/resources/uniticons', 'en/strings/key_value']  # Example: specify resources
-    widgetui_items_to_copy = ['textures/menu/civs']   # Example: specify widgetui
+    # Specify which files and folders you want to copy
+    items_to_copy = {
+        'resources': [
+            '_common/dat/civilizations.json',
+            '_common/dat/civTechTrees.json',
+            '_common/dat/empires2_x2_p1.dat',
+            '_common/wpfg/resources/civ_techtree',
+            '_common/wpfg/resources/uniticons',
+            'en/strings/key-value/key-value-strings-utf8.txt',
+            'en/strings/key-value/key-value-modded-strings-utf8.txt'
+        ],
+        'widgetui': [
+            'textures/menu/civs'
+        ]
+    }
 
-    # Count total files in both resources and widgetui
-    total_files_resources = count_files_in_specified_items(os.path.join(selected_folder_path, 'resources'), resources_items_to_copy)
-    total_files_widgetui = count_files_in_specified_items(os.path.join(selected_folder_path, 'widgetui'), widgetui_items_to_copy)
-    total_files = total_files_resources + total_files_widgetui
+    total_files = 0
+
+    # Count total files in the specified items
+    for key, items in items_to_copy.items():
+        for item in items:
+            full_path = os.path.join(selected_folder_path, key, item)
+            if os.path.isfile(full_path):
+                total_files += 1
+            elif os.path.isdir(full_path):
+                total_files += len(os.listdir(full_path))
 
     try:
-        # Create the main project folder if it doesn't exist
-        os.makedirs(mod_save_path, exist_ok=True)
-
-        # Create a new window for progress bar
+        # Create a new window for the progress bar
         progress_window = Toplevel(root)
         progress_window.title("Saving Mod...")
-        center_window(progress_window, 400, 150)  # Center the progress window
+        center_window(progress_window, 400, 150)
 
         # Create a progress bar inside the popup window
         progress_bar = ttk.Progressbar(progress_window, orient="horizontal", length=300, mode="determinate")
-        progress_bar.pack(pady=20)
+        progress_bar.pack(pady=10)
 
-        # Create a label to indicate the saving status inside the popup window
+        # Create a label to indicate the saving status
         progress_label = Label(progress_window, text="Starting...")
         progress_label.pack()
 
-        # Copy the specified folders and files for resources
-        copy_specified_items_with_progress(
-            os.path.join(selected_folder_path, 'resources'),
-            resources_items_to_copy,
-            os.path.join(mod_save_path, 'resources'),
-            progress_bar, total_files, progress_window, progress_label
-        )
+        # Function to copy items recursively
+        def copy_item(src, dst):
+            if os.path.isfile(src):
+                shutil.copy2(src, dst)
+            elif os.path.isdir(src):
+                shutil.copytree(src, dst, dirs_exist_ok=True)
 
-        # Copy the specified folders and files for widgetui
-        copy_specified_items_with_progress(
-            os.path.join(selected_folder_path, 'widgetui'),
-            widgetui_items_to_copy,
-            os.path.join(mod_save_path, 'widgetui'),
-            progress_bar, total_files, progress_window, progress_label
-        )
+        # Copy the specified folders and files
+        for key, items in items_to_copy.items():
+            for item in items:
+                src_path = os.path.join(selected_folder_path, key, item)
+                dst_path = os.path.join(mod_save_path, key, item)
+
+                # Create destination directory if it doesn't exist
+                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+
+                copy_item(src_path, dst_path)
+
+                # Update the progress bar
+                progress_bar['value'] += (1 / total_files) * 100
+                progress_label.config(text=f"Copying: {item}")
+                progress_window.update_idletasks()
 
         progress_label.config(text="New Project Created!")
 
@@ -411,10 +434,14 @@ def createNewProject(project_name):
         save_txt_file(project_name, selected_folder_path, mod_save_path)
 
         # Close the popup window after the saving is complete
-        progress_window.after(1000, progress_window.destroy)
+        progress_window.after(500, progress_window.destroy)
 
         # Close the project creation window
         project_creation_window.destroy()
+
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred while saving the mod: {e}")
+
 
     except Exception as e:
         messagebox.showerror("Error", f"An error occurred while saving the mod: {e}")
