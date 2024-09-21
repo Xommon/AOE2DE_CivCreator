@@ -8,6 +8,7 @@ import sys
 import json
 import string
 import re
+import random
 
 # Civilisation object
 class Civilisation:
@@ -20,6 +21,7 @@ selected_folder_path = None
 mod_save_path = None
 mod_path = ''
 civilisations = []
+
 
 # Function to count files in specified folders and files
 def count_files_in_specified_items(folder_path, items_to_copy):
@@ -71,7 +73,7 @@ def save_txt_file(project_name, original_path, mod_path):
         with open(txt_file_path, 'w') as file:
             file.write(txt_content)
 
-        open_project_file(f"{mod_path}/{project_name}.txt")
+        open_project_file_specific(f"{mod_path}/{project_name}.txt")
         
     except Exception as e:
         messagebox.showerror("Error", f"Failed to save .txt file: {e}")
@@ -194,13 +196,6 @@ def open_project_file():
                 # Find the corresponding Civilisation object in the civilisations list
                 selected_civ = next((civ for civ in civilisations if civ.name == selected_civ_name), None)
 
-                if selected_civ:
-                    print(f"Units for {selected_civ.name}:")
-                    for unit, status in selected_civ.units.items():
-                        print(f"  {unit}: {status}")
-                else:
-                    print(f"No civilization found for {selected_civ_name}")
-
             # Bind the dropdown selection event to the function
             dropdown.bind("<<ComboboxSelected>>", on_dropdown_change)
         
@@ -210,7 +205,7 @@ def open_project_file():
         sys.exit("Error: Failed to open .txt file.")
 
 # Function to open a .txt file and read it
-def open_project_file(file_to_open):
+def open_project_file_specific(file_to_open):
     try:
         # Read the .txt file
         with open(file_to_open, 'r') as file:
@@ -337,11 +332,47 @@ def center_window(window, width, height):
     # Set the geometry of the new window
     window.geometry(f"{width}x{height}+{x}+{y}")
 
-import os
-import shutil
+# Function to populate mod string file
+def populate_mod_string_file():
+    try:
+        original_path = rf"{mod_save_path}/resources/en/strings/key-value/key-value-strings-utf8.txt"
+        modded_path = rf"{mod_save_path}/resources/en/strings/key-value/key-value-modded-strings-utf8.txt"
+
+        # Read the original text file with specified encoding
+        with open(original_path, 'r', encoding='utf-8-sig') as original_text:
+            original_lines = original_text.readlines()  # Read all lines into a list
+
+        # Create or open the modded text file for writing
+        with open(modded_path, 'w', encoding='utf-8-sig') as modded_text:
+            copy_start_stop(original_lines, modded_text, "10271", "ReservedCiv", False)
+            copy_start_stop(original_lines, modded_text, "120150", "120176", True)
+            copy_start_stop(original_lines, modded_text, "120177", "120180", True)
+            copy_start_stop(original_lines, modded_text, "120181", "120184", True)
+            copy_start_stop(original_lines, modded_text, "120181", "120194", True)
+
+    except Exception as e:
+        print(f"Error populating mod string file: {e}")
+        messagebox.showerror("Error", f"Failed to populate mod string file: {e}")
+
+def copy_start_stop(original_lines, modded_text, start, stop, inclusive):
+    copy_lines = False  # Flag to indicate when to start copying
+    for line in original_lines:
+                if line.startswith(start):
+                    copy_lines = True  # Start copying lines after this line
+                
+                if copy_lines:
+                    if stop in line and inclusive:
+                        modded_text.write(line)  # Write the line to the modded file
+                        break  # Stop copying when we hit a line containing <stop>
+                    elif stop in line and not inclusive:
+                        break  # Stop copying when we hit a line containing <stop>
+                    modded_text.write(line)  # Write the line to the modded file
 
 def createNewProject(project_name):
     global mod_save_path
+
+    # DEBUG Randomise name
+    project_name = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(5))
     
     if not project_name:
         messagebox.showerror("Error", "Project name cannot be empty.")
@@ -432,6 +463,9 @@ def createNewProject(project_name):
 
         # Save the .txt file
         save_txt_file(project_name, selected_folder_path, mod_save_path)
+
+        # Populate the modded text file
+        populate_mod_string_file()
 
         # Close the popup window after the saving is complete
         progress_window.after(500, progress_window.destroy)
@@ -531,7 +565,7 @@ separator = ttk.Separator(root, orient='horizontal')
 separator.pack(fill='x', padx=1, pady=0)
 
 # Create a dropdown (ComboBox) in the top left corner
-dropdown = ttk.Combobox(root, values=[])
+dropdown = ttk.Combobox(root, values=[], state="readonly")
 dropdown.place(x=10, y=10)
 
 # Create a grey circle next to the dropdown
