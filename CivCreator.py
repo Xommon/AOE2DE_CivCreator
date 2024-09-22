@@ -9,12 +9,14 @@ import json
 import string
 import re
 import random
+from PIL import Image, ImageTk
 
 # Civilisation object
 class Civilisation:
     def __init__(self, name):
         self.name = name
         self.units = {}
+        self.text_id = ''
 
 # Global variables to store the selected AoE2DE folder path and mod save path
 selected_folder_path = None
@@ -22,6 +24,41 @@ mod_save_path = None
 mod_path = ''
 civilisations = []
 
+# Tech tree button object
+class TreeButton:
+    def __init__(self, name, normal_image, highlighted_image, disabled_image, disabled_highlighted_image):
+        self.name = name
+        self.disabled = False
+        self.normal_image = ImageTk.PhotoImage(Image.open(normal_image))
+        self.highlighted_image = ImageTk.PhotoImage(Image.open(highlighted_image))
+        self.disabled_image = ImageTk.PhotoImage(Image.open(disabled_image))
+        self.disabled_highlighted_image = ImageTk.PhotoImage(Image.open(disabled_highlighted_image))
+        self.current_image = self.normal_image  # Start with the normal image
+
+    def update_image(self, label):
+        label.config(image=self.current_image)
+
+    def on_enter(self, event, label):
+        if not self.disabled:
+            self.current_image = self.highlighted_image
+        else:
+            self.current_image = self.disabled_highlighted_image
+        self.update_image(label)
+
+    def on_leave(self, event, label):
+        if self.disabled:
+            self.current_image = self.disabled_image
+        else:
+            self.current_image = self.normal_image
+        self.update_image(label)
+
+    def on_click(self, event, label):
+        self.disabled = not self.disabled
+        if self.disabled:
+            self.current_image = self.disabled_highlighted_image
+        else:
+            self.current_image = self.highlighted_image
+        self.update_image(label)
 
 # Function to count files in specified folders and files
 def count_files_in_specified_items(folder_path, items_to_copy):
@@ -121,7 +158,14 @@ def save_project_file():
             # Truncate the file to remove any remaining old content
             file.truncate()
 
-        messagebox.showinfo("Success", "Project file saved successfully!")
+        # Save civilization names
+        #with open(f'{new_path}', 'r+') as mod_text_file:
+        #    lines = mod_text_file.readlines()
+        #    for i, civ in enumerate(civilisations):
+        #        lines[i] = rf'{civ.text_id} "{civ.name}"\n'  # Ensure to add a newline character
+        #    mod_text_file.seek(0)  # Move the file pointer to the beginning
+        #    mod_text_file.writelines(lines)  # Write the modified lines back to the file
+        #    mod_text_file.truncate()  # Truncate the file to remove any old content
 
     except Exception as e:
         print(f"Error saving project file: {e}")
@@ -162,6 +206,7 @@ def open_project_file():
         techTrees = ''
         currentCiv = None
         currentUnit = ''
+        add_on = 0
         with open(f'{mod_path}/resources/_common/dat/civTechTrees.json', 'r') as file:
             techTrees = file.read()
             dropdown_values = []
@@ -172,6 +217,8 @@ def open_project_file():
                     formatted_civ = newCiv[0].upper() + newCiv[1:].lower()
                     dropdown_values.append(formatted_civ)
                     currentCiv = Civilisation(formatted_civ)
+                    currentCiv.text_id = 10271 + add_on
+                    add_on += 1
                     civilisations.append(currentCiv)
                 elif '\"Name\":' in line:
                     # Enter new unit name
@@ -567,6 +614,41 @@ separator.pack(fill='x', padx=1, pady=0)
 # Create a dropdown (ComboBox) in the top left corner
 dropdown = ttk.Combobox(root, values=[], state="readonly")
 dropdown.place(x=10, y=10)
+change_civ_name_button = ttk.Button(text="Change Name", command=lambda: change_civ_name())
+change_civ_name_button.pack()
+
+def change_civ_name():
+    selected_index = dropdown.current()
+    current_civ_name = dropdown.get()
+    print(selected_index)
+    print(current_civ_name)
+    if selected_index >= 0:
+        values_list = list(dropdown['values'])
+        values_list[selected_index] = "Test"
+        dropdown['values'] = values_list
+        dropdown.set(current_civ_name)
+
+
+# Get the directory of the current Python file
+directory_of_civ_creator = os.path.dirname(os.path.abspath(__file__))
+
+# Build the tree
+archer = TreeButton(
+    'Archer',
+    normal_image=rf'{directory_of_civ_creator}/Images/TechTree/unit.png',
+    highlighted_image=rf'{directory_of_civ_creator}/Images/TechTree/unit_hover.png',
+    disabled_image=rf'{directory_of_civ_creator}/Images/TechTree/unit_disabled.png',
+    disabled_highlighted_image=rf'{directory_of_civ_creator}/Images/TechTree/unit_disabled_hover.png'
+)
+
+# Create a Label to display the image
+image_label = tk.Label(root, image=archer.current_image)
+image_label.pack(pady=20)
+
+# Bind events
+image_label.bind("<Enter>", lambda event: archer.on_enter(event, image_label))
+image_label.bind("<Leave>", lambda event: archer.on_leave(event, image_label))
+image_label.bind("<Button-1>", lambda event: archer.on_click(event, image_label))
 
 # Create a grey circle next to the dropdown
 #canvas = Canvas(root, width=104, height=104, bg="black", highlightthickness=0)
