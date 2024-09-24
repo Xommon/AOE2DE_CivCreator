@@ -10,6 +10,9 @@ import string
 import re
 import random
 from PIL import Image, ImageTk
+from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QApplication, QMainWindow
+import civ_creator_ui
 
 # Civilisation object
 class Civilisation:
@@ -23,42 +26,86 @@ selected_folder_path = None
 mod_save_path = None
 mod_path = ''
 civilisations = []
+directory_of_civ_creator = os.path.dirname(os.path.abspath(__file__))
 
 # Tech tree button object
 class TreeButton:
-    def __init__(self, name, normal_image, highlighted_image, disabled_image, disabled_highlighted_image):
+    def __init__(self, name, type):
         self.name = name
         self.disabled = False
-        self.normal_image = ImageTk.PhotoImage(Image.open(normal_image))
-        self.highlighted_image = ImageTk.PhotoImage(Image.open(highlighted_image))
-        self.disabled_image = ImageTk.PhotoImage(Image.open(disabled_image))
-        self.disabled_highlighted_image = ImageTk.PhotoImage(Image.open(disabled_highlighted_image))
-        self.current_image = self.normal_image  # Start with the normal image
 
-    def update_image(self, label):
-        label.config(image=self.current_image)
+        # Load images based on type
+        self.normal_image_path = rf'{directory_of_civ_creator}/Images/TechTree/{type}.png'
+        self.highlighted_image_path = rf'{directory_of_civ_creator}/Images/TechTree/{type}_hover.png'
+        self.disabled_image_path = rf'{directory_of_civ_creator}/Images/TechTree/disabled.png'
+        self.enabled_image_path = rf'{directory_of_civ_creator}/Images/TechTree/enabled.png'
+
+        # Load images
+        self.normal_image = ImageTk.PhotoImage(Image.open(self.normal_image_path))
+        self.highlighted_image = ImageTk.PhotoImage(Image.open(self.highlighted_image_path))
+        self.disabled_image = ImageTk.PhotoImage(Image.open(self.disabled_image_path))
+        self.enabled_image = ImageTk.PhotoImage(Image.open(self.enabled_image_path))
+
+        # Set default images
+        self.base_image = self.normal_image
+        self.unit_image = ImageTk.PhotoImage(Image.open(rf'{directory_of_civ_creator}/Images/TechTree/{self.name}.png').resize((54, 54)))
+        self.status_image = self.enabled_image
+
+    def update_base(self, label):
+        label.config(image = self.base_image)
+
+    def update_status(self, label):
+        label.config(image = self.status_image)
 
     def on_enter(self, event, label):
-        if not self.disabled:
-            self.current_image = self.highlighted_image
-        else:
-            self.current_image = self.disabled_highlighted_image
-        self.update_image(label)
+        self.base_image = self.highlighted_image
+        self.update_base(label)
 
     def on_leave(self, event, label):
-        if self.disabled:
-            self.current_image = self.disabled_image
-        else:
-            self.current_image = self.normal_image
-        self.update_image(label)
+        self.base_image = self.normal_image
+        self.update_base(label)
 
     def on_click(self, event, label):
         self.disabled = not self.disabled
         if self.disabled:
-            self.current_image = self.disabled_highlighted_image
+            self.status_image = self.disabled_image
         else:
-            self.current_image = self.highlighted_image
-        self.update_image(label)
+            self.status_image = self.enabled_image
+        self.update_base(label)
+
+    def on_right_click(self, event):
+        print(rf'right clicked {self.name}')
+    #    # Change type of unit
+    #    types = ['building', 'unit', 'research', 'unique']
+    #    current_index = types.index(type)  # Get current index
+    #    new_type = types[(current_index + 1) % len(types)]  # Cycle through types
+#
+    #    # Update paths
+    #    self.normal_image_path = rf'{directory_of_civ_creator}/Images/TechTree/{new_type}.png'
+    #    self.highlighted_image_path = rf'{directory_of_civ_creator}/Images/TechTree/{new_type}_hover.png'
+    #    self.disabled_image_path = rf'{directory_of_civ_creator}/Images/TechTree/disabled.png'
+#
+    #    # Load new images
+    #    self.normal_image = ImageTk.PhotoImage(Image.open(self.normal_image_path))
+    #    self.highlighted_image = ImageTk.PhotoImage(Image.open(self.highlighted_image_path))
+    #    self.disabled_image = ImageTk.PhotoImage(Image.open(self.disabled_image_path))
+#
+    #    # Reset current image to normal
+    #    self.base_image = self.normal_image
+
+    def draw(self, canvas):
+        """ Draw the main image, status image, and overlay image on the given canvas. """
+        # Draw the base image
+        canvas.create_image(0, 0, anchor=tk.NW, image=self.base_image)
+
+        # Draw the status image (enabled or disabled)
+        if self.disabled:
+            canvas.create_image(0, 0, anchor=tk.NW, image=self.disabled_image)
+        else:
+            canvas.create_image(0, 0, anchor=tk.NW, image=self.enabled_image)
+
+        # Draw the overlay image, offset by 16 pixels down and 30 pixels to the right
+        canvas.create_image(30, 16, anchor=tk.NW, image=self.unit_image)
 
 # Function to count files in specified folders and files
 def count_files_in_specified_items(folder_path, items_to_copy):
@@ -628,27 +675,23 @@ def change_civ_name():
         dropdown['values'] = values_list
         dropdown.set(current_civ_name)
 
-
-# Get the directory of the current Python file
-directory_of_civ_creator = os.path.dirname(os.path.abspath(__file__))
+# Create a canvas to draw the images
+canvas = tk.Canvas(root, width=256, height=256)
+canvas.pack()
 
 # Build the tree
-archer = TreeButton(
-    'Archer',
-    normal_image=rf'{directory_of_civ_creator}/Images/TechTree/unit.png',
-    highlighted_image=rf'{directory_of_civ_creator}/Images/TechTree/unit_hover.png',
-    disabled_image=rf'{directory_of_civ_creator}/Images/TechTree/unit_disabled.png',
-    disabled_highlighted_image=rf'{directory_of_civ_creator}/Images/TechTree/unit_disabled_hover.png'
-)
+archer = TreeButton('Archer', 'unit')
 
 # Create a Label to display the image
-image_label = tk.Label(root, image=archer.current_image)
+image_label = tk.Label(root, image=archer.base_image)
 image_label.pack(pady=20)
 
 # Bind events
 image_label.bind("<Enter>", lambda event: archer.on_enter(event, image_label))
 image_label.bind("<Leave>", lambda event: archer.on_leave(event, image_label))
 image_label.bind("<Button-1>", lambda event: archer.on_click(event, image_label))
+image_label.bind("<Button-3>", archer.on_right_click)
+#archer.draw(canvas)
 
 # Create a grey circle next to the dropdown
 #canvas = Canvas(root, width=104, height=104, bg="black", highlightthickness=0)
