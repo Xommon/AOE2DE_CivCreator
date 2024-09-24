@@ -786,6 +786,7 @@ class Ui_MainWindow(object):
                 currently_selected_civilisation = civ
                 new_description = civ.description[1:-1].replace('\\n', '\n').replace('<b>', '')
                 self.civilisation_description_label.setText(new_description)
+                self.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -936,7 +937,7 @@ def open_project(path):
                         ui.civilisation_dropdown.addItem(new_name)
 
                     # Create Civilisation object
-                    current_civilisation = Civilisation(civ_read_offset, new_name, true_name, '', new_name_id, '', rf'{CIV_IMAGE_FOLDER}/{new_name.lower()}.png', {})
+                    current_civilisation = Civilisation(civ_read_offset, new_name, true_name, '', new_name_id, '', rf'{CIV_IMAGE_FOLDER}/{true_name.lower()}.png', {})
                     civilisation_objects.append(current_civilisation)
                     civ_read_offset += 1
 
