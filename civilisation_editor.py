@@ -211,7 +211,7 @@ class Ui_MainWindow(object):
         self.label.setMinimumSize(QtCore.QSize(85, 65))
         self.label.setMaximumSize(QtCore.QSize(75, 60))
         self.label.setText("")
-        self.label.setPixmap(QtGui.QPixmap("../../../../../../../../OneDrive/Documents/GitHub/AOE2DE_CivCreator/Images/TechTree/dark_age.png"))
+        self.label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/dark_age.png"))
         self.label.setScaledContents(True)
         self.label.setObjectName("label")
         self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
@@ -361,7 +361,7 @@ class Ui_MainWindow(object):
         self.label_2.setMinimumSize(QtCore.QSize(85, 65))
         self.label_2.setMaximumSize(QtCore.QSize(75, 60))
         self.label_2.setText("")
-        self.label_2.setPixmap(QtGui.QPixmap("../../../../../../../../OneDrive/Documents/GitHub/AOE2DE_CivCreator/Images/TechTree/feudal_age.png"))
+        self.label_2.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/feudal_age.png"))
         self.label_2.setScaledContents(True)
         self.label_2.setObjectName("label_2")
         self.gridLayout_2.addWidget(self.label_2, 0, 0, 1, 1)
@@ -496,7 +496,7 @@ class Ui_MainWindow(object):
         self.label_3.setMinimumSize(QtCore.QSize(85, 65))
         self.label_3.setMaximumSize(QtCore.QSize(75, 60))
         self.label_3.setText("")
-        self.label_3.setPixmap(QtGui.QPixmap("../../../../../../../../OneDrive/Documents/GitHub/AOE2DE_CivCreator/Images/TechTree/castle_age.png"))
+        self.label_3.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/castle_age.png"))
         self.label_3.setScaledContents(True)
         self.label_3.setObjectName("label_3")
         self.gridLayout_3.addWidget(self.label_3, 0, 0, 1, 1)
@@ -630,7 +630,7 @@ class Ui_MainWindow(object):
         self.label_4.setMinimumSize(QtCore.QSize(85, 65))
         self.label_4.setMaximumSize(QtCore.QSize(75, 60))
         self.label_4.setText("")
-        self.label_4.setPixmap(QtGui.QPixmap("../../../../../../../../OneDrive/Documents/GitHub/AOE2DE_CivCreator/Images/TechTree/imperial_age.png"))
+        self.label_4.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/imperial_age.png"))
         self.label_4.setScaledContents(True)
         self.label_4.setObjectName("label_4")
         self.gridLayout_4.addWidget(self.label_4, 0, 0, 1, 1)
@@ -780,13 +780,7 @@ class Ui_MainWindow(object):
         self.civilisation_dropdown.currentIndexChanged.connect(self.on_civilisation_dropdown_changed)
 
     def on_civilisation_dropdown_changed(self):
-        selected_value = self.civilisation_dropdown.currentText()  # Get the current text
-        for civ in civ_objects:
-            if (civ.name == selected_value):
-                currently_selected_civilisation = civ
-                new_description = civ.description[1:-1].replace('\\n', '\n').replace('<b>', '')
-                self.civilisation_description_label.setText(new_description)
-                self.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
+        changed_civilisation_dropdown()
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -953,7 +947,7 @@ def open_project(path):
                         current_civilisation.units[currentUnit] = 2
                     elif status == "ResearchRequired":
                         current_civilisation.units[currentUnit] = 3
-
+                ui.on_civilisation_dropdown_changed
         # Get the description and description ID for each civilization
         with open(MODDED_STRINGS_FILE, 'r', encoding='utf-8') as strings_file:
             strings_lines = strings_file.read().splitlines()
@@ -973,6 +967,15 @@ def save_project():
 def quit_application():
     QApplication.quit()
 
+def changed_civilisation_dropdown():
+    selected_value = ui.civilisation_dropdown.currentText()  # Get the current text
+    for civ in civ_objects:
+        if (civ.name == selected_value):
+            currently_selected_civilisation = civ
+            new_description = civ.description[1:-1].replace('\\n', '\n').replace('<b>', '')
+            ui.civilisation_description_label.setText(new_description)
+            ui.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
+
 if __name__ == "__main__":
     # Open main window
     import sys
@@ -984,5 +987,6 @@ if __name__ == "__main__":
     MainWindow.showMaximized()
 
     open_project('')
+    changed_civilisation_dropdown()
     # Exit app
     sys.exit(app.exec_())
