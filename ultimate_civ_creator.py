@@ -18,18 +18,31 @@ import string
 import re
 import random
 from PIL import Image, ImageTk
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushButton, QFileDialog, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QSettings
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtCore import pyqtSignal
 import genieutils
 #from genieutils import GenieObjectContainer
 from genieutils.datfile import DatFile
 
 # Constants
 civilisation_objects = []
+tech_tree_blocks = []
 ORIGINAL_FOLDER = ''
 MOD_FOLDER = ''
+DATA = ''
+DATA_FILE_DAT = ''
+
+# Tech tree blocks
+'''class TechTreeBlock:
+    def __init__(self, name: str, type: str, icon: str):
+        self.name = name
+        self.type = type
+        self.icon = icon'''
 
 # Civilisation object
 class Civilisation:
@@ -42,6 +55,61 @@ class Civilisation:
         self.name_id = name_id
         self.desc_id = desc_id
         self.image_path = image_path
+
+# Create a class for the custom combo box for civilizations
+class CivilisationDropdown(QtWidgets.QComboBox):
+    def __init__(self, parent=None):
+        super(CivilisationDropdown, self).__init__(parent)
+        # Any initialization specific to this dropdown goes here
+
+        self.setEditable(True)  # Initially not editable
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent):
+    # Check if the right mouse button was clicked
+        print("click")
+        if event.button() == QtCore.Qt.RightButton:
+            # Do nothing to prevent the dropdown from closing
+            print("right click")
+            event.ignore()
+        else:
+            # Default behavior for other mouse clicks (e.g., left-click)
+            print("left click")
+            super().mousePressEvent(event)
+        
+
+# Now replace the existing MAIN_WINDOW.civilisation_dropdown with the new class
+class MainApp(QtWidgets.QMainWindow):
+    def __init__(self):
+        super(MainApp, self).__init__()
+        
+        # Create an instance of Ui_MainWindow and setup the UI
+        self.MAIN_WINDOW = Ui_MainWindow()
+        self.MAIN_WINDOW.setupUi(self)  # Pass self (the QMainWindow) as the parent
+
+        # Replace the existing combo box with the new custom class
+        self.MAIN_WINDOW.civilisation_dropdown = CivilisationDropdown(self)
+
+        #self.MAIN_WINDOW.civilisation_dropdown.addItems(["Britons", "Franks", "Teutons"])  # Example items, can be populated dynamically
+
+        # Set the layout or add this widget to the already existing one
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.MAIN_WINDOW.civilisation_dropdown)
+        self.setLayout(layout)  # Set the layout if needed or ensure the widget placement
+
+        # Add some example functionality
+        self.MAIN_WINDOW.civilisation_dropdown.currentIndexChanged.connect(self.update_civ_info)
+
+    def update_civ_info(self):
+        current_civ = self.MAIN_WINDOW.civilisation_dropdown.currentText()
+        print(f"Selected Civilization: {current_civ}")
+
+# DEBUG Show stats of a civ object
+def show_civ_object_stats(civ_object):
+    print(civ_object.index, civ_object.name)
+    print(civ_object.name_id, civ_object.true_name)
+    print(civ_object.desc_id, civ_object.description)
+    print(civ_object.image_path)
+    print(len(civ_object.units))
 
 def show_error_message(message):
     """Displays an error message using QMessageBox"""
@@ -62,32 +130,156 @@ def revert_project():
     if response == QMessageBox.Ok:
         print("You clicked OK!")
 
-def new_project():
-    # Show the CreateProjectWindow as a modal dialog
-    CreateProjectWindow.exec_()  # This makes the main window unresponsive until the dialog is closed
+def open_saving_window(title):
+    saving_dialog = QtWidgets.QDialog()
+    saving_ui = Ui_Dialog()
+    saving_ui.setupUi(saving_dialog)
+    saving_dialog.setWindowTitle(title)
+    saving_ui.progress_bar.setValue(0)
+    saving_dialog.setModal(True)  # Make it modal
+    saving_dialog.show()
 
-def open_project():
-    global ORIGINAL_FOLDER, MOD_FOLDER
+class Worker(QtCore.QObject):
+    progress = QtCore.pyqtSignal(int)
+    finished = QtCore.pyqtSignal()
+    error = QtCore.pyqtSignal(str)
 
-    try:
-        # Use QFileDialog to open a modal file explorer
-        file_dialog = QtWidgets.QFileDialog(MainWindow)
-        file_dialog.setFileMode(QtWidgets.QFileDialog.ExistingFile)
-        file_dialog.setNameFilter("Text files (*.txt)")
-        file_dialog.setWindowTitle("Open Project")
-        if file_dialog.exec_():  # Open the dialog in a modal state
-            PROJECT_FILE = file_dialog.selectedFiles()[0]  # Get the selected file
+    def __init__(self, files_to_copy):
+        super().__init__()
+        self.files_to_copy = files_to_copy
+        self._is_running = True  # To handle potential cancellation in the future
 
-            with open(PROJECT_FILE, 'r') as file:
-                lines = file.read().splitlines()
-                ORIGINAL_FOLDER = lines[0]
-                MOD_FOLDER = lines[1]
+    @QtCore.pyqtSlot()
+    def run(self):
+        total = len(self.files_to_copy)
+        for i, source in enumerate(self.files_to_copy, 1):  # 'source' is a string (file path)
+            if not self._is_running:
+                break
 
-            DATA_FILE_DAT = rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat'
-            MODDED_STRINGS_FILE = rf'{MOD_FOLDER}\resources\en\strings\key-value\key-value-modded-strings-utf8.txt'
-            CIV_TECH_TREES_FILE = rf'{MOD_FOLDER}\resources\_common\dat\civTechTrees.json'
-            CIV_IMAGE_FOLDER = rf'{MOD_FOLDER}\widgetui\textures\menu\civs'
-            #METADATA = DatFile.parse(DATA_FILE_DAT)
+            try:
+                # Construct the destination path based on the source path
+                dest = os.path.join(MOD_FOLDER, os.path.relpath(source, ORIGINAL_FOLDER))
+
+                if os.path.isdir(source):
+                    # Copy the entire directory
+                    shutil.copytree(source, dest, dirs_exist_ok=True)
+                else:
+                    # Ensure destination directory exists
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    # Copy the file
+                    shutil.copy2(source, dest)
+            except Exception as e:
+                self.error.emit(f"Error copying {source} to {dest}: {str(e)}")
+                continue
+
+            progress_percent = int((i / total) * 100)
+            self.progress.emit(progress_percent)
+
+        self.finished.emit()
+
+def new_project(project_name):
+    # File locations
+    original_folder_location = ''
+    mod_folder_location = ''
+
+    # DEBUG: Default folders
+    original_folder_location = rf'C:\Program Files (x86)\Steam\steamapps\common\AoE2DE'
+    mod_folder_location = rf'C:\Users\Micheal Q\Games\Age of Empires 2 DE\76561198021486964\mods\local'
+    CREATE_WINDOW.lineEdit_2.setText(rf"C:\Program Files (x86)\Steam\steamapps\common\AoE2DE")
+    CREATE_WINDOW.lineEdit_3.setText(rf"C:\Users\Micheal Q\Games\Age of Empires 2 DE\76561198021486964\mods\local")
+
+    # Browse for AoE2DE folder
+    def browse_original_folder():
+        try:
+            # Use QFileDialog to open a modal folder explorer with the correct parent
+            selected_dir = QtWidgets.QFileDialog.getExistingDirectory(
+                CreateProjectWindow,
+                "Select Original \"AoE2DE\" Folder",
+                "",
+                QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks
+            )
+            if selected_dir:
+                CREATE_WINDOW.lineEdit_2.setText(selected_dir)  # Set the folder path in QLineEdit
+        except Exception as e:
+            show_error_message("ERROR: " + str(e))  # Convert exception to string
+
+    def browse_mod_folder():
+        try:
+            # Use QFileDialog to open a modal folder explorer with the correct parent
+            selected_dir = QtWidgets.QFileDialog.getExistingDirectory(
+                CreateProjectWindow,
+                "Select \"/mods/local\" Folder",
+                "",
+                QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks
+            )
+            if selected_dir:
+                CREATE_WINDOW.lineEdit_3.setText(selected_dir)  # Set the folder path in QLineEdit
+        except Exception as e:
+            show_error_message("ERROR: " + str(e))  # Convert exception to string
+
+    def create_project_button():
+        # Get project name and folder paths (it may seem redundant but it's to prevent failed creation from wiping the current project's files)
+        project_name = CREATE_WINDOW.lineEdit.text()
+        original_folder_location = CREATE_WINDOW.lineEdit_2.text()
+        mod_folder_location = CREATE_WINDOW.lineEdit_3.text()
+
+        # Check that all fields are filled
+        if (project_name == ''):
+            show_error_message("ERROR: Project name cannot be blank.")
+            return
+        elif (original_folder_location == ''):
+            show_error_message("ERROR: Original AoE2DE folder path cannot be blank.")
+            return
+        elif (mod_folder_location == ''):
+            show_error_message("ERROR: Mods folder path cannot be blank.")
+            return
+
+        # Try to create a new project
+        try:
+            # Create the project folder inside the mod path (with the project name)
+            ORIGINAL_FOLDER = original_folder_location
+            MOD_FOLDER = os.path.join(mod_folder_location, project_name)
+            os.makedirs(MOD_FOLDER, exist_ok=True)
+            os.chdir(MOD_FOLDER)
+
+            # Write the project file
+            with open(f'{project_name}.txt', 'w') as file:
+                file.write(rf"{original_folder_location}\n{mod_folder_location}\{project_name}")
+
+            files_to_copy = [
+                'resources/_common/dat/civilizations.json', 
+                'resources/_common/dat/civTechTrees.json', 
+                'resources/_common/dat/empires2_x2_p1.dat', 
+                'resources/_common/wpfg/resources/civ_techtree',
+                'resources/_common/wpfg/resources/uniticons',
+                'resources/en/strings/key-value/key-value-strings-utf8.txt',
+                'resources/en/strings/key-value/key-value-modded-strings-utf8.txt',
+                'widgetui/textures/menu/civs'
+                ]
+            
+            for item in files_to_copy:
+                # Construct the full paths for the source and destination
+                source_path = os.path.join(ORIGINAL_FOLDER, item)
+                dest_path = os.path.join(MOD_FOLDER, item)
+
+                # Check if the source path exists
+                if os.path.exists(source_path):
+                    # If it's a file, copy it
+                    if os.path.isfile(source_path):
+                        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                        shutil.copy2(source_path, dest_path)
+
+                    # If it's a directory, copy it recursively
+                    elif os.path.isdir(source_path):
+                        shutil.copytree(source_path, dest_path, dirs_exist_ok=True)
+                else:
+                    print(f"Warning: {source_path} does not exist.")
+
+            # Constant files
+            CIV_TECH_TREES_FILE = rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json'
+            ORIGINAL_STRINGS_FILE = rf'{MOD_FOLDER}/resources/en/strings/key-value/key-value-strings-utf8.txt'
+            MODDED_STRINGS_FILE = rf'{MOD_FOLDER}/resources/en/strings/key-value/key-value-modded-strings-utf8.txt'
+            CIV_IMAGE_FOLDER = rf'{MOD_FOLDER}/widgetui/textures/menu/civs'
 
             # Import civilisations and create objects for them with unit values
             with open(CIV_TECH_TREES_FILE, 'r', encoding='utf-8') as file:
@@ -97,21 +289,59 @@ def open_project():
                 current_civilisation = None  # Initialize this to track the current civilisation
 
                 civ_read_offset = 0
+                found_index = 0
                 for line in lines:
                     if '\"civ_id\":' in line:
                         # Get the true name of the civilisation
                         true_name = line[16:].replace('"', '').replace(',', '').capitalize()
 
-                        # Get the name ID
-                        with open(MODDED_STRINGS_FILE, 'r', encoding='utf-8') as strings_file:
-                            strings_lines = strings_file.read().splitlines()
+                        # Write names to the string file
+                        line_to_paste = 'error'
+                        new_name = ''
+                        new_name_id = ''
+                        
+                        # Write new lines to modded strings file
+                        with open(ORIGINAL_STRINGS_FILE, 'r', encoding='utf-8') as original_strings_file:
+                            lines = original_strings_file.readlines()
+                            
+                            if (found_index == 0):
+                                for idx, line in enumerate(lines):
+                                    if rf'{10271 + civ_read_offset} ' in line:
+                                        # Paste the new line in the modded strings file
+                                        line_to_paste = line
 
-                            # Set the name ID
-                            new_name_id = re.sub(r'\D', '', strings_lines[civ_read_offset])
+                                        # Get the modded name
+                                        new_name = re.sub(r'[\d\s' + re.escape(string.punctuation) + ']', '', lines[civ_read_offset])
 
-                            # Get the modded name
-                            new_name = re.sub(r'[\d\s' + re.escape(string.punctuation) + ']', '', strings_lines[civ_read_offset])
-                            MAIN_WINDOW.civilisation_dropdown.addItem(new_name)
+                                        # Get the name ID
+                                        new_name_id = 10271 + civ_read_offset
+
+                                        # Mark the index where the item was found
+                                        found_index = idx
+                                        break
+                            else:
+                                if rf'{10271 + civ_read_offset} ' in lines[found_index + civ_read_offset]:
+                                    # Paste the new line in the modded strings file
+                                    line_to_paste = lines[found_index + civ_read_offset]
+
+                                    # Get the modded name
+                                    new_name = re.sub(r'[\d\s' + re.escape(string.punctuation) + ']', '', lines[civ_read_offset])
+
+                                    # Get the name ID
+                                    new_name_id = 10271 + civ_read_offset
+
+                        # Determine whether to overwrite the file or just append it
+                        if (civ_read_offset == 0):
+                            write_mode = 'w'
+                        else:
+                            write_mode = 'a'
+
+                        # Write names to the string file
+                        with open(MODDED_STRINGS_FILE, write_mode, encoding='utf-8') as modded_strings_file:
+                            modded_strings_file.write(line_to_paste)
+
+                        # Add the civilisation to the dropdown
+                        MAIN_WINDOW.civilisation_dropdown.addItem(new_name)
 
                         # Create Civilisation object
                         magyar_correction = ''
@@ -119,6 +349,8 @@ def open_project():
                             magyar_correction = 's'
                         current_civilisation = Civilisation(civ_read_offset, new_name, true_name, '', new_name_id, '', rf'{CIV_IMAGE_FOLDER}/{(true_name + magyar_correction).lower()}.png', {})
                         civilisation_objects.append(current_civilisation)
+
+                        # Increae the civ read offset
                         civ_read_offset += 1
 
                     elif '\"Name\":' in line and current_civilisation is not None:
@@ -133,47 +365,198 @@ def open_project():
                             current_civilisation.units[currentUnit] = 2
                         elif status == "ResearchRequired":
                             current_civilisation.units[currentUnit] = 3
-                    update_civilisation_dropdown()
+                    #MAIN_WINDOW.on_civilisation_dropdown_changed
+
             # Get the description and description ID for each civilization
-            with open(MODDED_STRINGS_FILE, 'r', encoding='utf-8') as strings_file:
-                strings_lines = strings_file.read().splitlines()
-                total_civ_count = len(civilisation_objects)
-                for i in range(total_civ_count):
-                    civilisation_objects[i].desc_id = strings_lines[total_civ_count + i][:6]
-                    civilisation_objects[i].description = strings_lines[total_civ_count + i][7:]
+            with open(ORIGINAL_STRINGS_FILE, 'r', encoding='utf-8') as original_strings_file:
+                lines = original_strings_file.readlines()
+                civ_read_offset = 0
 
-            # Populate inactive civilisations
-            MAIN_WINDOW.civilisation_dropdown.insertSeparator(MAIN_WINDOW.civilisation_dropdown.count())
-            MAIN_WINDOW.civilisation_dropdown.addItem('New...')
+                for line in enumerate(lines):
+                    if rf'{120150 + civ_read_offset} ' in line:
+                        # Paste the new line in the modded strings file
 
-            # Clear dropdowns and populate with new data
-            MAIN_WINDOW.architecture_dropdown.clear()
-            MAIN_WINDOW.language_dropdown.clear()
+                        line_to_paste = line
+                        # Get the modded description
+                        civilisation_objects[civ_read_offset].description = re.sub(r'[\d\s' + re.escape(string.punctuation) + ']', '', lines[civ_read_offset])
 
-            MAIN_WINDOW.architecture_dropdown.addItems(
-                ["African", "Central Asian", "Central European", "East Asian", "Eastern European", "Mediterranean",
-                 "Middle Eastern", "Mesoamerican", "South Asian", "Southeast Asian", "Western European"])
-            MAIN_WINDOW.language_dropdown.addItems(
-                ["Armenians [Armenian]", "Aztecs [Nahuatl]", "Bengalis [Shadhu Bengali]", "Berbers [Taqbaylit]",
-                 "Bohemians [Czech]", "Britons [Middle English]", "Bulgarians [South Slavic]", "Burgundians [Burgundian]",
-                 "Burmese [Burmese]", "Byzantines / Italians [Latin]", "Celts [Gaelic / Irish]", "Chinese [Mandarin]",
-                 "Cumans [Cuman]", "Dravidians [Tamil]", "Ethiopians [Amharic]", "Franks [Old French]", "Georgians [Georgian]",
-                 "Goths / Teutons [Old German]", "Gurjaras [Gujarati]", "Hindustanis [Hindustani]", "Mongols / Huns [Mongolian]",
-                 "Incas [Runasimi / Quechua]", "Japanese [Japanese]", "Khmer [Khmer]", "Koreans [Korean]",
-                 "Lithuanians [Lithuanian]", "Magyars [Hungarian]", "Malay [Old Malay]", "Malians [Eastern Maninka]",
-                 "Mayans [K'iche']", "Persians [Farsi / Persian]", "Poles [Polish]", "Portuguese [Portuguese]",
-                 "Romans [Vulgar Latin]", "Saracens [Arabic]", "Sicilians [Sicilian]", "Slavs [Russian]",
-                 "Spanish [Spanish]", "Tatars [Chagatai]", "Turks [Turkish]", "Vietnamese [Vietnamese]", "Vikings [Old Norse]"])
+                        # Get the desc ID
+                        civilisation_objects[civ_read_offset].desc_id = 120150 + civ_read_offset
+
+                        show_civ_object_stats(civilisation_objects[civ_read_offset])
+
+            # Open the Saving Window
+            saving_dialog = QtWidgets.QDialog()
+            saving_ui = Ui_Dialog()
+            saving_ui.setupUi(saving_dialog)
+            saving_dialog.setWindowTitle("Saving Project")
+            saving_ui.progress_bar.setValue(0)
+            saving_dialog.setModal(True)  # Make it modal
+            saving_dialog.show()
+
+            # Create a QThread
+            thread = QtCore.QThread()
+
+            # Create a Worker instance
+            worker = Worker(files_to_copy)
+
+            # Move the worker to the thread
+            worker.moveToThread(thread)
+
+            # Connect signals and slots
+            thread.started.connect(worker.run)
+            worker.progress.connect(saving_ui.progress_bar.setValue)
+            worker.finished.connect(saving_dialog.accept)  # Close the dialog when done
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            worker.error.connect(show_error_message)  # Connect error signal to error handler
+
+            # Start the thread
+            thread.start()
+
+            # Ensure the thread is safely stopped when the application closes
+            app.aboutToQuit.connect(thread.quit)
+            app.aboutToQuit.connect(thread.wait)
+
+            # Close create project window
+            MainWindow.setWindowTitle(f"Talofa - {project_name}")
+            open_project(MOD_FOLDER)
+            CreateProjectWindow.close()
+
+        except Exception as e:
+            show_error_message("ERROR: " + str(e))
+
+    # Attach the functions to the buttons
+    CREATE_WINDOW.pushButton_2.clicked.connect(browse_original_folder)
+    CREATE_WINDOW.pushButton_3.clicked.connect(browse_mod_folder)
+    CREATE_WINDOW.pushButton.clicked.connect(create_project_button)
+
+    # DEBUG Randomise name if lineEdit is empty
+    if CREATE_WINDOW.lineEdit.text() == "":  # <-- Add parentheses to call the method
+        project_name = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(5))
+        CREATE_WINDOW.lineEdit.setText(project_name)  # <-- Optionally set the randomized name in the UI
+
+    # Show the CreateProjectWindow as a modal dialog without calling show()
+    CreateProjectWindow.exec_()  # This makes the dialog modal and prevents the main window from being responsive until closed
+
+def open_project(path = None):
+    global ORIGINAL_FOLDER, MOD_FOLDER
+
+    try:
+        # Use QFileDialog to open a modal file explorer
+        if path:
+            PROJECT_FILE = path
+        else:
+            file_dialog = QtWidgets.QFileDialog(MainWindow)
+            file_dialog.setFileMode(QtWidgets.QFileDialog.ExistingFile)
+            file_dialog.setNameFilter("Text files (*.txt)")
+            file_dialog.setWindowTitle("Open Project")
+            if file_dialog.exec_():  # Open the dialog in a modal state
+                PROJECT_FILE = file_dialog.selectedFiles()[0]  # Get the selected file
+
+        with open(PROJECT_FILE, 'r') as file:
+            lines = file.read().splitlines()
+            ORIGINAL_FOLDER = lines[0]
+            MOD_FOLDER = lines[1]
+        DATA_FILE_DAT = rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat'
+        MODDED_STRINGS_FILE = rf'{MOD_FOLDER}\resources\en\strings\key-value\key-value-modded-strings-utf8.txt'
+        CIV_TECH_TREES_FILE = rf'{MOD_FOLDER}\resources\_common\dat\civTechTrees.json'
+        CIV_IMAGE_FOLDER = rf'{MOD_FOLDER}\widgetui\textures\menu\civs'
+        DATA = DatFile.parse(DATA_FILE_DAT)
+
+        # Test change
+        #DATA.techs[22].resource_costs[0].amount = 69
+        '''DATA.civs[1].units[12].disabled = 1
+        DATA.civs[1].units[12].enabled = 0
+        DATA.civs[1].units[20].disabled = 1
+        DATA.civs[1].units[20].enabled = 0
+        DATA.civs[1].units[132].disabled = 1
+        DATA.civs[1].units[132].enabled = 0
+        DATA.civs[1].units[498].disabled = 1
+        DATA.civs[1].units[12].enabled = 0
+        
+        DATA.save(DATA_FILE_DAT)'''
+
+        # Import civilisations and create objects for them with unit values
+        with open(CIV_TECH_TREES_FILE, 'r', encoding='utf-8') as file:
+            lines = file.read().splitlines()
+            MAIN_WINDOW.civilisation_dropdown.clear()  # Clear the dropdown before adding new items
+            current_civilisation = None  # Initialize this to track the current civilisation
+            civ_read_offset = 0
+            for line in lines:
+                if '\"civ_id\":' in line:
+                    # Get the true name of the civilisation
+                    true_name = line[16:].replace('"', '').replace(',', '').capitalize()
+                    # Get the name ID
+                    with open(MODDED_STRINGS_FILE, 'r', encoding='utf-8') as strings_file:
+                        strings_lines = strings_file.read().splitlines()
+                        # Set the name ID
+                        new_name_id = re.sub(r'\D', '', strings_lines[civ_read_offset])
+                        # Get the modded name
+                        new_name = re.sub(r'[\d\s' + re.escape(string.punctuation) + ']', '', strings_lines[civ_read_offset])
+                        MAIN_WINDOW.civilisation_dropdown.addItem(new_name)
+                    # Create Civilisation object
+                    magyar_correction = ''
+                    if (true_name == 'Magyar'):
+                        magyar_correction = 's'
+                    current_civilisation = Civilisation(civ_read_offset, new_name, true_name, '', new_name_id, '', rf'{CIV_IMAGE_FOLDER}/{(true_name + magyar_correction).lower()}.png', {})
+                    civilisation_objects.append(current_civilisation)
+                    civ_read_offset += 1
+                elif '\"Name\":' in line and current_civilisation is not None:
+                    # Enter new unit name
+                    currentUnit = line[18:].replace('"', '').replace(',', '')
+                elif '\"Node Status\":' in line and current_civilisation is not None:
+                    # Determine the unit's availability status and store it
+                    status = line[25:].replace('"', '').replace(',', '')
+                    if status == "ResearchedCompleted":
+                        current_civilisation.units[currentUnit] = 1
+                    elif status == "NotAvailable":
+                        current_civilisation.units[currentUnit] = 2
+                    elif status == "ResearchRequired":
+                        current_civilisation.units[currentUnit] = 3
+                update_civilisation_dropdown()
+        # Get the description and description ID for each civilization
+        with open(MODDED_STRINGS_FILE, 'r', encoding='utf-8') as strings_file:
+            strings_lines = strings_file.read().splitlines()
+            total_civ_count = len(civilisation_objects)
+            for i in range(total_civ_count):
+                civilisation_objects[i].desc_id = strings_lines[total_civ_count + i][:6]
+                civilisation_objects[i].description = strings_lines[total_civ_count + i][7:]
+        # Populate inactive civilisations
+        MAIN_WINDOW.civilisation_dropdown.insertSeparator(MAIN_WINDOW.civilisation_dropdown.count())
+        MAIN_WINDOW.civilisation_dropdown.addItem('New...')
+        # Clear dropdowns and populate with new data
+        MAIN_WINDOW.architecture_dropdown.clear()
+        MAIN_WINDOW.language_dropdown.clear()
+        MAIN_WINDOW.architecture_dropdown.addItems(
+            ["African", "Central Asian", "Central European", "East Asian", "Eastern European", "Mediterranean",
+             "Middle Eastern", "Mesoamerican", "South Asian", "Southeast Asian", "Western European"])
+        MAIN_WINDOW.language_dropdown.addItems(
+            ["Armenians [Armenian]", "Aztecs [Nahuatl]", "Bengalis [Shadhu Bengali]", "Berbers [Taqbaylit]",
+             "Bohemians [Czech]", "Britons [Middle English]", "Bulgarians [South Slavic]", "Burgundians [Burgundian]",
+             "Burmese [Burmese]", "Byzantines / Italians [Latin]", "Celts [Gaelic / Irish]", "Chinese [Mandarin]",
+             "Cumans [Cuman]", "Dravidians [Tamil]", "Ethiopians [Amharic]", "Franks [Old French]", "Georgians [Georgian]",
+             "Goths / Teutons [Old German]", "Gurjaras [Gujarati]", "Hindustanis [Hindustani]", "Mongols / Huns [Mongolian]",
+             "Incas [Runasimi / Quechua]", "Japanese [Japanese]", "Khmer [Khmer]", "Koreans [Korean]",
+             "Lithuanians [Lithuanian]", "Magyars [Hungarian]", "Malay [Old Malay]", "Malians [Eastern Maninka]",
+             "Mayans [K'iche']", "Persians [Farsi / Persian]", "Poles [Polish]", "Portuguese [Portuguese]",
+             "Romans [Vulgar Latin]", "Saracens [Arabic]", "Sicilians [Sicilian]", "Slavs [Russian]",
+             "Spanish [Spanish]", "Tatars [Chagatai]", "Turks [Turkish]", "Vietnamese [Vietnamese]", "Vikings [Old Norse]"])
+        
+        MAIN_WINDOW.architecture_dropdown.insertSeparator(MAIN_WINDOW.architecture_dropdown.count())
+        MAIN_WINDOW.language_dropdown.insertSeparator(MAIN_WINDOW.language_dropdown.count())
+        MAIN_WINDOW.architecture_dropdown.addItems(["Northeast American", "Nomadic", "Pacific", "South African", "South American"])
+        MAIN_WINDOW.language_dropdown.addItems(["Aromanian", "Cantonese", "Catalan", "Javanese", "Lakota", "Mohawk", "Somali", "Thai", "Tibetan", "Zapotec", "Zulu"])
+        #MAIN_WINDOW.update_civs(civilisation_objects)
+        #MAIN_WINDOW.changed_civilisation_dropdown()
+
+        # Test
+        #for civ in civilisation_objects:
+            #print(rf'{civ.name}: {DATA.civs[civ.index]['architecture']}')
             
-            MAIN_WINDOW.architecture_dropdown.insertSeparator(MAIN_WINDOW.architecture_dropdown.count())
-            MAIN_WINDOW.language_dropdown.insertSeparator(MAIN_WINDOW.language_dropdown.count())
-
-            MAIN_WINDOW.architecture_dropdown.addItems(["Northeast American", "Nomadic", "Pacific", "South African", "South American"])
-            MAIN_WINDOW.language_dropdown.addItems(["Aromanian", "Cantonese", "Catalan", "Javanese", "Lakota", "Mohawk", "Somali", "Thai", "Tibetan", "Zapotec", "Zulu"])
-
-            #MAIN_WINDOW.update_civs(civilisation_objects)
-            #MAIN_WINDOW.changed_civilisation_dropdown()
-            update_civilisation_dropdown()
+        
+        update_civilisation_dropdown()
 
     except Exception as e:
         show_error_message(f"An error occurred: {str(e)}")
@@ -341,7 +724,80 @@ def update_civilisation_dropdown():
                 MAIN_WINDOW.architecture_dropdown.setCurrentIndex(5)
 
 def save_project():
+    DATA.save(DATA_FILE_DAT)
     print("saving")
+
+'''class Unit_Square(QtWidgets.QWidget):  # Inherit from QWidget to add it to a layout
+    def __init__(self, name: str, type: str, coordinates: [], enabled: bool = True):
+        super().__init__()
+        self.name = name
+        self.type = type
+        self.coordinates = coordinates
+        self.enabled = enabled
+
+        # Create background image
+        self.background = QtWidgets.QLabel(self)
+        self.background.setEnabled(self.enabled)
+        self.background.setGeometry(QtCore.QRect(0, 0, 75, 75))
+        self.background.setMinimumSize(QtCore.QSize(75, 75))
+        self.background.setMaximumSize(QtCore.QSize(75, 75))
+        self.background.setAutoFillBackground(False)
+        self.background.setText("")
+        self.background.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{name.capitalize()}.png"))
+        self.background.setScaledContents(True)
+        self.background.setObjectName(rf"background_{name.lower()}")
+
+        # Create icon
+        self.icon = QtWidgets.QLabel(self)
+        self.icon.setEnabled(self.enabled)
+        self.icon.setGeometry(QtCore.QRect(20, 10, 35, 35))
+        self.icon.setMinimumSize(QtCore.QSize(35, 35))
+        self.icon.setMaximumSize(QtCore.QSize(35, 33))
+        self.icon.setText("")
+        self.icon.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{name.capitalize()}.png"))
+        self.icon.setScaledContents(True)
+        self.icon.setObjectName(rf"icon_{name.lower()}")
+
+        # Create text
+        self.text = QtWidgets.QLabel(self)
+        self.text.setEnabled(self.enabled)
+        self.text.setGeometry(QtCore.QRect(10, 46, 55, 16))
+        font = QtGui.QFont()
+        font.setPointSize(5)
+        self.text.setFont(font)
+        self.text.setStyleSheet("color: rgb(255, 255, 255);\n"
+                                "background-color: rgba(255, 255, 255, 0);")
+        self.text.setAlignment(QtCore.Qt.AlignCenter)
+        self.text.setWordWrap(True)
+        self.text.setObjectName(rf"text_{name.lower()}")
+        self.text.setText(name.title())'''
+
+class PixmapLabel(QtWidgets.QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._pixmap_path = None  # To store the pixmap path
+
+    def setPixmap(self, pixmap, pixmap_path=None):
+        super().setPixmap(pixmap)
+        self._pixmap_path = pixmap_path  # Store the path
+
+    def getPixmapPath(self):
+        return self._pixmap_path  # Return the stored path
+
+# Unit blocks
+unit_blocks = []
+class UnitBlock():
+    def __init__(self, name, unit_code, enabled):
+        self.name = name
+        self.unit_code = unit_code
+        self.enabled = enabled
+
+    def update_block(self):
+        block = getattr(MAIN_WINDOW, f"{self.name}", None)
+        if block is None:
+            print(f"Block '{self.name}' not found in MAIN_WINDOW.")
+        else:
+            block.setEnabled(self.enabled)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
@@ -353,11 +809,14 @@ if __name__ == "__main__":
     MAIN_WINDOW = Ui_MainWindow()
     MAIN_WINDOW.setupUi(MainWindow)
 
-    CREATE = Ui_CreateProjectWindow()
-    CREATE.setupUi(CreateProjectWindow)
+    CREATE_WINDOW = Ui_CreateProjectWindow()
+    CREATE_WINDOW.setupUi(CreateProjectWindow)
 
     SAVING_WINDOW = Ui_Dialog()
     SAVING_WINDOW.setupUi(SavingWindow)
+
+    # Connect Civilisation dropdown
+    #MAIN_WINDOW.civilisation_dropdown = CivilisationDropdown(QtWidgets.QComboBox)
 
     # Set application images
     MAIN_WINDOW.label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/dark_age.png"))
@@ -365,7 +824,59 @@ if __name__ == "__main__":
     MAIN_WINDOW.label_3.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/castle_age.png"))
     MAIN_WINDOW.label_4.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/imperial_age.png"))
 
+    # Setup objects
+    #unit_codes = [4, 24, 492, 7, 6, 1155, 185, 5, 39, 474, 873, 875, 583, 586, 437, 'Parthian TacticsR', 'Archery RangeB', 'MilitiaU', 'Man-at-ArmsU', 'Long SwordsmanU', 'Two-Handed SwordsmanU', 'ChampionU', 'SuppliesR', 'GambesonsR', 'SpearmanU', 'PikemanU', 'HalberdierU', 'BarracksB', 'Eagle ScoutU', 'Eagle WarriorU', 'Elite Eagle WarriorU', 'SquiresR', 'CondottieroX', 'ArsonR', 'Scout CavalryU', 'Light CavalryU', 'HussarU', 'BloodlinesR', 'Shrivamsha RiderX', 'Elite Shrivamsha RiderX', 'KnightU', 'CavalierU', 'PaladinU', 'Steppe LancerU', 'Elite Steppe LancerU', 'StableB', 'Camel ScoutX', 'Camel RiderU', 'Heavy Camel RiderU', 'Imperial Camel RiderX', 'Battle ElephantU', 'Elite Battle ElephantU', 'HusbandryR', 'Battering RamU', 'Capped RamU', 'Siege RamU', 'Armored ElephantU', 'Siege ElephantU', 'Flaming CamelX', 'Siege WorkshopB', 'MangonelU', 'OnagerU', 'Siege OnagerU', 'ScorpionU', 'Heavy ScorpionU', 'Siege TowerU', 'Bombard CannonU', 'HoufniceX', 'Padded Archer ArmorR', 'Leather Archer ArmorR', 'Ring Archer ArmorR', 'FletchingR', 'Bodkin ArrowR', 'BracerR', 'BlacksmithB', 'ForgingR', 'Iron CastingR', 'Blast FurnaceR', 'Scale Barding ArmorR', 'Chain Barding ArmorR', 'Plate Barding ArmorR', 'Scale Mail ArmorR', 'Chain Mail ArmorR', 'Plate Mail ArmorR', 'Fishing ShipU', 'Fire GalleyU', 'Fire ShipU', 'Fast Fire ShipU', 'Transport ShipU', 'Trade CogU', 'GillnetsR', 'Cannon GalleonU', 'Elite Cannon GalleonU', 'Demolition RaftU', 'Demolition ShipU', 'Heavy Demolition ShipU', 'GalleyU', 'War GalleyU', 'GalleonU', 'DromonU', 'DockB', 'Turtle ShipU', 'Elite Turtle ShipU', 'CareeningR', 'Dry DockR', 'ShipwrightR', 'Fish TrapB', 'MasonryR', 'ArchitectureR', 'Fortified WallR', 'ChemistryR', 'Bombard TowerR', 'BallisticsR', 'Siege EngineersR', 'UniversityB', 'Guard TowerR', 'KeepR', 'Heated ShotR', 'ArrowslitsR', 'Murder HolesR', 'Treadmill CraneR', 'OutpostB', 'Watch TowerB', 'Guard TowerBB', 'KeepBB', 'Bombard TowerBB', 'Palisade WallB', 'Palisade GateB', 'GateB', 'Stone WallB', 'Fortified WallBB', 'Unique UnitX', 'Elite Unique UnitX', 'PetardU', 'TrebuchetU', 'Castle TechR', 'Imperial TechR', 'CastleB', 'HoardingsR', 'SappersR', 'ConscriptionR', 'SpiesR', 'KrepostB', 'KonnikX', 'Elite KonnikX', 'DonjonB', 'SerjeantX', 'Elite SerjeantX', 'SpearmanXU', 'PikemanXU', 'HalberdierXU', 'MonkU', 'IlluminationR', 'MissionaryX', 'Block PrintingR', 'DevotionR', 'FaithR', 'RedemptionR', 'TheocracyR', 'MonasteryB', 'AtonementR', 'Herbal MedicineR', 'HeresyR', 'SanctityR', 'FervorR', 'Fortified ChurchB', 'Warrior PriestX', 'HouseB', 'VillagerU', 'Town WatchR', 'Town PatrolR', 'Town CenterB', 'Feudal AgeR', 'Castle AgeR', 'Imperial AgeR', 'LoomR', 'WheelbarrowR', 'Hand CartR', 'WonderB', 'FeitoriaB', 'CaravanseraiB', 'Mining CampB', 'Gold MiningR', 'Gold Shaft MiningR', 'Stone MiningR', 'Stone Shaft MiningR', 'Mule CartB', 'Lumber CampB', 'Double-Bit AxeR', 'Bow SawR', 'Two-Man SawR', 'MarketB', 'Trade CartU', 'CoinageR', 'BankingR', 'CaravanR', 'GuildsR', 'FolwarkB', 'FarmB', 'MillB', 'Horse CollarR', 'Heavy PlowR', 'Crop RotationR']:
+    for unit in ['ArcherU', 'CrossbowmanU', 'ArbalesterU', 'SkirmisherU', 'Elite SkirmisherU', 'Imperial SkirmisherX', 'SlingerX', 'Hand CannoneerU', 'Cavalry ArcherU', 'Heavy Cavalry ArcherU', 'Elephant ArcherU', 'Elite Elephant ArcherU', 'GenitourX', 'Elite GenitourX', 'Thumb RingR', 'Parthian TacticsR', 'Archery RangeB', 'MilitiaU', 'Man-at-ArmsU', 'Long SwordsmanU', 'Two-Handed SwordsmanU', 'ChampionU', 'SuppliesR', 'GambesonsR', 'SpearmanU', 'PikemanU', 'HalberdierU', 'BarracksB', 'Eagle ScoutU', 'Eagle WarriorU', 'Elite Eagle WarriorU', 'SquiresR', 'CondottieroX', 'ArsonR', 'Scout CavalryU', 'Light CavalryU', 'HussarU', 'BloodlinesR', 'Shrivamsha RiderX', 'Elite Shrivamsha RiderX', 'KnightU', 'CavalierU', 'PaladinU', 'Steppe LancerU', 'Elite Steppe LancerU', 'StableB', 'Camel ScoutX', 'Camel RiderU', 'Heavy Camel RiderU', 'Imperial Camel RiderX', 'Battle ElephantU', 'Elite Battle ElephantU', 'HusbandryR', 'Battering RamU', 'Capped RamU', 'Siege RamU', 'Armored ElephantU', 'Siege ElephantU', 'Flaming CamelX', 'Siege WorkshopB', 'MangonelU', 'OnagerU', 'Siege OnagerU', 'ScorpionU', 'Heavy ScorpionU', 'Siege TowerU', 'Bombard CannonU', 'HoufniceX', 'Padded Archer ArmorR', 'Leather Archer ArmorR', 'Ring Archer ArmorR', 'FletchingR', 'Bodkin ArrowR', 'BracerR', 'BlacksmithB', 'ForgingR', 'Iron CastingR', 'Blast FurnaceR', 'Scale Barding ArmorR', 'Chain Barding ArmorR', 'Plate Barding ArmorR', 'Scale Mail ArmorR', 'Chain Mail ArmorR', 'Plate Mail ArmorR', 'Fishing ShipU', 'Fire GalleyU', 'Fire ShipU', 'Fast Fire ShipU', 'Transport ShipU', 'Trade CogU', 'GillnetsR', 'Cannon GalleonU', 'Elite Cannon GalleonU', 'Demolition RaftU', 'Demolition ShipU', 'Heavy Demolition ShipU', 'GalleyU', 'War GalleyU', 'GalleonU', 'DromonU', 'DockB', 'Turtle ShipU', 'Elite Turtle ShipU', 'CareeningR', 'Dry DockR', 'ShipwrightR', 'Fish TrapB', 'MasonryR', 'ArchitectureR', 'Fortified WallR', 'ChemistryR', 'Bombard TowerR', 'BallisticsR', 'Siege EngineersR', 'UniversityB', 'Guard TowerR', 'KeepR', 'Heated ShotR', 'ArrowslitsR', 'Murder HolesR', 'Treadmill CraneR', 'OutpostB', 'Watch TowerB', 'Guard TowerBB', 'KeepBB', 'Bombard TowerBB', 'Palisade WallB', 'Palisade GateB', 'GateB', 'Stone WallB', 'Fortified WallBB', 'Unique UnitX', 'Elite Unique UnitX', 'PetardU', 'TrebuchetU', 'Castle TechR', 'Imperial TechR', 'CastleB', 'HoardingsR', 'SappersR', 'ConscriptionR', 'SpiesR', 'KrepostB', 'KonnikX', 'Elite KonnikX', 'DonjonB', 'SerjeantX', 'Elite SerjeantX', 'SpearmanXU', 'PikemanXU', 'HalberdierXU', 'MonkU', 'IlluminationR', 'MissionaryX', 'Block PrintingR', 'DevotionR', 'FaithR', 'RedemptionR', 'TheocracyR', 'MonasteryB', 'AtonementR', 'Herbal MedicineR', 'HeresyR', 'SanctityR', 'FervorR', 'Fortified ChurchB', 'Warrior PriestX', 'HouseB', 'VillagerU', 'Town WatchR', 'Town PatrolR', 'Town CenterB', 'Feudal AgeR', 'Castle AgeR', 'Imperial AgeR', 'LoomR', 'WheelbarrowR', 'Hand CartR', 'WonderB', 'FeitoriaB', 'CaravanseraiB', 'Mining CampB', 'Gold MiningR', 'Gold Shaft MiningR', 'Stone MiningR', 'Stone Shaft MiningR', 'Mule CartB', 'Lumber CampB', 'Double-Bit AxeR', 'Bow SawR', 'Two-Man SawR', 'MarketB', 'Trade CartU', 'CoinageR', 'BankingR', 'CaravanR', 'GuildsR', 'FolwarkB', 'FarmB', 'MillB', 'Horse CollarR', 'Heavy PlowR', 'Crop RotationR']:
+        try:
+            # Check the pixmap path and determine type
+            if unit[-1] == 'U':
+                type = 'unit'
+            elif unit[-1] == 'B':
+                type = 'building'
+            elif unit[-1] == 'R':
+                type = 'research'
+            elif unit[-1] == 'X':
+                type = 'unique'
+
+            # Format the new name
+            if unit[-2] == 'X':
+                unit_name = unit[:-2]
+            else:
+                unit_name = unit[:-1]
+            file_name = unit[:-1].replace(' ', '_').replace('-', '0')
+            #print(unit_name)
+
+            # Dynamically get the PixmapLabel for the icon and background based on the unit name
+            icon_label = getattr(MAIN_WINDOW, f"{file_name}_3")
+            bg_label = getattr(MAIN_WINDOW, f"{file_name}_2")
+
+            # Disable all units upon load
+            #getattr(MAIN_WINDOW, f"{file_name}").setEnabled(False)
+
+            # Set the pixmaps dynamically, storing the paths
+            icon_label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{unit_name}.png"))
+
+            # Set the background pixmap based on type
+            bg_label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{type}.png"))
+            #MAIN_WINDOW.Crossbowman_icon.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/Crossbowman.png"))
+
+            # Add new block to the list
+            unit_blocks.append(UnitBlock(unit[:-1], 0, True))
+        
+        except:
+            print(rf'Failed Block: {unit}')
+    # Set images for tech tree block
+    #Unit_Square("Crossbowman", 'building')
+    #MAIN_WINDOW.background.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/unit.png"))
+    #MAIN_WINDOW.icon.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/archer.png"))
+    #MAIN_WINDOW.text.setText("Archer")
+
+    unit_blocks[3].enabled = False
+    unit_blocks[3].update_block()
+
     # Show the main window
+    MainWindow.setWindowTitle(f"Talofa")
+    MainWindow.setWindowIcon(QtGui.QIcon(rf"{os.path.dirname(os.path.abspath(__file__))}\Images\UI\flower.ico"))
     MainWindow.showMaximized()
 
     # Assign functions to navigation buttons
@@ -374,7 +885,39 @@ if __name__ == "__main__":
     MAIN_WINDOW.actionSave_Project.triggered.connect(save_project)
     MAIN_WINDOW.actionRevert_To_Original.triggered.connect(revert_project)
 
-    # Update the stats when the civilisation dropdown is changed
-    MAIN_WINDOW.civilisation_dropdown.currentIndexChanged.connect(update_civilisation_dropdown)
+    #combo = CivilisationDropdown()
+    #combo.addItems(['Britons', 'Franks', 'Japanese'])
 
-    sys.exit(app.exec_())  # Run the application's event loop
+# Set up tech tree
+'''class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Main Window Example")
+        print("show item")
+        
+        # Create central widget and set layout
+        central_widget = QtWidgets.QWidget(self)
+        self.setCentralWidget(central_widget)
+        layout = QtWidgets.QVBoxLayout(central_widget)  # A vertical layout for simplicity
+
+        # Create and add Unit_Square instance to layout
+        unit_square = Unit_Square(name="Crossbowman", type="Infantry", coordinates=[10, 20], enabled=True)
+        layout.addWidget(unit_square)
+
+    # Test layout
+    MAIN_WINDOW.background.setEnabled(True)
+    MAIN_WINDOW.background.setGeometry(QtCore.QRect(0, 0, 75, 75))
+    MAIN_WINDOW.background.setMinimumSize(QtCore.QSize(75, 75))
+    MAIN_WINDOW.background.setMaximumSize(QtCore.QSize(75, 75))
+    MAIN_WINDOW.background.setAutoFillBackground(False)
+    MAIN_WINDOW.background.setText("")
+    MAIN_WINDOW.background.setPixmap(QtGui.QPixmap("../../../../../../../../OneDrive/Documents/GitHub/AOE2DE_CivCreator/Images/TechTree/unit.png"))
+    MAIN_WINDOW.background.setScaledContents(True)
+    MAIN_WINDOW.background.setObjectName("background")'''
+
+#special_ui.setup_custom_dropbox()    
+
+# Update the stats when the civilisation dropdown is changed
+MAIN_WINDOW.civilisation_dropdown.currentIndexChanged.connect(update_civilisation_dropdown)
+
+sys.exit(app.exec_())  # Run the application's event loop

@@ -1,0 +1,212 @@
+Archery Range: 10 14 87
+Archer: 4
+Crossbowman: 24
+Arbalester: 492
+Skirmisher: 7
+Elite Skirmisher: 6
+Imperial Skirmisher: 1155
+Slinger: 185
+Hand Cannoneer: 5
+Cavalry Archer: 39
+Heavy Cavalry Archer: 474
+El arch: 873
+Elite El arch: 875
+Genitour: 583
+El Geni: 596
+thumb ring:
+partian: 
+
+Barracks: 12 20 132 498
+Militia: 74
+Manatarms: 75
+Longsw: 77
+2Hand: 473
+Champ: 567
+Legionary: 1793
+Spear: 93
+Pike: 358
+scout: 751
+warrior: 753
+el warrior: 752
+condo: 184
+Flemish: 1699
+supplies:
+gambesons:
+squires:
+arson:
+
+stable: 86 101 153
+scout cav: 448
+light cav: 546
+hussar: 441
+winged hussar: 1707
+shriv: 1751
+el shriv: 1753
+knight: 38
+cavalier: 283
+paladin: 569
+steppe lancer: 1370
+el steppe: 1372
+savar: 1813
+camel scout: 1755
+camel rider: 329
+hv camel: 330
+imp camel: 207
+bat ele: 1132
+el bat ele: 1134
+xolo: 1570
+bloodlines:
+husbandry:
+
+siege workshop: 49 150
+ram: 35
+cap ram: 422
+siege ram: 548
+arm ele: 1744
+siege ele: 1746
+mangonel: 280
+ong: 550
+s ong: 588
+scorp: 279
+hv scorp: 542
+s tower: 885
+bombcan: 36
+houfnice: 1709
+
+Blacksmith: 18 19 103 105
+pad arch:
+lea arch:
+ring arch:
+fletching:
+bodkin:
+bracer:
+forging:
+iron:
+blast:
+scale bard:
+chain bard:
+plate bard:
+scale mail:
+chain mail:
+plate mail:
+
+Dock: 45 47 51 133 805 806 807 808
+harbor: 1189
+fish trap: 199
+fishing: 13
+fire gal: 1103
+fire ship: 529
+fast fire: 532
+transport: 545
+trade cog: 17
+can gal: 420
+el can gal: 691
+demo raft: 1104
+demo ship: 527
+hv demo ship: 528
+galley: 539
+war gal: 21
+galleon: 442
+turt: 831
+el turt: 832
+longboat: 250
+el longboat: 533
+caravel: 1004
+el carv: 1006
+thirisadai: 1750
+gillnets:
+careening:
+dry dock:
+shipwright:
+
+University: 209 210
+masonry:
+architecture:
+fortified wall:
+chemistry:
+bombard tower:
+ballistics
+siege engineers:
+guard tower:
+keep:
+heated shot:
+arrowslits:
+murder holes:
+treadmimll crane:
+
+outpost: 598
+watch: 79
+guard: 234
+keep: 235
+bombard: 236
+palisade wall: 72
+palisade gate: 789 790-804
+gate: 64 78 81 88 91 95 487 490 661 663 665 667 669 671 673 1192
+stone wall:
+fortified wall:
+
+Castle: 82
+unique:
+el unique:
+petard: 440
+treb: 331
+castle tech:
+imperial tech:
+hoardings:
+sappers:
+conscription:
+spies:
+
+Monastery: 30 31 32 104
+fortified church: 1806
+monk: 125
+missionary: 775
+warrior priest: 1811
+illumination
+block printing
+devotion
+faith
+redemption
+theocracy
+atonement
+herbal medicine
+heresy
+sancity
+fervor
+
+House: 70 191 192 463 464 465
+Town watch: 
+town patrol:
+loom:
+wheelbarrow
+hand cart
+
+feitoria: 1021
+caravanserai: 1754
+
+mining camp: 584-587
+gold mining:
+stone mining:
+gold shaft:
+stone shaft:
+
+mule cart: 1808
+
+lumber camp: 562-565
+double bit axe:
+bow saw:
+2man:
+
+market: XXX
+coinage:
+banking:
+caravan:
+guilds:
+
+folwark: 1711 1720 1734
+farm: 50
+
+mill: 68 129-131
+horse collar
+heavy plow
+crop rotation
