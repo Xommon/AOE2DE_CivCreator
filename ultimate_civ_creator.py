@@ -36,6 +36,7 @@ ORIGINAL_FOLDER = ''
 MOD_FOLDER = ''
 DATA = ''
 DATA_FILE_DAT = ''
+unique_unit = ''
 
 # Tech tree blocks
 '''class TechTreeBlock:
@@ -584,21 +585,46 @@ def update_civilisation_dropdown():
             MAIN_WINDOW.civilisation_description_label.setText(new_description)
             MAIN_WINDOW.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
 
+            # Rename unique units
+            match = re.search(r"Unique Unit:\s*([^\(]+)", new_description)
+            if not match:
+                match = re.search(r"Unique Units:\s*([^\(]+)", new_description)
+
+            if match:
+                unique_unit = match.group(1).strip()
+            else:
+                print("Unique Unit not found.")
+
+            try:
+                for block in unit_blocks:
+                    if block.name == 'Unique Unit':
+                        getattr(MAIN_WINDOW, f"Unique_Unit_4").setText(unique_unit)
+                        getattr(MAIN_WINDOW, f"Unique_Unit_3").setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{unique_unit}.png"))
+                    if block.name == 'Elite Unique Unit':
+                        getattr(MAIN_WINDOW, f"Elite_Unique_Unit_4").setText(rf'Elite {unique_unit}')
+                        getattr(MAIN_WINDOW, f"Elite_Unique_Unit_3").setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{unique_unit}.png"))
+            except Exception as e:
+                print(str(e))
+
             # Update the tech tree
             for block in unit_blocks:
-                block.disable()
+                if block.name != 'Unique Unit' and block.name != 'Elite Unique Unit' and block.name != 'Castle Tech' and block.name != 'Imperial Tech' and block.name != 'Trebuchet' and block.name != 'Spies':
+                    block.disable()
+                else:
+                    block.enable()
 
                 try:
                     if civ.units[block.name] == 1 or civ.units[block.name] == 3:
                         block.enable()
                 except:
                     continue
-            '''for key, value in civ.units.items():
+                
+            for key, value in civ.units.items():
                 for block in unit_blocks:
                     if block.name == key:
                         if value == 1 or value == 3:
                             block.enable()
-                            break'''
+                            break
 
             # DEBUG Set architecture and sound
             if (civ.true_name == 'Britons'):
@@ -883,8 +909,9 @@ if __name__ == "__main__":
             file_name = unit[:-1].replace(' ', '_').replace('-', '0')
 
             # Dynamically get the PixmapLabel for the icon and background based on the unit name
-            icon_label = getattr(MAIN_WINDOW, f"{file_name}_3")
             bg_label = getattr(MAIN_WINDOW, f"{file_name}_2")
+            icon_label = getattr(MAIN_WINDOW, f"{file_name}_3")
+            text_label = getattr(MAIN_WINDOW, f"{file_name}_4")
             push_button = getattr(MAIN_WINDOW, f"{file_name}_5")
 
             # Set the pixmaps dynamically, storing the paths
