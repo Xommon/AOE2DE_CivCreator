@@ -580,15 +580,25 @@ def update_civilisation_dropdown():
     selected_value = MAIN_WINDOW.civilisation_dropdown.currentText()  # Get the current text
     for civ in civilisation_objects:
         if (civ.name == selected_value):
-            currently_selected_civilisation = civ
             new_description = civ.description[1:-1].replace('\\n', '\n').replace('<b>', '')
             MAIN_WINDOW.civilisation_description_label.setText(new_description)
             MAIN_WINDOW.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
 
             # Update the tech tree
-            #print(len(civ.units))
-            #for key, value in civ.units:
-            #    print(rf'{key}: {value}')
+            for block in unit_blocks:
+                block.disable()
+
+                try:
+                    if civ.units[block.name] == 1 or civ.units[block.name] == 3:
+                        block.enable()
+                except:
+                    continue
+            '''for key, value in civ.units.items():
+                for block in unit_blocks:
+                    if block.name == key:
+                        if value == 1 or value == 3:
+                            block.enable()
+                            break'''
 
             # DEBUG Set architecture and sound
             if (civ.true_name == 'Britons'):
@@ -791,17 +801,17 @@ class PixmapLabel(QtWidgets.QLabel):
 # Unit blocks
 unit_blocks = []
 class UnitBlock():
-    def __init__(self, name, unit_code, enabled):
+    def __init__(self, name, type, unit_code, enabled):
         self.name = name
         self.unit_code = unit_code
         self.enabled = enabled
-
+        self.type = type
         file_name = self.name.replace(' ', '_').replace('-', '0')
 
         parent_widget = getattr(MAIN_WINDOW, f"{file_name}")
         self.disable_label = QtWidgets.QLabel(parent_widget)
         self.disable_label.setGeometry(0, 0, 75, 75)
-        self.disable_label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/disabled.png"))
+        self.disable_label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/disabled_2.png"))
         self.disable_label.setObjectName(f"{file_name}_6")
         self.opacity_effect = QtWidgets.QGraphicsOpacityEffect()
         self.opacity_effect.setOpacity(0)  # Initially set to 0 (enabled)
@@ -809,16 +819,22 @@ class UnitBlock():
         self.disable_label.show()
         self.disable_label.setScaledContents(True)
 
+    def enable(self):
+        self.enabled = True
+        self.opacity_effect.setOpacity(0)
+        self.disable_label.setGraphicsEffect(self.opacity_effect)
+
+    def disable(self):
+        self.enabled = False
+        self.opacity_effect.setOpacity(0.75)
+        self.disable_label.setGraphicsEffect(self.opacity_effect)
+
     def on_button_clicked(self):
         # Toggle the enabled state
-        self.enabled = not self.enabled
-
         if self.enabled:
-            self.opacity_effect.setOpacity(0)
+            self.disable()
         else:
-            self.opacity_effect.setOpacity(0.85)
-        
-        self.disable_label.setGraphicsEffect(self.opacity_effect)
+            self.enable()
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
@@ -896,7 +912,7 @@ if __name__ == "__main__":
             #pushButton.setStyleSheet("background-color: transparent; border: none;")
 
             # Add new block to the list
-            new_block = UnitBlock(unit[:-1], -1, True)
+            new_block = UnitBlock(unit[:-1], type, -1, True)
             unit_blocks.append(new_block)
 
             # Connect the button click to a function
