@@ -515,7 +515,7 @@ def open_project(path = None):
                         current_civilisation.units[currentUnit] = 2
                     elif status == "ResearchRequired":
                         current_civilisation.units[currentUnit] = 3
-                update_civilisation_dropdown()
+                #update_civilisation_dropdown()
         # Get the description and description ID for each civilization
         with open(MODDED_STRINGS_FILE, 'r', encoding='utf-8') as strings_file:
             strings_lines = strings_file.read().splitlines()
@@ -555,7 +555,6 @@ def open_project(path = None):
         #for civ in civilisation_objects:
             #print(rf'{civ.name}: {DATA.civs[civ.index]['architecture']}')
             
-        
         update_civilisation_dropdown()
 
     except Exception as e:
@@ -585,6 +584,11 @@ def update_civilisation_dropdown():
             new_description = civ.description[1:-1].replace('\\n', '\n').replace('<b>', '')
             MAIN_WINDOW.civilisation_description_label.setText(new_description)
             MAIN_WINDOW.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
+
+            # Update the tech tree
+            #print(len(civ.units))
+            #for key, value in civ.units:
+            #    print(rf'{key}: {value}')
 
             # DEBUG Set architecture and sound
             if (civ.true_name == 'Britons'):
@@ -792,12 +796,29 @@ class UnitBlock():
         self.unit_code = unit_code
         self.enabled = enabled
 
-    def update_block(self):
-        block = getattr(MAIN_WINDOW, f"{self.name}", None)
-        if block is None:
-            print(f"Block '{self.name}' not found in MAIN_WINDOW.")
+        file_name = self.name.replace(' ', '_').replace('-', '0')
+
+        parent_widget = getattr(MAIN_WINDOW, f"{file_name}")
+        self.disable_label = QtWidgets.QLabel(parent_widget)
+        self.disable_label.setGeometry(0, 0, 75, 75)
+        self.disable_label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/disabled.png"))
+        self.disable_label.setObjectName(f"{file_name}_6")
+        self.opacity_effect = QtWidgets.QGraphicsOpacityEffect()
+        self.opacity_effect.setOpacity(0)  # Initially set to 0 (enabled)
+        self.disable_label.setGraphicsEffect(self.opacity_effect)
+        self.disable_label.show()
+        self.disable_label.setScaledContents(True)
+
+    def on_button_clicked(self):
+        # Toggle the enabled state
+        self.enabled = not self.enabled
+
+        if self.enabled:
+            self.opacity_effect.setOpacity(0)
         else:
-            block.setEnabled(self.enabled)
+            self.opacity_effect.setOpacity(0.85)
+        
+        self.disable_label.setGraphicsEffect(self.opacity_effect)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
@@ -844,35 +865,52 @@ if __name__ == "__main__":
             else:
                 unit_name = unit[:-1]
             file_name = unit[:-1].replace(' ', '_').replace('-', '0')
-            #print(unit_name)
 
             # Dynamically get the PixmapLabel for the icon and background based on the unit name
             icon_label = getattr(MAIN_WINDOW, f"{file_name}_3")
             bg_label = getattr(MAIN_WINDOW, f"{file_name}_2")
-
-            # Disable all units upon load
-            #getattr(MAIN_WINDOW, f"{file_name}").setEnabled(False)
+            push_button = getattr(MAIN_WINDOW, f"{file_name}_5")
 
             # Set the pixmaps dynamically, storing the paths
             icon_label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{unit_name}.png"))
 
             # Set the background pixmap based on type
             bg_label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{type}.png"))
-            #MAIN_WINDOW.Crossbowman_icon.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/Crossbowman.png"))
+
+            # Add disable image
+            parent_widget = getattr(MAIN_WINDOW, f"{file_name}")
+            disable_label = QtWidgets.QLabel(parent_widget)
+            disable_label.setGeometry(0, 0, 75, 75)
+            disable_label.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/disabled.png"))
+            disable_label.setObjectName(f"{file_name}_5")
+            opacity_effect = QtWidgets.QGraphicsOpacityEffect()
+            opacity_effect.setOpacity(0)
+            disable_label.setGraphicsEffect(opacity_effect)
+            disable_label.show()
+            disable_label.setScaledContents(True)
+
+            # Turn the box into a push button
+            #pushButton = QtWidgets.QPushButton(parent_widget)
+            #pushButton.setGeometry(QtCore.QRect(0, 0, 75, 75))  # Position of the button
+            #pushButton.setObjectName(rf"{unit_name}_button")
+            #pushButton.setStyleSheet("background-color: transparent; border: none;")
 
             # Add new block to the list
-            unit_blocks.append(UnitBlock(unit[:-1], 0, True))
-        
-        except:
-            print(rf'Failed Block: {unit}')
-    # Set images for tech tree block
-    #Unit_Square("Crossbowman", 'building')
-    #MAIN_WINDOW.background.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/unit.png"))
-    #MAIN_WINDOW.icon.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/archer.png"))
-    #MAIN_WINDOW.text.setText("Archer")
+            new_block = UnitBlock(unit[:-1], -1, True)
+            unit_blocks.append(new_block)
 
-    unit_blocks[3].enabled = False
-    unit_blocks[3].update_block()
+            # Connect the button click to a function
+            push_button.setStyleSheet("background-color: transparent; border: none;")
+            push_button.raise_()
+            #push_button.setEnabled(True)
+            push_button.clicked.connect(new_block.on_button_clicked)
+        
+        except Exception as e:
+            print(rf'Failed Block: {unit} : {str(e)}')
+
+    # DEBUG Disable a button
+    #unit_blocks[0].disabled = True
+    #unit_blocks[0].update_block()
 
     # Show the main window
     MainWindow.setWindowTitle(f"Talofa")
