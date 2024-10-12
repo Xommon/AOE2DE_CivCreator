@@ -833,14 +833,12 @@ class PixmapLabel(QtWidgets.QLabel):
 # Unit blocks
 unit_blocks = []
 class UnitBlock():
-    def __init__(self, index, name, type, unit_code, enabled, enable_list, disable_list):
+    def __init__(self, index, name, type, unit_code, enabled):
         self.index = index
         self.name = name
         self.unit_code = unit_code
         self.enabled = enabled
         self.type = type
-        self.disable_list = disable_list
-        self.enable_list = enable_list
         file_name = self.name.replace(' ', '_').replace('-', '0')
 
         parent_widget = getattr(MAIN_WINDOW, f"{file_name}")
@@ -855,25 +853,106 @@ class UnitBlock():
         self.disable_label.setScaledContents(True)
 
         self.hierarchies = [
-    (16, 0, 1, 2), (16, 3, 4, 5), (16, 6), (16, 7), (16, 8, 9), (16, 10, 11), (16, 12, 13), 
-    (16, 14), (16, 15), (27, 17, 18, 19, 20, 21), (27, 22, 23), (27, 24, 25, 26), 
-    (27, 28, 29, 30), (27, 31), (27, 32), (27, 33), (45, 34, 35, 36), (45, 37), 
-    (45, 38, 39), (45, 40, 41, 42), (45, 43, 44), (45, 46), (45, 47, 48, 49), 
-    (45, 50, 51), (45, 52), (59, 53, 54, 55), (59, 56, 57), (59, 58), (59, 60, 61, 62), 
-    (59, 63, 64), (59, 65), (59, 66, 67), (74, 68, 69, 70), (74, 71, 72, 73), 
-    (74, 75, 76, 77), (74, 78, 79, 80), (74, 81, 82, 83), (100, 84), (100, 85, 86, 87), 
-    (100, 88), (100, 89), (100, 90), (100, 91, 92), (100, 93, 94, 95), (100, 96, 97, 98), 
-    (100, 99), (100, 101, 102), (100, 103, 104), (100, 105), (100, 106), (114, 107, 108), 
-    (114, 109), (114, 110, 111), (114, 112), (114, 113), (114, 115, 116), (114, 117), 
-    (114, 118), (114, 119), (114, 120),
-    (137, 131, 132), (137, 133), (137, 134), (137, 135, 136), (137, 138), 
-    (137, 139), (137, 140), (137, 141), (142, 143, 144), (145, 146, 147), (145, 148, 149, 150), 
-    (159, 151), (159, 152), (159, 153), (159, 154), (159, 155, 156), (159, 157), (159, 158), 
-    (159, 160), (159, 161), (159, 162), (159, 163), (159, 164), (165, 166), (171, 168), 
-    (171, 169, 170), (171, 172, 173, 174), (171, 175), (171, 176, 177), (191, 192), 
-    (191, 193, 194), (191, 195), (191, 196), (122, 123, 124), (129, 130), (182, 183), (184, 185), (188, 189, 190), (200, 201, 202)
-]
-        self.equals = [(24, 148), (25, 149), (26, 150), (111, 125), (109, 130), (115, 123), (116, 124)]
+            (16, 0, 1, 2),
+            (16, 3, 4, 5),
+            (16, 6),
+            (16, 7),
+            (16, 8, 9),
+            (16, 10, 11),
+            (16, 12, 13),
+            (16, 14),
+            (16, 15),
+            (27, 17, 18, 19, 20, 21),
+            (27, 22, 23),
+            (27, 24, 25, 26),
+            (27, 28, 29, 30),
+            (27, 31),
+            (27, 32),
+            (27, 33),
+            (45, 34, 35, 36),
+            (45, 37),
+            (45, 38, 39),
+            (45, 40, 41, 42),
+            (45, 43, 44),
+            (45, 46),
+            (45, 47, 48, 49),
+            (45, 50, 51),
+            (45, 52),
+            (59, 53, 54, 55),
+            (59, 56, 57),
+            (59, 58),
+            (59, 60, 61, 62),
+            (59, 63, 64),
+            (59, 65),
+            (59, 66, 67),
+            (74, 68, 69, 70),
+            (74, 71, 72, 73),
+            (74, 75, 76, 77),
+            (74, 78, 79, 80),
+            (74, 81, 82, 83),
+            (100, 84),
+            (100, 85, 86, 87),
+            (100, 88),
+            (100, 89),
+            (100, 90),
+            (100, 91, 92),
+            (100, 93, 94, 95),
+            (100, 96, 97, 98),
+            (100, 99),
+            (100, 101, 102),
+            (100, 103, 104),
+            (100, 105),
+            (100, 106),
+            (114, 107, 108),
+            (114, 109),
+            (114, 110, 111),
+            (114, 112),
+            (114, 113),
+            (114, 115, 116),
+            (114, 117),
+            (114, 118),
+            (114, 119),
+            (114, 120),
+            (137, 131, 132),
+            (137, 133),
+            (137, 134),
+            (137, 135, 136),
+            (137, 138),
+            (137, 139),
+            (137, 140),
+            (137, 141),
+            (142, 143, 144),
+            (145, 146, 147),
+            (156, 148),
+            (156, 149),
+            (156, 150),
+            (156, 151),
+            (156, 152, 153),
+            (156, 154),
+            (156, 155),
+            (156, 157),
+            (156, 158),
+            (156, 159),
+            (156, 160),
+            (156, 161),
+            (162, 163),
+            (168, 165),
+            (168, 166, 167),
+            (168, 169, 170, 171),
+            (168, 172),
+            (168, 173, 174),
+            (188, 189),
+            (188, 190, 191),
+            (188, 192),
+            (188, 193),
+            (122, 123, 124),
+            (129, 130),
+            (179, 180),
+            (181, 182),
+            (185, 186, 187),
+            (197, 198, 199)
+        ]
+        #self.equals = [(24, 148), (25, 149), (26, 150), (111, 125), (109, 130), (115, 123), (116, 124)]
         #self.opposites = [(6, 7), (8, 10), (9, 10), (10, 8), (11, 8), (53, 56), (54, 56), (55, 56), (56, 53), (57, 53), (186, 181), (186, 187), (199, 197)]
 
     def enable(self):
@@ -911,7 +990,6 @@ class UnitBlock():
                     else:
                         break
 
-
     def on_button_clicked(self):
         # Toggle the enabled state
         if self.enabled:
@@ -947,7 +1025,7 @@ if __name__ == "__main__":
     # Setup objects
     #unit_codes = [4, 24, 492, 7, 6, 1155, 185, 5, 39, 474, 873, 875, 583, 586, 437, 'Parthian TacticsR', 'Archery RangeB', 'MilitiaU', 'Man-at-ArmsU', 'Long SwordsmanU', 'Two-Handed SwordsmanU', 'ChampionU', 'SuppliesR', 'GambesonsR', 'SpearmanU', 'PikemanU', 'HalberdierU', 'BarracksB', 'Eagle ScoutU', 'Eagle WarriorU', 'Elite Eagle WarriorU', 'SquiresR', 'CondottieroX', 'ArsonR', 'Scout CavalryU', 'Light CavalryU', 'HussarU', 'BloodlinesR', 'Shrivamsha RiderX', 'Elite Shrivamsha RiderX', 'KnightU', 'CavalierU', 'PaladinU', 'Steppe LancerU', 'Elite Steppe LancerU', 'StableB', 'Camel ScoutX', 'Camel RiderU', 'Heavy Camel RiderU', 'Imperial Camel RiderX', 'Battle ElephantU', 'Elite Battle ElephantU', 'HusbandryR', 'Battering RamU', 'Capped RamU', 'Siege RamU', 'Armored ElephantU', 'Siege ElephantU', 'Flaming CamelX', 'Siege WorkshopB', 'MangonelU', 'OnagerU', 'Siege OnagerU', 'ScorpionU', 'Heavy ScorpionU', 'Siege TowerU', 'Bombard CannonU', 'HoufniceX', 'Padded Archer ArmorR', 'Leather Archer ArmorR', 'Ring Archer ArmorR', 'FletchingR', 'Bodkin ArrowR', 'BracerR', 'BlacksmithB', 'ForgingR', 'Iron CastingR', 'Blast FurnaceR', 'Scale Barding ArmorR', 'Chain Barding ArmorR', 'Plate Barding ArmorR', 'Scale Mail ArmorR', 'Chain Mail ArmorR', 'Plate Mail ArmorR', 'Fishing ShipU', 'Fire GalleyU', 'Fire ShipU', 'Fast Fire ShipU', 'Transport ShipU', 'Trade CogU', 'GillnetsR', 'Cannon GalleonU', 'Elite Cannon GalleonU', 'Demolition RaftU', 'Demolition ShipU', 'Heavy Demolition ShipU', 'GalleyU', 'War GalleyU', 'GalleonU', 'DromonU', 'DockB', 'Turtle ShipU', 'Elite Turtle ShipU', 'CareeningR', 'Dry DockR', 'ShipwrightR', 'Fish TrapB', 'MasonryR', 'ArchitectureR', 'Fortified WallR', 'ChemistryR', 'Bombard TowerR', 'BallisticsR', 'Siege EngineersR', 'UniversityB', 'Guard TowerR', 'KeepR', 'Heated ShotR', 'ArrowslitsR', 'Murder HolesR', 'Treadmill CraneR', 'OutpostB', 'Watch TowerB', 'Guard TowerBB', 'KeepBB', 'Bombard TowerBB', 'Palisade WallB', 'Palisade GateB', 'GateB', 'Stone WallB', 'Fortified WallBB', 'Unique UnitX', 'Elite Unique UnitX', 'PetardU', 'TrebuchetU', 'Castle TechR', 'Imperial TechR', 'CastleB', 'HoardingsR', 'SappersR', 'ConscriptionR', 'SpiesR', 'KrepostB', 'KonnikX', 'Elite KonnikX', 'DonjonB', 'SerjeantX', 'Elite SerjeantX', 'SpearmanXU', 'PikemanXU', 'HalberdierXU', 'MonkU', 'IlluminationR', 'MissionaryX', 'Block PrintingR', 'DevotionR', 'FaithR', 'RedemptionR', 'TheocracyR', 'MonasteryB', 'AtonementR', 'Herbal MedicineR', 'HeresyR', 'SanctityR', 'FervorR', 'Fortified ChurchB', 'Warrior PriestX', 'HouseB', 'VillagerU', 'Town WatchR', 'Town PatrolR', 'Town CenterB', 'Feudal AgeR', 'Castle AgeR', 'Imperial AgeR', 'LoomR', 'WheelbarrowR', 'Hand CartR', 'WonderB', 'FeitoriaB', 'CaravanseraiB', 'Mining CampB', 'Gold MiningR', 'Gold Shaft MiningR', 'Stone MiningR', 'Stone Shaft MiningR', 'Mule CartB', 'Lumber CampB', 'Double-Bit AxeR', 'Bow SawR', 'Two-Man SawR', 'MarketB', 'Trade CartU', 'CoinageR', 'BankingR', 'CaravanR', 'GuildsR', 'FolwarkB', 'FarmB', 'MillB', 'Horse CollarR', 'Heavy PlowR', 'Crop RotationR']:
     block_index = 0
-    for unit in ['ArcherU', 'CrossbowmanU', 'ArbalesterU', 'SkirmisherU', 'Elite SkirmisherU', 'Imperial SkirmisherX', 'SlingerX', 'Hand CannoneerU', 'Cavalry ArcherU', 'Heavy Cavalry ArcherU', 'Elephant ArcherU', 'Elite Elephant ArcherU', 'GenitourX', 'Elite GenitourX', 'Thumb RingR', 'Parthian TacticsR', 'Archery RangeB', 'MilitiaU', 'Man-at-ArmsU', 'Long SwordsmanU', 'Two-Handed SwordsmanU', 'ChampionU', 'SuppliesR', 'GambesonsR', 'SpearmanU', 'PikemanU', 'HalberdierU', 'BarracksB', 'Eagle ScoutU', 'Eagle WarriorU', 'Elite Eagle WarriorU', 'SquiresR', 'CondottieroX', 'ArsonR', 'Scout CavalryU', 'Light CavalryU', 'HussarU', 'BloodlinesR', 'Shrivamsha RiderX', 'Elite Shrivamsha RiderX', 'KnightU', 'CavalierU', 'PaladinU', 'Steppe LancerU', 'Elite Steppe LancerU', 'StableB', 'Camel ScoutX', 'Camel RiderU', 'Heavy Camel RiderU', 'Imperial Camel RiderX', 'Battle ElephantU', 'Elite Battle ElephantU', 'HusbandryR', 'Battering RamU', 'Capped RamU', 'Siege RamU', 'Armored ElephantU', 'Siege ElephantU', 'Flaming CamelX', 'Siege WorkshopB', 'MangonelU', 'OnagerU', 'Siege OnagerU', 'ScorpionU', 'Heavy ScorpionU', 'Siege TowerU', 'Bombard CannonU', 'HoufniceX', 'Padded Archer ArmorR', 'Leather Archer ArmorR', 'Ring Archer ArmorR', 'FletchingR', 'Bodkin ArrowR', 'BracerR', 'BlacksmithB', 'ForgingR', 'Iron CastingR', 'Blast FurnaceR', 'Scale Barding ArmorR', 'Chain Barding ArmorR', 'Plate Barding ArmorR', 'Scale Mail ArmorR', 'Chain Mail ArmorR', 'Plate Mail ArmorR', 'Fishing ShipU', 'Fire GalleyU', 'Fire ShipU', 'Fast Fire ShipU', 'Transport ShipU', 'Trade CogU', 'GillnetsR', 'Cannon GalleonU', 'Elite Cannon GalleonU', 'Demolition RaftU', 'Demolition ShipU', 'Heavy Demolition ShipU', 'GalleyU', 'War GalleyU', 'GalleonU', 'DromonU', 'DockB', 'Turtle ShipU', 'Elite Turtle ShipU', 'CareeningR', 'Dry DockR', 'ShipwrightR', 'Fish TrapB', 'MasonryR', 'ArchitectureR', 'Fortified WallR', 'ChemistryR', 'Bombard TowerR', 'BallisticsR', 'Siege EngineersR', 'UniversityB', 'Guard TowerR', 'KeepR', 'Heated ShotR', 'ArrowslitsR', 'Murder HolesR', 'Treadmill CraneR', 'OutpostB', 'Watch TowerB', 'Guard TowerBB', 'KeepBB', 'Bombard TowerBB', 'Palisade WallB', 'Palisade GateB', 'GateB', 'Stone WallB', 'Fortified WallBB', 'Unique UnitX', 'Elite Unique UnitX', 'PetardU', 'TrebuchetU', 'Castle TechR', 'Imperial TechR', 'CastleB', 'HoardingsR', 'SappersR', 'ConscriptionR', 'SpiesR', 'KrepostB', 'KonnikX', 'Elite KonnikX', 'DonjonB', 'SerjeantX', 'Elite SerjeantX', 'SpearmanXU', 'PikemanXU', 'HalberdierXU', 'MonkU', 'IlluminationR', 'MissionaryX', 'Block PrintingR', 'DevotionR', 'FaithR', 'RedemptionR', 'TheocracyR', 'MonasteryB', 'AtonementR', 'Herbal MedicineR', 'HeresyR', 'SanctityR', 'FervorR', 'Fortified ChurchB', 'Warrior PriestX', 'HouseB', 'VillagerU', 'Town WatchR', 'Town PatrolR', 'Town CenterB', 'Feudal AgeR', 'Castle AgeR', 'Imperial AgeR', 'LoomR', 'WheelbarrowR', 'Hand CartR', 'WonderB', 'FeitoriaB', 'CaravanseraiB', 'Mining CampB', 'Gold MiningR', 'Gold Shaft MiningR', 'Stone MiningR', 'Stone Shaft MiningR', 'Mule CartB', 'Lumber CampB', 'Double-Bit AxeR', 'Bow SawR', 'Two-Man SawR', 'MarketB', 'Trade CartU', 'CoinageR', 'BankingR', 'CaravanR', 'GuildsR', 'FolwarkB', 'FarmB', 'MillB', 'Horse CollarR', 'Heavy PlowR', 'Crop RotationR']:
+    for unit in ['ArcherU', 'CrossbowmanU', 'ArbalesterU', 'SkirmisherU', 'Elite SkirmisherU', 'Imperial SkirmisherX', 'SlingerX', 'Hand CannoneerU', 'Cavalry ArcherU', 'Heavy Cavalry ArcherU', 'Elephant ArcherU', 'Elite Elephant ArcherU', 'GenitourX', 'Elite GenitourX', 'Thumb RingR', 'Parthian TacticsR', 'Archery RangeB', 'MilitiaU', 'Man-at-ArmsU', 'Long SwordsmanU', 'Two-Handed SwordsmanU', 'ChampionU', 'SuppliesR', 'GambesonsR', 'SpearmanU', 'PikemanU', 'HalberdierU', 'BarracksB', 'Eagle ScoutU', 'Eagle WarriorU', 'Elite Eagle WarriorU', 'SquiresR', 'CondottieroX', 'ArsonR', 'Scout CavalryU', 'Light CavalryU', 'HussarU', 'BloodlinesR', 'Shrivamsha RiderX', 'Elite Shrivamsha RiderX', 'KnightU', 'CavalierU', 'PaladinU', 'Steppe LancerU', 'Elite Steppe LancerU', 'StableB', 'Camel ScoutX', 'Camel RiderU', 'Heavy Camel RiderU', 'Imperial Camel RiderX', 'Battle ElephantU', 'Elite Battle ElephantU', 'HusbandryR', 'Battering RamU', 'Capped RamU', 'Siege RamU', 'Armored ElephantU', 'Siege ElephantU', 'Flaming CamelX', 'Siege WorkshopB', 'MangonelU', 'OnagerU', 'Siege OnagerU', 'ScorpionU', 'Heavy ScorpionU', 'Siege TowerU', 'Bombard CannonU', 'HoufniceX', 'Padded Archer ArmorR', 'Leather Archer ArmorR', 'Ring Archer ArmorR', 'FletchingR', 'Bodkin ArrowR', 'BracerR', 'BlacksmithB', 'ForgingR', 'Iron CastingR', 'Blast FurnaceR', 'Scale Barding ArmorR', 'Chain Barding ArmorR', 'Plate Barding ArmorR', 'Scale Mail ArmorR', 'Chain Mail ArmorR', 'Plate Mail ArmorR', 'Fishing ShipU', 'Fire GalleyU', 'Fire ShipU', 'Fast Fire ShipU', 'Transport ShipU', 'Trade CogU', 'GillnetsR', 'Cannon GalleonU', 'Elite Cannon GalleonU', 'Demolition RaftU', 'Demolition ShipU', 'Heavy Demolition ShipU', 'GalleyU', 'War GalleyU', 'GalleonU', 'DromonU', 'DockB', 'Turtle ShipU', 'Elite Turtle ShipU', 'CareeningR', 'Dry DockR', 'ShipwrightR', 'Fish TrapB', 'MasonryR', 'ArchitectureR', 'Fortified WallR', 'ChemistryR', 'Bombard TowerR', 'BallisticsR', 'Siege EngineersR', 'UniversityB', 'Guard TowerR', 'KeepR', 'Heated ShotR', 'ArrowslitsR', 'Murder HolesR', 'Treadmill CraneR', 'OutpostB', 'Watch TowerB', 'Guard TowerBB', 'KeepBB', 'Bombard TowerBB', 'Palisade WallB', 'Palisade GateB', 'GateB', 'Stone WallB', 'Fortified WallBB', 'Unique UnitX', 'Elite Unique UnitX', 'PetardU', 'TrebuchetU', 'Castle TechR', 'Imperial TechR', 'CastleB', 'HoardingsR', 'SappersR', 'ConscriptionR', 'SpiesR', 'KrepostB', 'KonnikX', 'Elite KonnikX', 'DonjonB', 'SerjeantX', 'Elite SerjeantX', 'MonkU', 'IlluminationR', 'MissionaryX', 'Block PrintingR', 'DevotionR', 'FaithR', 'RedemptionR', 'TheocracyR', 'MonasteryB', 'AtonementR', 'Herbal MedicineR', 'HeresyR', 'SanctityR', 'FervorR', 'Fortified ChurchB', 'Warrior PriestX', 'HouseB', 'VillagerU', 'Town WatchR', 'Town PatrolR', 'Town CenterB', 'Feudal AgeR', 'Castle AgeR', 'Imperial AgeR', 'LoomR', 'WheelbarrowR', 'Hand CartR', 'WonderB', 'FeitoriaB', 'CaravanseraiB', 'Mining CampB', 'Gold MiningR', 'Gold Shaft MiningR', 'Stone MiningR', 'Stone Shaft MiningR', 'Mule CartB', 'Lumber CampB', 'Double-Bit AxeR', 'Bow SawR', 'Two-Man SawR', 'MarketB', 'Trade CartU', 'CoinageR', 'BankingR', 'CaravanR', 'GuildsR', 'FolwarkB', 'FarmB', 'MillB', 'Horse CollarR', 'Heavy PlowR', 'Crop RotationR']:
         try:
             # Check the pixmap path and determine type
             if unit[-1] == 'U':
@@ -991,14 +1069,13 @@ if __name__ == "__main__":
             disable_label.setScaledContents(True)
 
             # Add new block to the list
-            new_block = UnitBlock(block_index, unit_name, type, -1, True, [], [])
+            new_block = UnitBlock(block_index, unit_name, type, -1, True)
             unit_blocks.append(new_block)
             block_index += 1
 
             # Connect the button click to a function
             push_button.setStyleSheet("background-color: transparent; border: none;")
             push_button.raise_()
-            #push_button.setEnabled(True)
             push_button.clicked.connect(new_block.on_button_clicked)
         
         except Exception as e:
@@ -1153,9 +1230,7 @@ if __name__ == "__main__":
         'Donjon',                # 145
         'Serjeant',              # 146
         'Elite Serjeant',        # 147
-        'SpearmanXU',            # 148
-        'PikemanXU',             # 149
-        'HalberdierXU',          # 150
+        
         'Monk',                  # 151
         'Illumination',          # 152
         'Missionary',            # 153
