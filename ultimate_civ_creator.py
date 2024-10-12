@@ -606,6 +606,12 @@ def update_civilisation_dropdown():
             except Exception as e:
                 print(str(e))
 
+            # Castle and Impertial Techs
+            job_description = "Castle_Tech_4 will be replaced with Castle Tech and Imperial_Tech_4 will be replaced with Imperial Tech."
+
+            # Step 1: Extract the unique techs using regex
+            
+
             # Update the tech tree
             for block in unit_blocks:
                 if block.name != 'Unique Unit' and block.name != 'Elite Unique Unit' and block.name != 'Castle Tech' and block.name != 'Imperial Tech' and block.name != 'Trebuchet' and block.name != 'Spies':
@@ -827,11 +833,14 @@ class PixmapLabel(QtWidgets.QLabel):
 # Unit blocks
 unit_blocks = []
 class UnitBlock():
-    def __init__(self, name, type, unit_code, enabled):
+    def __init__(self, index, name, type, unit_code, enabled, enable_list, disable_list):
+        self.index = index
         self.name = name
         self.unit_code = unit_code
         self.enabled = enabled
         self.type = type
+        self.disable_list = disable_list
+        self.enable_list = enable_list
         file_name = self.name.replace(' ', '_').replace('-', '0')
 
         parent_widget = getattr(MAIN_WINDOW, f"{file_name}")
@@ -845,15 +854,63 @@ class UnitBlock():
         self.disable_label.show()
         self.disable_label.setScaledContents(True)
 
+        self.hierarchies = [
+    (16, 0, 1, 2), (16, 3, 4, 5), (16, 6), (16, 7), (16, 8, 9), (16, 10, 11), (16, 12, 13), 
+    (16, 14), (16, 15), (27, 17, 18, 19, 20, 21), (27, 22, 23), (27, 24, 25, 26), 
+    (27, 28, 29, 30), (27, 31), (27, 32), (27, 33), (45, 34, 35, 36), (45, 37), 
+    (45, 38, 39), (45, 40, 41, 42), (45, 43, 44), (45, 46), (45, 47, 48, 49), 
+    (45, 50, 51), (45, 52), (59, 53, 54, 55), (59, 56, 57), (59, 58), (59, 60, 61, 62), 
+    (59, 63, 64), (59, 65), (59, 66, 67), (74, 68, 69, 70), (74, 71, 72, 73), 
+    (74, 75, 76, 77), (74, 78, 79, 80), (74, 81, 82, 83), (100, 84), (100, 85, 86, 87), 
+    (100, 88), (100, 89), (100, 90), (100, 91, 92), (100, 93, 94, 95), (100, 96, 97, 98), 
+    (100, 99), (100, 101, 102), (100, 103, 104), (100, 105), (100, 106), (114, 107, 108), 
+    (114, 109), (114, 110, 111), (114, 112), (114, 113), (114, 115, 116), (114, 117), 
+    (114, 118), (114, 119), (114, 120),
+    (137, 131, 132), (137, 133), (137, 134), (137, 135, 136), (137, 138), 
+    (137, 139), (137, 140), (137, 141), (142, 143, 144), (145, 146, 147), (145, 148, 149, 150), 
+    (159, 151), (159, 152), (159, 153), (159, 154), (159, 155, 156), (159, 157), (159, 158), 
+    (159, 160), (159, 161), (159, 162), (159, 163), (159, 164), (165, 166), (171, 168), 
+    (171, 169, 170), (171, 172, 173, 174), (171, 175), (171, 176, 177), (191, 192), 
+    (191, 193, 194), (191, 195), (191, 196), (122, 123, 124), (129, 130), (182, 183), (184, 185), (188, 189, 190), (200, 201, 202)
+]
+        self.equals = [(24, 148), (25, 149), (26, 150), (111, 125), (109, 130), (115, 123), (116, 124)]
+        #self.opposites = [(6, 7), (8, 10), (9, 10), (10, 8), (11, 8), (53, 56), (54, 56), (55, 56), (56, 53), (57, 53), (186, 181), (186, 187), (199, 197)]
+
     def enable(self):
         self.enabled = True
         self.opacity_effect.setOpacity(0)
         self.disable_label.setGraphicsEffect(self.opacity_effect)
 
+        # Enabled equals
+        
+
+        # Enable other units in hierarchy
+        for hierarchy in self.hierarchies:
+            if self.index in hierarchy:
+                for unit_index in hierarchy:
+                    if unit_index != self.index:
+                        unit_blocks[unit_index].enable()
+                    else:
+                        break
+
     def disable(self):
         self.enabled = False
         self.opacity_effect.setOpacity(0.75)
         self.disable_label.setGraphicsEffect(self.opacity_effect)
+
+        # Enabled equals
+        
+
+        # Disable other units in hierarchy
+        for hierarchy in self.hierarchies:
+            reverse_hierarchy = hierarchy[::-1]  # Create a reversed copy of the hierarchy
+            if self.index in reverse_hierarchy:
+                for unit_index in reverse_hierarchy:
+                    if unit_index != self.index:
+                        unit_blocks[unit_index].disable()
+                    else:
+                        break
+
 
     def on_button_clicked(self):
         # Toggle the enabled state
@@ -889,6 +946,7 @@ if __name__ == "__main__":
 
     # Setup objects
     #unit_codes = [4, 24, 492, 7, 6, 1155, 185, 5, 39, 474, 873, 875, 583, 586, 437, 'Parthian TacticsR', 'Archery RangeB', 'MilitiaU', 'Man-at-ArmsU', 'Long SwordsmanU', 'Two-Handed SwordsmanU', 'ChampionU', 'SuppliesR', 'GambesonsR', 'SpearmanU', 'PikemanU', 'HalberdierU', 'BarracksB', 'Eagle ScoutU', 'Eagle WarriorU', 'Elite Eagle WarriorU', 'SquiresR', 'CondottieroX', 'ArsonR', 'Scout CavalryU', 'Light CavalryU', 'HussarU', 'BloodlinesR', 'Shrivamsha RiderX', 'Elite Shrivamsha RiderX', 'KnightU', 'CavalierU', 'PaladinU', 'Steppe LancerU', 'Elite Steppe LancerU', 'StableB', 'Camel ScoutX', 'Camel RiderU', 'Heavy Camel RiderU', 'Imperial Camel RiderX', 'Battle ElephantU', 'Elite Battle ElephantU', 'HusbandryR', 'Battering RamU', 'Capped RamU', 'Siege RamU', 'Armored ElephantU', 'Siege ElephantU', 'Flaming CamelX', 'Siege WorkshopB', 'MangonelU', 'OnagerU', 'Siege OnagerU', 'ScorpionU', 'Heavy ScorpionU', 'Siege TowerU', 'Bombard CannonU', 'HoufniceX', 'Padded Archer ArmorR', 'Leather Archer ArmorR', 'Ring Archer ArmorR', 'FletchingR', 'Bodkin ArrowR', 'BracerR', 'BlacksmithB', 'ForgingR', 'Iron CastingR', 'Blast FurnaceR', 'Scale Barding ArmorR', 'Chain Barding ArmorR', 'Plate Barding ArmorR', 'Scale Mail ArmorR', 'Chain Mail ArmorR', 'Plate Mail ArmorR', 'Fishing ShipU', 'Fire GalleyU', 'Fire ShipU', 'Fast Fire ShipU', 'Transport ShipU', 'Trade CogU', 'GillnetsR', 'Cannon GalleonU', 'Elite Cannon GalleonU', 'Demolition RaftU', 'Demolition ShipU', 'Heavy Demolition ShipU', 'GalleyU', 'War GalleyU', 'GalleonU', 'DromonU', 'DockB', 'Turtle ShipU', 'Elite Turtle ShipU', 'CareeningR', 'Dry DockR', 'ShipwrightR', 'Fish TrapB', 'MasonryR', 'ArchitectureR', 'Fortified WallR', 'ChemistryR', 'Bombard TowerR', 'BallisticsR', 'Siege EngineersR', 'UniversityB', 'Guard TowerR', 'KeepR', 'Heated ShotR', 'ArrowslitsR', 'Murder HolesR', 'Treadmill CraneR', 'OutpostB', 'Watch TowerB', 'Guard TowerBB', 'KeepBB', 'Bombard TowerBB', 'Palisade WallB', 'Palisade GateB', 'GateB', 'Stone WallB', 'Fortified WallBB', 'Unique UnitX', 'Elite Unique UnitX', 'PetardU', 'TrebuchetU', 'Castle TechR', 'Imperial TechR', 'CastleB', 'HoardingsR', 'SappersR', 'ConscriptionR', 'SpiesR', 'KrepostB', 'KonnikX', 'Elite KonnikX', 'DonjonB', 'SerjeantX', 'Elite SerjeantX', 'SpearmanXU', 'PikemanXU', 'HalberdierXU', 'MonkU', 'IlluminationR', 'MissionaryX', 'Block PrintingR', 'DevotionR', 'FaithR', 'RedemptionR', 'TheocracyR', 'MonasteryB', 'AtonementR', 'Herbal MedicineR', 'HeresyR', 'SanctityR', 'FervorR', 'Fortified ChurchB', 'Warrior PriestX', 'HouseB', 'VillagerU', 'Town WatchR', 'Town PatrolR', 'Town CenterB', 'Feudal AgeR', 'Castle AgeR', 'Imperial AgeR', 'LoomR', 'WheelbarrowR', 'Hand CartR', 'WonderB', 'FeitoriaB', 'CaravanseraiB', 'Mining CampB', 'Gold MiningR', 'Gold Shaft MiningR', 'Stone MiningR', 'Stone Shaft MiningR', 'Mule CartB', 'Lumber CampB', 'Double-Bit AxeR', 'Bow SawR', 'Two-Man SawR', 'MarketB', 'Trade CartU', 'CoinageR', 'BankingR', 'CaravanR', 'GuildsR', 'FolwarkB', 'FarmB', 'MillB', 'Horse CollarR', 'Heavy PlowR', 'Crop RotationR']:
+    block_index = 0
     for unit in ['ArcherU', 'CrossbowmanU', 'ArbalesterU', 'SkirmisherU', 'Elite SkirmisherU', 'Imperial SkirmisherX', 'SlingerX', 'Hand CannoneerU', 'Cavalry ArcherU', 'Heavy Cavalry ArcherU', 'Elephant ArcherU', 'Elite Elephant ArcherU', 'GenitourX', 'Elite GenitourX', 'Thumb RingR', 'Parthian TacticsR', 'Archery RangeB', 'MilitiaU', 'Man-at-ArmsU', 'Long SwordsmanU', 'Two-Handed SwordsmanU', 'ChampionU', 'SuppliesR', 'GambesonsR', 'SpearmanU', 'PikemanU', 'HalberdierU', 'BarracksB', 'Eagle ScoutU', 'Eagle WarriorU', 'Elite Eagle WarriorU', 'SquiresR', 'CondottieroX', 'ArsonR', 'Scout CavalryU', 'Light CavalryU', 'HussarU', 'BloodlinesR', 'Shrivamsha RiderX', 'Elite Shrivamsha RiderX', 'KnightU', 'CavalierU', 'PaladinU', 'Steppe LancerU', 'Elite Steppe LancerU', 'StableB', 'Camel ScoutX', 'Camel RiderU', 'Heavy Camel RiderU', 'Imperial Camel RiderX', 'Battle ElephantU', 'Elite Battle ElephantU', 'HusbandryR', 'Battering RamU', 'Capped RamU', 'Siege RamU', 'Armored ElephantU', 'Siege ElephantU', 'Flaming CamelX', 'Siege WorkshopB', 'MangonelU', 'OnagerU', 'Siege OnagerU', 'ScorpionU', 'Heavy ScorpionU', 'Siege TowerU', 'Bombard CannonU', 'HoufniceX', 'Padded Archer ArmorR', 'Leather Archer ArmorR', 'Ring Archer ArmorR', 'FletchingR', 'Bodkin ArrowR', 'BracerR', 'BlacksmithB', 'ForgingR', 'Iron CastingR', 'Blast FurnaceR', 'Scale Barding ArmorR', 'Chain Barding ArmorR', 'Plate Barding ArmorR', 'Scale Mail ArmorR', 'Chain Mail ArmorR', 'Plate Mail ArmorR', 'Fishing ShipU', 'Fire GalleyU', 'Fire ShipU', 'Fast Fire ShipU', 'Transport ShipU', 'Trade CogU', 'GillnetsR', 'Cannon GalleonU', 'Elite Cannon GalleonU', 'Demolition RaftU', 'Demolition ShipU', 'Heavy Demolition ShipU', 'GalleyU', 'War GalleyU', 'GalleonU', 'DromonU', 'DockB', 'Turtle ShipU', 'Elite Turtle ShipU', 'CareeningR', 'Dry DockR', 'ShipwrightR', 'Fish TrapB', 'MasonryR', 'ArchitectureR', 'Fortified WallR', 'ChemistryR', 'Bombard TowerR', 'BallisticsR', 'Siege EngineersR', 'UniversityB', 'Guard TowerR', 'KeepR', 'Heated ShotR', 'ArrowslitsR', 'Murder HolesR', 'Treadmill CraneR', 'OutpostB', 'Watch TowerB', 'Guard TowerBB', 'KeepBB', 'Bombard TowerBB', 'Palisade WallB', 'Palisade GateB', 'GateB', 'Stone WallB', 'Fortified WallBB', 'Unique UnitX', 'Elite Unique UnitX', 'PetardU', 'TrebuchetU', 'Castle TechR', 'Imperial TechR', 'CastleB', 'HoardingsR', 'SappersR', 'ConscriptionR', 'SpiesR', 'KrepostB', 'KonnikX', 'Elite KonnikX', 'DonjonB', 'SerjeantX', 'Elite SerjeantX', 'SpearmanXU', 'PikemanXU', 'HalberdierXU', 'MonkU', 'IlluminationR', 'MissionaryX', 'Block PrintingR', 'DevotionR', 'FaithR', 'RedemptionR', 'TheocracyR', 'MonasteryB', 'AtonementR', 'Herbal MedicineR', 'HeresyR', 'SanctityR', 'FervorR', 'Fortified ChurchB', 'Warrior PriestX', 'HouseB', 'VillagerU', 'Town WatchR', 'Town PatrolR', 'Town CenterB', 'Feudal AgeR', 'Castle AgeR', 'Imperial AgeR', 'LoomR', 'WheelbarrowR', 'Hand CartR', 'WonderB', 'FeitoriaB', 'CaravanseraiB', 'Mining CampB', 'Gold MiningR', 'Gold Shaft MiningR', 'Stone MiningR', 'Stone Shaft MiningR', 'Mule CartB', 'Lumber CampB', 'Double-Bit AxeR', 'Bow SawR', 'Two-Man SawR', 'MarketB', 'Trade CartU', 'CoinageR', 'BankingR', 'CaravanR', 'GuildsR', 'FolwarkB', 'FarmB', 'MillB', 'Horse CollarR', 'Heavy PlowR', 'Crop RotationR']:
         try:
             # Check the pixmap path and determine type
@@ -932,15 +990,10 @@ if __name__ == "__main__":
             disable_label.show()
             disable_label.setScaledContents(True)
 
-            # Turn the box into a push button
-            #pushButton = QtWidgets.QPushButton(parent_widget)
-            #pushButton.setGeometry(QtCore.QRect(0, 0, 75, 75))  # Position of the button
-            #pushButton.setObjectName(rf"{unit_name}_button")
-            #pushButton.setStyleSheet("background-color: transparent; border: none;")
-
             # Add new block to the list
-            new_block = UnitBlock(unit[:-1], type, -1, True)
+            new_block = UnitBlock(block_index, unit_name, type, -1, True, [], [])
             unit_blocks.append(new_block)
+            block_index += 1
 
             # Connect the button click to a function
             push_button.setStyleSheet("background-color: transparent; border: none;")
@@ -951,9 +1004,211 @@ if __name__ == "__main__":
         except Exception as e:
             print(rf'Failed Block: {unit} : {str(e)}')
 
-    # DEBUG Disable a button
-    #unit_blocks[0].disabled = True
-    #unit_blocks[0].update_block()
+    '''unit_list = [
+        'Archer',                # 0
+        'Crossbowman',           # 1
+        'Arbalester',            # 2
+        'Skirmisher',            # 3
+        'Elite Skirmisher',      # 4
+        'Imperial Skirmisher',   # 5
+        'Slinger',               # 6
+        'Hand Cannoneer',        # 7
+        'Cavalry Archer',        # 8
+        'Heavy Cavalry Archer',  # 9
+        'Elephant Archer',       # 10
+        'Elite Elephant Archer', # 11
+        'Genitour',              # 12
+        'Elite Genitour',        # 13
+        'Thumb Ring',            # 14
+        'Parthian Tactics',      # 15
+        'Archery Range',         # 16
+        'Militia',               # 17
+        'Man-at-Arms',           # 18
+        'Long Swordsman',        # 19
+        'Two-Handed Swordsman',  # 20
+        'Champion',              # 21
+        'Supplies',              # 22
+        'Gambesons',             # 23
+        'Spearman',              # 24
+        'Pikeman',               # 25
+        'Halberdier',            # 26
+        'Barracks',              # 27
+        'Eagle Scout',           # 28
+        'Eagle Warrior',         # 29
+        'Elite Eagle Warrior',   # 30
+        'Squires',               # 31
+        'Condottiero',           # 32
+        'Arson',                 # 33
+        'Scout Cavalry',         # 34
+        'Light Cavalry',         # 35
+        'Hussar',                # 36
+        'Bloodlines',            # 37
+        'Shrivamsha Rider',      # 38
+        'Elite Shrivamsha Rider',# 39
+        'Knight',                # 40
+        'Cavalier',              # 41
+        'Paladin',               # 42
+        'Steppe Lancer',         # 43
+        'Elite Steppe Lancer',   # 44
+        'Stable',                # 45
+        'Camel Scout',           # 46
+        'Camel Rider',           # 47
+        'Heavy Camel Rider',     # 48
+        'Imperial Camel Rider',  # 49
+        'Battle Elephant',       # 50
+        'Elite Battle Elephant', # 51
+        'Husbandry',             # 52
+        'Battering Ram',         # 53
+        'Capped Ram',            # 54
+        'Siege Ram',             # 55
+        'Armored Elephant',      # 56
+        'Siege Elephant',        # 57
+        'Flaming Camel',         # 58
+        'Siege Workshop',        # 59
+        'Mangonel',              # 60
+        'Onager',                # 61
+        'Siege Onager',          # 62
+        'Scorpion',              # 63
+        'Heavy Scorpion',        # 64
+        'Siege Tower',           # 65
+        'Bombard Cannon',        # 66
+        'Houfnice',              # 67
+        'Padded Archer Armor',   # 68
+        'Leather Archer Armor',  # 69
+        'Ring Archer Armor',     # 70
+        'Fletching',             # 71
+        'Bodkin Arrow',          # 72
+        'Bracer',                # 73
+        'Blacksmith',            # 74
+        'Forging',               # 75
+        'Iron Casting',          # 76
+        'Blast Furnace',         # 77
+        'Scale Barding Armor',   # 78
+        'Chain Barding Armor',   # 79
+        'Plate Barding Armor',   # 80
+        'Scale Mail Armor',      # 81
+        'Chain Mail Armor',      # 82
+        'Plate Mail Armor',      # 83
+        'Fishing Ship',          # 84
+        'Fire Galley',           # 85
+        'Fire Ship',             # 86
+        'Fast Fire Ship',        # 87
+        'Transport Ship',        # 88
+        'Trade Cog',             # 89
+        'Gillnets',              # 90
+        'Cannon Galleon',        # 91
+        'Elite Cannon Galleon',  # 92
+        'Demolition Raft',       # 93
+        'Demolition Ship',       # 94
+        'Heavy Demolition Ship', # 95
+        'Galley',                # 96
+        'War Galley',            # 97
+        'Galleon',               # 98
+        'Dromon',                # 99
+        'Dock',                  # 100
+        'Turtle Ship',           # 101
+        'Elite Turtle Ship',     # 102
+        'Careening',             # 103
+        'Dry Dock',              # 104
+        'Shipwright',            # 105
+        'Fish Trap',             # 106
+        'Masonry',               # 107
+        'Architecture',          # 108
+        'Fortified Wall',        # 109
+        'Chemistry',             # 110
+        'Bombard Tower',         # 111
+        'Ballistics',            # 112
+        'Siege Engineers',       # 113
+        'University',            # 114
+        'Guard Tower',           # 115
+        'Keep',                  # 116
+        'Heated Shot',           # 117
+        'Arrowslits',            # 118
+        'Murder Holes',          # 119
+        'Treadmill Crane',       # 120
+        'Outpost',               # 121
+        'Watch Tower',           # 122
+        'Guard TowerB',          # 123
+        'KeepBB',                # 124
+        'Bombard TowerBB',       # 125
+        'Palisade Wall',         # 126
+        'Palisade Gate',         # 127
+        'Gate',                  # 128
+        'Stone Wall',            # 129
+        'Fortified WallBB',      # 130
+        'Unique Unit',           # 131
+        'Elite Unique Unit',     # 132
+        'Petard',                # 133
+        'Trebuchet',             # 134
+        'Castle Tech',           # 135
+        'Imperial Tech',         # 136
+        'Castle',                # 137
+        'Hoardings',             # 138
+        'Sappers',               # 139
+        'Conscription',          # 140
+        'Spies',                 # 141
+        'Krepost',               # 142
+        'Konnik',                # 143
+        'Elite Konnik',          # 144
+        'Donjon',                # 145
+        'Serjeant',              # 146
+        'Elite Serjeant',        # 147
+        'SpearmanXU',            # 148
+        'PikemanXU',             # 149
+        'HalberdierXU',          # 150
+        'Monk',                  # 151
+        'Illumination',          # 152
+        'Missionary',            # 153
+        'Block Printing',        # 154
+        'Devotion',              # 155
+        'Faith',                 # 156
+        'Redemption',            # 157
+        'Theocracy',             # 158
+        'Monastery',             # 159
+        'Atonement',             # 160
+        'Herbal Medicine',       # 161
+        'Heresy',                # 162
+        'Sanctity',              # 163
+        'Fervor',                # 164
+        'Fortified Church',      # 165
+        'Warrior Priest',        # 166
+        'House',                 # 167
+        'Villager',              # 168
+        'Town Watch',            # 169
+        'Town Patrol',           # 170
+        'Town Center',           # 171
+        'Feudal Age',            # 172
+        'Castle Age',            # 173
+        'Imperial Age',          # 174
+        'Loom',                  # 175
+        'Wheelbarrow',           # 176
+        'Hand Cart',             # 177
+        'Wonder',                # 178
+        'Feitoria',              # 179
+        'Caravanserai',          # 180
+        'Mining Camp',           # 181
+        'Gold Mining',           # 182
+        'Gold Shaft Mining',     # 183
+        'Stone Mining',          # 184
+        'Stone Shaft Mining',    # 185
+        'Mule Cart',             # 186
+        'Lumber Camp',           # 187
+        'Double-Bit Axe',        # 188
+        'Bow Saw',               # 189
+        'Two-Man Saw',           # 190
+        'Market',                # 191
+        'Trade Cart',            # 192
+        'Coinage',               # 193
+        'Banking',               # 194
+        'Caravan',               # 195
+        'Guilds',                # 196
+        'Folwark',               # 197
+        'Farm',                  # 198
+        'Mill',                  # 199
+        'Horse Collar',          # 200
+        'Heavy Plow',            # 201
+        'Crop Rotation'          # 202
+    ]'''
 
     # Show the main window
     MainWindow.setWindowTitle(f"Talofa")
@@ -965,9 +1220,6 @@ if __name__ == "__main__":
     MAIN_WINDOW.actionOpen_Project.triggered.connect(open_project)
     MAIN_WINDOW.actionSave_Project.triggered.connect(save_project)
     MAIN_WINDOW.actionRevert_To_Original.triggered.connect(revert_project)
-
-    #combo = CivilisationDropdown()
-    #combo.addItems(['Britons', 'Franks', 'Japanese'])
 
 # Set up tech tree
 '''class MainWindow(QtWidgets.QMainWindow):
