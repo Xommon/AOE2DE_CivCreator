@@ -28,6 +28,7 @@ from PyQt5.QtCore import pyqtSignal
 import genieutils
 #from genieutils import GenieObjectContainer
 from genieutils.datfile import DatFile
+import ijson
 
 # Constants
 civilisation_objects = []
@@ -38,6 +39,7 @@ MOD_FOLDER = ''
 DATA = ''
 DATA_FILE_DAT = ''
 unique_unit = ''
+global JSON_DATA
 
 # Civilisation object
 class Civilisation:
@@ -123,7 +125,20 @@ def revert_project():
     response = msg_box.exec_()  # Execute the dialog and get the response
 
     if response == QMessageBox.Ok:
-        print("You clicked OK!")
+        # Copy JSON file
+        if os.path.exists(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json'):
+            os.remove(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json')
+            shutil.copy(rf'{ORIGINAL_FOLDER}/\resources\_common\dat\civTechTrees.json', rf'{MOD_FOLDER}/resources/_common/dat/')
+        else:
+            print("Cannot find JSON file")
+            
+        # Copy DAT file
+        if os.path.exists(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'):
+            os.remove(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+            shutil.copy(rf'{ORIGINAL_FOLDER}/\resources\_common\dat\empires2_x2_p1.dat', rf'{MOD_FOLDER}/resources/_common/dat/')
+        else:
+            print("Cannot find DAT file")
+        print("Project reverted")
 
 def open_saving_window(title):
     saving_dialog = QtWidgets.QDialog()
@@ -456,10 +471,16 @@ def open_project(path = None):
             MOD_FOLDER = lines[1]
             DATA_FILE_DAT = rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat'
             MODDED_STRINGS_FILE = rf'{MOD_FOLDER}\resources\en\strings\key-value\key-value-modded-strings-utf8.txt'
+            global CIV_TECH_TREES_FILE
             CIV_TECH_TREES_FILE = rf'{MOD_FOLDER}\resources\_common\dat\civTechTrees.json'
             CIV_IMAGE_FOLDER = rf'{MOD_FOLDER}\widgetui\textures\menu\civs'
             global DATA
             DATA = DatFile.parse(DATA_FILE_DAT)
+
+            with open(CIV_TECH_TREES_FILE, 'r') as techtree:
+                json_data = json.load(techtree)
+                global JSON_TECH_TREE
+                JSON_TECH_TREE = json.dumps(json_data)
 
         # Import civilisations and create objects for them with unit values
         with open(CIV_TECH_TREES_FILE, 'r', encoding='utf-8') as file:
@@ -499,6 +520,7 @@ def open_project(path = None):
                     elif status == "ResearchRequired":
                         current_civilisation.units[currentUnit] = 3
                 #update_civilisation_dropdown()
+
         # Get the description and description ID for each civilization
         with open(MODDED_STRINGS_FILE, 'r', encoding='utf-8') as strings_file:
             strings_lines = strings_file.read().splitlines()
@@ -506,6 +528,7 @@ def open_project(path = None):
             for i in range(total_civ_count):
                 civilisation_objects[i].desc_id = strings_lines[total_civ_count + i][:6]
                 civilisation_objects[i].description = strings_lines[total_civ_count + i][7:]
+
         # Populate inactive civilisations
         MAIN_WINDOW.civilisation_dropdown.insertSeparator(MAIN_WINDOW.civilisation_dropdown.count())
         MAIN_WINDOW.civilisation_dropdown.addItem('New...')
@@ -565,7 +588,6 @@ def update_civilisation_dropdown():
         if (civ.name == selected_value):
             global CURRENT_CIV_INDEX
             CURRENT_CIV_INDEX = i
-            print('Setting current civ index to', i)
             new_description = civ.description[1:-1].replace('\\n', '\n').replace('<b>', '')
             MAIN_WINDOW.civilisation_description_label.setText(new_description)
             MAIN_WINDOW.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
@@ -600,13 +622,13 @@ def update_civilisation_dropdown():
             # Update the tech tree
             for block in unit_blocks:
                 if block.name != 'Unique Unit' and block.name != 'Elite Unique Unit' and block.name != 'Castle Tech' and block.name != 'Imperial Tech' and block.name != 'Trebuchet' and block.name != 'Spies':
-                    block.disable()
+                    block.enable_disable(False, True, False)
                 else:
-                    block.enable()
+                    block.enable_disable(True, True, False)
 
                 try:
                     if civ.units[block.name] == 1 or civ.units[block.name] == 3:
-                        block.enable()
+                        block.enable_disable(True, True, False)
                 except:
                     continue
                 
@@ -614,7 +636,7 @@ def update_civilisation_dropdown():
                 for block in unit_blocks:
                     if block.name == key:
                         if value == 1 or value == 3:
-                            block.enable()
+                            block.enable_disable(True, True, False)
                             break
 
             # DEBUG Set architecture and sound
@@ -755,8 +777,20 @@ def update_civilisation_dropdown():
                 MAIN_WINDOW.architecture_dropdown.setCurrentIndex(5)
 
 def save_project():
-    # Save changes
+    #open_saving_window('Saving project...')
+
+    # Save changes to .dat file
     DATA.save(rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat')
+
+    # Write changes to tech tree
+    with open('civTechTrees.json', 'w') as file:
+        #lines = file.readlines()
+        #current_civ, current_item = ''
+
+        #for line in lines:
+
+        json.dump(JSON_DATA, file, indent=4)
+
     print("Project Saved!")
 
     #DATA.techs[22].resource_costs[0].amount = 69
@@ -796,158 +830,195 @@ class UnitBlock():
         self.disable_label.setScaledContents(True)
 
         self.hierarchies = [
-            (16, 0, 1, 2),
-            (16, 3, 4, 5),
-            (16, 6),
-            (16, 7),
-            (16, 8, 9),
-            (16, 10, 11),
-            (16, 12, 13),
-            (16, 14),
-            (16, 15),
-            (27, 17, 18, 19, 20, 21),
-            (27, 22, 23),
-            (27, 24, 25, 26),
-            (27, 28, 29, 30),
-            (27, 31),
-            (27, 32),
-            (27, 33),
-            (45, 34, 35, 36),
-            (45, 37),
-            (45, 38, 39),
-            (45, 40, 41, 42),
-            (45, 43, 44),
-            (45, 46),
-            (45, 47, 48, 49),
-            (45, 50, 51),
-            (45, 52),
-            (59, 53, 54, 55),
-            (59, 56, 57),
-            (59, 58),
-            (59, 60, 61, 62),
-            (59, 63, 64),
-            (59, 65),
-            (59, 66, 67),
-            (74, 68, 69, 70),
-            (74, 71, 72, 73),
-            (74, 75, 76, 77),
-            (74, 78, 79, 80),
-            (74, 81, 82, 83),
-            (100, 84),
-            (100, 85, 86, 87),
-            (100, 88),
-            (100, 89),
-            (100, 90),
-            (100, 91, 92),
-            (100, 93, 94, 95),
-            (100, 96, 97, 98),
-            (100, 99),
-            (100, 101, 102),
-            (100, 103, 104),
-            (100, 105),
-            (100, 106),
-            (114, 107, 108),
-            (114, 109),
-            (114, 110, 111),
-            (114, 112),
-            (114, 113),
-            (114, 115, 116),
-            (114, 117),
-            (114, 118),
-            (114, 119),
-            (114, 120),
-            (137, 131, 132),
-            (137, 133),
-            (137, 134),
-            (137, 135, 136),
-            (137, 138),
-            (137, 139),
-            (137, 140),
-            (137, 141),
-            (142, 143, 144),
-            (145, 146, 147),
-            (156, 148),
-            (156, 149),
-            (156, 150),
-            (156, 151),
-            (156, 152, 153),
-            (156, 154),
-            (156, 155),
-            (156, 157),
-            (156, 158),
-            (156, 159),
-            (156, 160),
-            (156, 161),
-            (162, 163),
-            (168, 165),
-            (168, 166, 167),
-            (168, 169, 170, 171),
-            (168, 172),
-            (168, 173, 174),
-            (188, 189),
-            (188, 190, 191),
-            (188, 192),
-            (188, 193),
-            (122, 123, 124),
-            (129, 130),
-            (179, 180),
-            (181, 182),
-            (185, 186, 187),
-            (197, 198, 199)
+            [16, 0, 1, 2],
+            [16, 3, 4, 5],
+            [16, 6],
+            [16, 7],
+            [16, 8, 9],
+            [16, 10, 11],
+            [16, 12, 13],
+            [16, 14],
+            [16, 15],
+            [27, 17, 18, 19, 20, 21],
+            [27, 22, 23],
+            [27, 24, 25, 26],
+            [27, 28, 29, 30],
+            [27, 31],
+            [27, 32],
+            [27, 33],
+            [45, 34, 35, 36],
+            [45, 37],
+            [45, 38, 39],
+            [45, 40, 41, 42],
+            [45, 43, 44],
+            [45, 46],
+            [45, 47, 48, 49],
+            [45, 50, 51],
+            [45, 52],
+            [59, 53, 54, 55],
+            [59, 56, 57],
+            [59, 58],
+            [59, 60, 61, 62],
+            [59, 63, 64],
+            [59, 65],
+            [59, 66, 67],
+            [74, 68, 69, 70],
+            [74, 71, 72, 73],
+            [74, 75, 76, 77],
+            [74, 78, 79, 80],
+            [74, 81, 82, 83],
+            [100, 84],
+            [100, 85, 86, 87],
+            [100, 88],
+            [100, 89],
+            [100, 90],
+            [100, 91, 92],
+            [100, 93, 94, 95],
+            [100, 96, 97, 98],
+            [100, 99],
+            [100, 101, 102],
+            [100, 103, 104],
+            [100, 105],
+            [100, 106],
+            [114, 107, 108],
+            [114, 109],
+            [114, 110, 111],
+            [114, 112],
+            [114, 113],
+            [114, 115, 116],
+            [114, 117],
+            [114, 118],
+            [114, 119],
+            [114, 120],
+            [137, 131, 132],
+            [137, 133],
+            [137, 134],
+            [137, 135, 136],
+            [137, 138],
+            [137, 139],
+            [137, 140],
+            [137, 141],
+            [142, 143, 144],
+            [145, 146, 147],
+            [156, 148],
+            [156, 149],
+            [156, 150],
+            [156, 151],
+            [156, 152, 153],
+            [156, 154],
+            [156, 155],
+            [156, 157],
+            [156, 158],
+            [156, 159],
+            [156, 160],
+            [156, 161],
+            [162, 163],
+            [168, 165],
+            [168, 166, 167],
+            [168, 169, 170, 171],
+            [168, 172],
+            [168, 173, 174],
+            [188, 189],
+            [188, 190, 191],
+            [188, 192],
+            [188, 193],
+            [122, 123, 124],
+            [129, 130],
+            [179, 180],
+            [181, 182],
+            [185, 186, 187],
+            [197, 198, 199]
         ]
+
         #self.equals = [(24, 148), (25, 149), (26, 150), (111, 125), (109, 130), (115, 123), (116, 124)]
         #self.opposites = [(6, 7), (8, 10), (9, 10), (10, 8), (11, 8), (53, 56), (54, 56), (55, 56), (56, 53), (57, 53), (186, 181), (186, 187), (199, 197)]
 
-    def enable(self):
-        self.enabled = True
-        self.opacity_effect.setOpacity(0)
+    def enable_disable(self, status, setup, first):
+        # status = enabled or disabled (true/false)
+        # setup = only cosmetic
+        # first = first button in a series to change
+
+        # Set the visuals
+        self.enabled = status
+        if status:
+            self.opacity_effect.setOpacity(0)
+        else:
+            self.opacity_effect.setOpacity(0.75)
         self.disable_label.setGraphicsEffect(self.opacity_effect)
-        try:
-            if DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].enabled != 1 and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].disabled != 0:
-                DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].enabled = 1
-                DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].disabled = 0
-        except Exception as e:
-            pass
 
-        # Enable other units in hierarchy
-        for hierarchy in self.hierarchies:
-            if self.index in hierarchy:
-                for unit_index in hierarchy:
-                    if unit_index != self.index:
-                        unit_blocks[unit_index].enable()
-                    else:
-                        break
+        if not setup:
+            # Change unit status in .dat
+            if status and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code[0]].enabled != 1 and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code[0]].disabled != 0:
+                for i, code in enumerate(self.unit_code):
+                    if len(self.unit_code) == 1: # Technology
+                        #DATA.techs[22].resource_costs[0].amount = 69
+                        DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].enabled = 0
+                        DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].disabled = 1
+                    elif len(self.unit_code) == 2: # Unit
+                        if i == 0:
+                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].enabled = 0
+                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].disabled = 1
+                        elif i == 1:
+                            if self.unit_code[i] == -1:
+                                pass
+                            DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].enabled = 0
+                            DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].disabled = 1
+                    elif len(self.unit_code) > 2: # Building
+                            DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].enabled = 0
+                            DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].disabled = 1
+            elif not status and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code[0]].enabled != 0 and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code[0]].disabled != 1:
+                for i, code in enumerate(self.unit_code):
+                    if len(self.unit_code) == 1: # Technology
+                        DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].enabled = 1
+                        DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].disabled = 0
+                    elif len(self.unit_code) == 2: # Unit
+                        if i == 0:
+                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].enabled = 1
+                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].disabled = 0
+                        elif i == 1:
+                            if self.unit_code[i] == -1:
+                                pass
+                            DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].enabled = 1
+                            DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].disabled = 0
+                    elif len(self.unit_code) > 2: # Building
+                            DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].enabled = 1
+                            DATA.civs[CURRENT_CIV_INDEX + 1].techs[0].disabled = 0
 
-    def disable(self):
-        self.enabled = False
-        self.opacity_effect.setOpacity(0.75)
-        self.disable_label.setGraphicsEffect(self.opacity_effect)
-        try:
-            if DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].enabled != 0 and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].disabled != 1:
-                DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].enabled = 0
-                DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].disabled = 1
-        except Exception as e:
-            pass
-
-        # Enabled equals
-        
-
-        # Disable other units in hierarchy
-        for hierarchy in self.hierarchies:
-            reverse_hierarchy = hierarchy[::-1]  # Create a reversed copy of the hierarchy
-            if self.index in reverse_hierarchy:
-                for unit_index in reverse_hierarchy:
-                    if unit_index != self.index:
-                        unit_blocks[unit_index].disable()
-                    else:
-                        break
+            # Change unit status in .json
+            with open(CIV_TECH_TREES_FILE, 'r+') as file:
+                parser = ijson.items(file, 'civs.item')
+                for civ in parser:
+                    if civ['civ_id'] == civilisation_objects[CURRENT_CIV_INDEX].true_name.upper():
+                        # Check through both buildings and units, or any tech node
+                        for category in ['civ_techs_buildings', 'civ_techs_units', 'civ_techs_research']:
+                            if category in civ:
+                                for item in civ[category]:
+                                    if item['Name'] == self.name:
+                                        if status:
+                                            item['Node Status'] = 'ResearchedCompleted'
+                                        else:
+                                            item['Node Status'] = 'NotAvailable'
+                                        break
+                                    
+                # Enable/disable connected blocks
+                if first:
+                    try:
+                        for hierarchy in self.hierarchies:
+                            if self.index in hierarchy:
+                                if not status:
+                                    hierarchy.reverse()
+                                for unit_index in hierarchy:
+                                    if unit_index != self.index:
+                                        unit_blocks[unit_index].enable_disable(status, False, False)
+                                    else:
+                                        if not status:
+                                            hierarchy.reverse()
+                                        break
+                    except:
+                        pass
 
     def on_button_clicked(self):
-        # Toggle the enabled state
-        if self.enabled:
-            self.disable()
-        else:
-            self.enable()
+        self.enable_disable(not self.enabled, False, True)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
@@ -976,206 +1047,207 @@ if __name__ == "__main__":
 
     # Setup objects
     unit_codes = [
-        (4), 
-        (24), 
-        (492), 
-        (7), 
-        (6), 
-        (1155), 
-        (185), 
-        (5), 
-        (39), 
-        (474), 
-        (873), 
-        (875), 
-        (583), 
-        (586), 
-        (437), 
-        (-1), #'Parthian TacticsR', 
-        (10, 14, 87), 
-        (74), 
-        (75), 
-        (77), 
-        (473), 
-        (567), 
-        (-1), #'SuppliesR', 
-        (-1), #'GambesonsR', 
-        (93), 
-        (358), 
-        (359), 
-        (12, 20, 132, 498), 
-        (751), 
-        (753), 
-        (752), 
-        (-1), #'SquiresR', 
-        (184), 
-        (-1), #'ArsonR', 
-        (448), 
-        (546), 
-        (441), 
-        (-1), #'BloodlinesR', 
-        (1751), 
-        (1753), 
-        (38), 
-        (283), 
-        (569), 
-        (1370), 
-        (1372), 
-        (86, 101, 153), 
-        (1755), 
-        (329), 
-        (330), 
-        (207), 
-        (1132), 
-        (1134), 
-        (-1), #'HusbandryR', 
-        (35), 
-        (422), 
-        (548), 
-        (1744), 
-        (1746), 
-        (-1), #'Flaming CamelX', 
-        (49, 150), 
-        (280), 
-        (550), 
-        (588), 
-        (279), 
-        (542), 
-        (885), 
-        (36), 
-        (1709), 
-        (-1), #'Padded Archer ArmorR', 
-        (-1), #'Leather Archer ArmorR', 
-        (-1), #'Ring Archer ArmorR', 
-        (-1), #'FletchingR', 
-        (-1), #'Bodkin ArrowR', 
-        (-1), #'BracerR', 
-        (18, 19, 103, 105), 
-        (-1), #'ForgingR', 
-        (-1), #'Iron CastingR', 
-        (-1), #'Blast FurnaceR', 
-        (-1), #'Scale Barding ArmorR', 
-        (-1), #'Chain Barding ArmorR', 
-        (-1), #'Plate Barding ArmorR', 
-        (-1), #'Scale Mail ArmorR', 
-        (-1), #'Chain Mail ArmorR', 
-        (-1), #'Plate Mail ArmorR', 
-        (13), 
-        (1103), 
-        (529), 
-        (532), 
-        (545), 
-        (17), 
-        (-1), #'GillnetsR', 
-        (420), 
-        (691), 
-        (1104), 
-        (527), 
-        (528), 
-        (539), 
-        (21), 
-        (442), 
-        (1795), 
-        (45, 47, 51, 133, 805, 806, 807, 808), 
-        (831), 
-        (832), 
-        (-1), #'CareeningR', 
-        (-1), #'Dry DockR', 
-        (-1), #'ShipwrightR', 
-        (199), 
-        (-1), #'MasonryR', 
-        (-1), #'ArchitectureR', 
-        (-1), #'Fortified WallR', 
-        (-1), #'ChemistryR', 
-        (-1), #'Bombard TowerR', 
-        (-1), #'BallisticsR', 
-        (-1), #'Siege EngineersR', 
-        (209, 210), 
-        (-1), #'Guard TowerR', 
-        (-1), #'KeepR', 
-        (-1), #'Heated ShotR', 
-        (-1), #'ArrowslitsR', 
-        (-1), #'Murder HolesR', 
-        (-1), #'Treadmill CraneR', 
-        (598), 
-        (79), 
-        (234), 
-        (235), 
-        (236), 
-        (72), 
-        (789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804), 
-        (64, 78, 81, 88, 91, 95, 487, 490, 661, 663, 665, 667, 669, 671, 673, 1192), 
-        (117), 
-        (115), 
-        (-1), #'Unique UnitX', 
-        (-1), #'Elite Unique UnitX', 
-        (440), 
-        (331), 
-        (-1), #'Castle TechR', 
-        (-1), #'Imperial TechR', 
-        (82), 
-        (-1), #'HoardingsR', 
-        (-1), #'SappersR', 
-        (-1), #'ConscriptionR', 
-        (-1), #'SpiesR', 
-        (1251), 
-        (-1), #'KonnikX', 
-        (-1), #'Elite KonnikX', 
-        (1665), 
-        (-1), #'SerjeantX', 
-        (-1), #'Elite SerjeantX',
-        (125), 
-        (-1), #'IlluminationR', 
-        (775), 
-        (-1), #'Block PrintingR', 
-        (-1), #'DevotionR', 
-        (-1), #'FaithR', 
-        (-1), #'RedemptionR', 
-        (-1), #'TheocracyR', 
-        (30, 31, 32, 104), 
-        (-1), #'AtonementR', 
-        (-1), #'Herbal MedicineR', 
-        (-1), #'HeresyR', 
-        (-1), #'SanctityR', 
-        (-1), #'FervorR', 
-        (1806), 
-        (1811), 
-        (70, 191, 192, 463, 464, 465), 
-        (83), 
-        (-1), #'Town WatchR', 
-        (-1), #'Town PatrolR', 
-        (-1), #'Town CenterB', 
-        (-1), #'Feudal AgeR', 
-        (-1), #'Castle AgeR', 
-        (-1), #'Imperial AgeR', 
-        (-1), #'LoomR', 
-        (-1), #'WheelbarrowR', 
-        (-1), #'Hand CartR', 
-        (276), 
-        (1021), 
-        (1754), 
-        (584, 585, 586, 587), 
-        (-1), #'Gold MiningR', 
-        (-1), #'Gold Shaft MiningR', 
-        (-1), #'Stone MiningR', 
-        (-1), #'Stone Shaft MiningR', 
-        (1808), 
-        (562, 563, 564, 565), 
-        (-1), #'Double-Bit AxeR', 
-        (-1), #'Bow SawR', 
-        (-1), #'Two-Man SawR', 
-        (84, 116, 137, 1646), 
-        (128, 204), 
-        (-1), #'CoinageR', 
-        (-1), #'BankingR', 
-        (-1), #'CaravanR', 
-        (-1), #'GuildsR', 
-        (1711, 1720, 1734), 
-        (50), 
-        (68, 129, 130, 131), 
-        (-1), #'Horse CollarR', 
-        (-1), #'Heavy PlowR', 
-        (-1), #'Crop RotationR'
+        [4, 151], # Archer
+        [24, 100], # Crossbowman
+        [492, 237], # Arbalester
+        [7, 99], # Skirmisher
+        [6, 98], # Elite Skirmisher
+        [1155, 655], # Imperial Skirmisher
+        [185, 987], # Slinger
+        [5, 85], # Hand Cannoneer 
+        [39, 192], # Cavalry Archer
+        [474, 218], # Heavy Cavalry Archer
+        [873, 480], # Elephant Archer
+        [875, 481], # Elite Elephant Archer
+        [583, 427], # Genitour
+        [586, 430], # Elite Genitour
+        [437], # Thumb Ring
+        [436], # Parthian Tactics
+        [10, 14, 87], # Archery Range
+        [74, -1], # Militia
+        [75, 222], # Man-at-Arms
+        [77, 207], # Long Swordsman 
+        [473, 217], # Two-Handed Swordsman
+        [567, 264], # Champion
+        [716], # Supplies
+        [875], # Gambesons
+        [93, 87], # Spearman 
+        [358, 197], # Pikeman
+        [359, 429], # Halberdier
+        [12, 20, 132, 498], # Barracks
+        [751, 433], # Eagle Scout
+        [753, 384], # Eagle Warrior
+        [752, 434], # Elite Eagle Warrior
+        [215], # Squires
+        [184, 522], # Condottiero 
+        [602], # Arson
+        [448, 204], # Scout Cavalry
+        [546, 254], # Light Cavalry
+        [441, 428], # Hussar
+        [435], # Bloodlines
+        [1751, 842], # Shrivamsha Rider 
+        [1753, 843], # Elite Shrivamsha Rider 
+        [38, 166], # Knight
+        [283, 209], # Cavalier
+        [569, 265], # Paladin
+        [1370, 714], # Steppe Lancer
+        [1372, 715], # Elite Steppe Lancer
+        [86, 101, 153], # Stable
+        [1755, 858], # Camel Scout
+        [329, 235], # Camel Rider
+        [330, 236], # Heavy Camel Rider
+        [207, 521], # Imperial Camel Rider
+        [1132, 630], # Battle Elephant
+        [1134, 631], # Elite Battle Elephant
+        [39], # Husbandry
+        [35, 162], # Battering Ram
+        [422, 96], # Capped Ram
+        [548, 255], # Siege Ram
+        [1744, 837], # Armored Elephant
+        [1746, 838], # Siege Elephant
+        [1263, 703], # Flaming Camel
+        [49, 150], # Siege Workshop
+        [280, 358], # Mangonel
+        [550, 257], # Onager
+        [588, 320], # Siege Onager
+        [279, 94], # Scorpion
+        [542, 239], # Heavy Scorpion
+        [885, 603], # Siege Tower
+        [36, 172], # Bombard Cannon
+        [1709, 787], # Houfnice
+        [211], # Padded Archer Armor
+        [212], # Leather Archer Armor
+        [219], # Ring Archer Armor
+        [199], # Fletching
+        [200], # Bodkin Arrow
+        [201], # Bracer
+        [18, 19, 103, 105], # Blacksmith
+        [67], # Forging
+        [68], # Iron Casting
+        [75], # Blast Furnace
+        [81], # Scale Barding Armor
+        [82], # Chain Barding Armor
+        [80], # Plate Barding Armor
+        [74], # Scale Mail Armor
+        [76], # Chain Mail Armor
+        [77], # Plate Mail Armor
+        [13, 112], # Fishing Ship
+        [1103, 604], # Fire Galley
+        [529, 243], # Fire Ship
+        [532, 246], # Fast Fire Ship
+        [545, -1], # Transport Ship
+        [17, -1], # Trade Cog
+        [65], # Gillnets
+        [420, 37], # Cannon Galleon
+        [691, 376], # Elite Cannon Galleon
+        [1104, 605], # Demolition Raft
+        [527, -1], # Demolition Ship
+        [528, 244], # Heavy Demolition Ship
+        [539, 240], # Galley
+        [21, 34], # War Galley
+        [442, 35], # Galleon
+        [1795, 886], # Dromon
+        [45, 47, 51, 133, 805, 806, 807, 808], # Dock
+        [831, 447], # Turtle Ship
+        [832, 448], # Elite Turtle Ship
+        [374], # Careening
+        [375], # Dry Dock
+        [373], # Shipwright
+        [199, 357], # Fish Trap
+        [50], # Masonry
+        [51], # Architecture
+        [194], # Fortified Wall
+        [47], # Chemistry
+        [64], # Bombard Tower
+        [93], # Ballistics
+        [377], # Siege Engineers
+        [209, 210], # University
+        [140], # Guard Tower
+        [63], # Keep
+        [380], # Heated Shot
+        [608], # Arrowslits
+        [322], # Murder Holes
+        [54], # Treadmill Crane
+        [598, 332], # Outpost 
+        [79, 127], # Watch Tower
+        [234, 140], # Guard Tower
+        [235, 63], # Keep
+        [236, 64], # Bombard Tower
+        [72, 523], # Palisade Walls
+        [789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804], # Palisade Gate
+        [64, 78, 81, 88, 91, 95, 487, 490, 661, 663, 665, 667, 669, 671, 673, 1192], # Gate
+        [117, 189], # Stone Wall
+        [115, 194], # Fortified Wall
+        [-1], # 'Unique UnitX'
+        [-1], # 'Elite Unique UnitX'
+        [440, 426], # Petard
+        [331, 256], # Trebuchet (Packed)
+        [-1],  # 'Castle TechR'
+        [-1],  # 'Imperial TechR'
+        [82, -1], # Castle
+        [379], # Hoardings
+        [321], # Sappers
+        [315], # Conscription
+        [408], # Spies/Treason
+        [1251, -1], # Krepost
+        [-1], # 'KonnikX'
+        [-1], # 'Elite KonnikX'
+        [1665, -1], # Donjon
+        [-1], # 'SerjeantX'
+        [-1], # 'Elite SerjeantX'
+        [125, 157], # Monk
+        [233], # Illumination
+        [775, 84], # Missionary
+        [230], # Block Printing
+        [46], # Devotion
+        [45], # Faith
+        [316], # Redemption
+        [438], # Theocracy
+        [30, 31, 32, 104], # Monastery
+        [319], # Atonement
+        [441], # Herbal Medicine
+        [439], # Heresy
+        [231], # Sanctity
+        [252], # Fervor
+        [1806, 929], # Fortified Church
+        [1811, 948], # Warrior Priest
+        [70, 191, 192, 463, 464, 465], # House
+        [83, 116], # Villager
+        [8], # Town Watch
+        [280], # Town Patrol
+        [-1], # Town Center
+        [101], # Feudal Age
+        [102], # Castle Age
+        [103], # Imperial Age
+        [22], # Loom
+        [213], # Wheelbarrow
+        [249], # Hand Cart
+        [276, -1], # Wonder
+        [1021, 570], # Feitoria
+        [1754, 518], # Caravanserai
+        [1754, 552], # Caravanserai
+        [584, 585, 586, 587], # Mining Camp
+        [55], # Gold Mining
+        [182], # Gold Shaft Mining
+        [278], # Stone Mining
+        [279], # Stone Shaft Mining
+        [1808, 932], # Mule Cart
+        [562, 563, 564, 565], # Lumber Camp
+        [202], # Double-Bit Axe
+        [203], # Bow Saw
+        [221], # Two-Man Saw
+        [84, 116, 137, 1646], # Market
+        [128, 161], # Trade Cart
+        [23], # Coinage
+        [17], # Banking
+        [48], # Caravan
+        [15], # Guilds
+        [1711, 1720, 1734], # Folwark
+        [50, 216], # Farm
+        [68, 129, 130, 131], # Mill
+        [14], # Horse Collar
+        [13], # Heavy Plow
+        [12], # Crop Rotation
     ]
 
     block_index = 0
