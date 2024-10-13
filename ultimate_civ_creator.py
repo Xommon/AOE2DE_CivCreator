@@ -31,19 +31,13 @@ from genieutils.datfile import DatFile
 
 # Constants
 civilisation_objects = []
+CURRENT_CIV_INDEX = -1
 tech_tree_blocks = []
 ORIGINAL_FOLDER = ''
 MOD_FOLDER = ''
 DATA = ''
 DATA_FILE_DAT = ''
 unique_unit = ''
-
-# Tech tree blocks
-'''class TechTreeBlock:
-    def __init__(self, name: str, type: str, icon: str):
-        self.name = name
-        self.type = type
-        self.icon = icon'''
 
 # Civilisation object
 class Civilisation:
@@ -460,24 +454,12 @@ def open_project(path = None):
             lines = file.read().splitlines()
             ORIGINAL_FOLDER = lines[0]
             MOD_FOLDER = lines[1]
-        DATA_FILE_DAT = rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat'
-        MODDED_STRINGS_FILE = rf'{MOD_FOLDER}\resources\en\strings\key-value\key-value-modded-strings-utf8.txt'
-        CIV_TECH_TREES_FILE = rf'{MOD_FOLDER}\resources\_common\dat\civTechTrees.json'
-        CIV_IMAGE_FOLDER = rf'{MOD_FOLDER}\widgetui\textures\menu\civs'
-        DATA = DatFile.parse(DATA_FILE_DAT)
-
-        # Test change
-        #DATA.techs[22].resource_costs[0].amount = 69
-        '''DATA.civs[1].units[12].disabled = 1
-        DATA.civs[1].units[12].enabled = 0
-        DATA.civs[1].units[20].disabled = 1
-        DATA.civs[1].units[20].enabled = 0
-        DATA.civs[1].units[132].disabled = 1
-        DATA.civs[1].units[132].enabled = 0
-        DATA.civs[1].units[498].disabled = 1
-        DATA.civs[1].units[12].enabled = 0
-        
-        DATA.save(DATA_FILE_DAT)'''
+            DATA_FILE_DAT = rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat'
+            MODDED_STRINGS_FILE = rf'{MOD_FOLDER}\resources\en\strings\key-value\key-value-modded-strings-utf8.txt'
+            CIV_TECH_TREES_FILE = rf'{MOD_FOLDER}\resources\_common\dat\civTechTrees.json'
+            CIV_IMAGE_FOLDER = rf'{MOD_FOLDER}\widgetui\textures\menu\civs'
+            global DATA
+            DATA = DatFile.parse(DATA_FILE_DAT)
 
         # Import civilisations and create objects for them with unit values
         with open(CIV_TECH_TREES_FILE, 'r', encoding='utf-8') as file:
@@ -579,8 +561,11 @@ def eventFilter(self, source, event):
 
 def update_civilisation_dropdown():
     selected_value = MAIN_WINDOW.civilisation_dropdown.currentText()  # Get the current text
-    for civ in civilisation_objects:
+    for i, civ in enumerate(civilisation_objects):
         if (civ.name == selected_value):
+            global CURRENT_CIV_INDEX
+            CURRENT_CIV_INDEX = i
+            print('Setting current civ index to', i)
             new_description = civ.description[1:-1].replace('\\n', '\n').replace('<b>', '')
             MAIN_WINDOW.civilisation_description_label.setText(new_description)
             MAIN_WINDOW.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
@@ -607,7 +592,7 @@ def update_civilisation_dropdown():
                 print(str(e))
 
             # Castle and Impertial Techs
-            job_description = "Castle_Tech_4 will be replaced with Castle Tech and Imperial_Tech_4 will be replaced with Imperial Tech."
+            #job_description = "Castle_Tech_4 will be replaced with Castle Tech and Imperial_Tech_4 will be replaced with Imperial Tech."
 
             # Step 1: Extract the unique techs using regex
             
@@ -770,53 +755,11 @@ def update_civilisation_dropdown():
                 MAIN_WINDOW.architecture_dropdown.setCurrentIndex(5)
 
 def save_project():
-    DATA.save(DATA_FILE_DAT)
-    print("saving")
+    # Save changes
+    DATA.save(rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat')
+    print("Project Saved!")
 
-'''class Unit_Square(QtWidgets.QWidget):  # Inherit from QWidget to add it to a layout
-    def __init__(self, name: str, type: str, coordinates: [], enabled: bool = True):
-        super().__init__()
-        self.name = name
-        self.type = type
-        self.coordinates = coordinates
-        self.enabled = enabled
-
-        # Create background image
-        self.background = QtWidgets.QLabel(self)
-        self.background.setEnabled(self.enabled)
-        self.background.setGeometry(QtCore.QRect(0, 0, 75, 75))
-        self.background.setMinimumSize(QtCore.QSize(75, 75))
-        self.background.setMaximumSize(QtCore.QSize(75, 75))
-        self.background.setAutoFillBackground(False)
-        self.background.setText("")
-        self.background.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{name.capitalize()}.png"))
-        self.background.setScaledContents(True)
-        self.background.setObjectName(rf"background_{name.lower()}")
-
-        # Create icon
-        self.icon = QtWidgets.QLabel(self)
-        self.icon.setEnabled(self.enabled)
-        self.icon.setGeometry(QtCore.QRect(20, 10, 35, 35))
-        self.icon.setMinimumSize(QtCore.QSize(35, 35))
-        self.icon.setMaximumSize(QtCore.QSize(35, 33))
-        self.icon.setText("")
-        self.icon.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/{name.capitalize()}.png"))
-        self.icon.setScaledContents(True)
-        self.icon.setObjectName(rf"icon_{name.lower()}")
-
-        # Create text
-        self.text = QtWidgets.QLabel(self)
-        self.text.setEnabled(self.enabled)
-        self.text.setGeometry(QtCore.QRect(10, 46, 55, 16))
-        font = QtGui.QFont()
-        font.setPointSize(5)
-        self.text.setFont(font)
-        self.text.setStyleSheet("color: rgb(255, 255, 255);\n"
-                                "background-color: rgba(255, 255, 255, 0);")
-        self.text.setAlignment(QtCore.Qt.AlignCenter)
-        self.text.setWordWrap(True)
-        self.text.setObjectName(rf"text_{name.lower()}")
-        self.text.setText(name.title())'''
+    #DATA.techs[22].resource_costs[0].amount = 69
 
 class PixmapLabel(QtWidgets.QLabel):
     def __init__(self, parent=None):
@@ -959,9 +902,12 @@ class UnitBlock():
         self.enabled = True
         self.opacity_effect.setOpacity(0)
         self.disable_label.setGraphicsEffect(self.opacity_effect)
-
-        # Enabled equals
-        
+        try:
+            if DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].enabled != 1 and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].disabled != 0:
+                DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].enabled = 1
+                DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].disabled = 0
+        except Exception as e:
+            pass
 
         # Enable other units in hierarchy
         for hierarchy in self.hierarchies:
@@ -976,6 +922,12 @@ class UnitBlock():
         self.enabled = False
         self.opacity_effect.setOpacity(0.75)
         self.disable_label.setGraphicsEffect(self.opacity_effect)
+        try:
+            if DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].enabled != 0 and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].disabled != 1:
+                DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].enabled = 0
+                DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code].disabled = 1
+        except Exception as e:
+            pass
 
         # Enabled equals
         
@@ -1023,7 +975,209 @@ if __name__ == "__main__":
     MAIN_WINDOW.label_4.setPixmap(QtGui.QPixmap(rf"{os.path.dirname(os.path.abspath(__file__))}/Images/TechTree/imperial_age.png"))
 
     # Setup objects
-    #unit_codes = [4, 24, 492, 7, 6, 1155, 185, 5, 39, 474, 873, 875, 583, 586, 437, 'Parthian TacticsR', 'Archery RangeB', 'MilitiaU', 'Man-at-ArmsU', 'Long SwordsmanU', 'Two-Handed SwordsmanU', 'ChampionU', 'SuppliesR', 'GambesonsR', 'SpearmanU', 'PikemanU', 'HalberdierU', 'BarracksB', 'Eagle ScoutU', 'Eagle WarriorU', 'Elite Eagle WarriorU', 'SquiresR', 'CondottieroX', 'ArsonR', 'Scout CavalryU', 'Light CavalryU', 'HussarU', 'BloodlinesR', 'Shrivamsha RiderX', 'Elite Shrivamsha RiderX', 'KnightU', 'CavalierU', 'PaladinU', 'Steppe LancerU', 'Elite Steppe LancerU', 'StableB', 'Camel ScoutX', 'Camel RiderU', 'Heavy Camel RiderU', 'Imperial Camel RiderX', 'Battle ElephantU', 'Elite Battle ElephantU', 'HusbandryR', 'Battering RamU', 'Capped RamU', 'Siege RamU', 'Armored ElephantU', 'Siege ElephantU', 'Flaming CamelX', 'Siege WorkshopB', 'MangonelU', 'OnagerU', 'Siege OnagerU', 'ScorpionU', 'Heavy ScorpionU', 'Siege TowerU', 'Bombard CannonU', 'HoufniceX', 'Padded Archer ArmorR', 'Leather Archer ArmorR', 'Ring Archer ArmorR', 'FletchingR', 'Bodkin ArrowR', 'BracerR', 'BlacksmithB', 'ForgingR', 'Iron CastingR', 'Blast FurnaceR', 'Scale Barding ArmorR', 'Chain Barding ArmorR', 'Plate Barding ArmorR', 'Scale Mail ArmorR', 'Chain Mail ArmorR', 'Plate Mail ArmorR', 'Fishing ShipU', 'Fire GalleyU', 'Fire ShipU', 'Fast Fire ShipU', 'Transport ShipU', 'Trade CogU', 'GillnetsR', 'Cannon GalleonU', 'Elite Cannon GalleonU', 'Demolition RaftU', 'Demolition ShipU', 'Heavy Demolition ShipU', 'GalleyU', 'War GalleyU', 'GalleonU', 'DromonU', 'DockB', 'Turtle ShipU', 'Elite Turtle ShipU', 'CareeningR', 'Dry DockR', 'ShipwrightR', 'Fish TrapB', 'MasonryR', 'ArchitectureR', 'Fortified WallR', 'ChemistryR', 'Bombard TowerR', 'BallisticsR', 'Siege EngineersR', 'UniversityB', 'Guard TowerR', 'KeepR', 'Heated ShotR', 'ArrowslitsR', 'Murder HolesR', 'Treadmill CraneR', 'OutpostB', 'Watch TowerB', 'Guard TowerBB', 'KeepBB', 'Bombard TowerBB', 'Palisade WallB', 'Palisade GateB', 'GateB', 'Stone WallB', 'Fortified WallBB', 'Unique UnitX', 'Elite Unique UnitX', 'PetardU', 'TrebuchetU', 'Castle TechR', 'Imperial TechR', 'CastleB', 'HoardingsR', 'SappersR', 'ConscriptionR', 'SpiesR', 'KrepostB', 'KonnikX', 'Elite KonnikX', 'DonjonB', 'SerjeantX', 'Elite SerjeantX', 'SpearmanXU', 'PikemanXU', 'HalberdierXU', 'MonkU', 'IlluminationR', 'MissionaryX', 'Block PrintingR', 'DevotionR', 'FaithR', 'RedemptionR', 'TheocracyR', 'MonasteryB', 'AtonementR', 'Herbal MedicineR', 'HeresyR', 'SanctityR', 'FervorR', 'Fortified ChurchB', 'Warrior PriestX', 'HouseB', 'VillagerU', 'Town WatchR', 'Town PatrolR', 'Town CenterB', 'Feudal AgeR', 'Castle AgeR', 'Imperial AgeR', 'LoomR', 'WheelbarrowR', 'Hand CartR', 'WonderB', 'FeitoriaB', 'CaravanseraiB', 'Mining CampB', 'Gold MiningR', 'Gold Shaft MiningR', 'Stone MiningR', 'Stone Shaft MiningR', 'Mule CartB', 'Lumber CampB', 'Double-Bit AxeR', 'Bow SawR', 'Two-Man SawR', 'MarketB', 'Trade CartU', 'CoinageR', 'BankingR', 'CaravanR', 'GuildsR', 'FolwarkB', 'FarmB', 'MillB', 'Horse CollarR', 'Heavy PlowR', 'Crop RotationR']:
+    unit_codes = [
+        (4), 
+        (24), 
+        (492), 
+        (7), 
+        (6), 
+        (1155), 
+        (185), 
+        (5), 
+        (39), 
+        (474), 
+        (873), 
+        (875), 
+        (583), 
+        (586), 
+        (437), 
+        (-1), #'Parthian TacticsR', 
+        (10, 14, 87), 
+        (74), 
+        (75), 
+        (77), 
+        (473), 
+        (567), 
+        (-1), #'SuppliesR', 
+        (-1), #'GambesonsR', 
+        (93), 
+        (358), 
+        (359), 
+        (12, 20, 132, 498), 
+        (751), 
+        (753), 
+        (752), 
+        (-1), #'SquiresR', 
+        (184), 
+        (-1), #'ArsonR', 
+        (448), 
+        (546), 
+        (441), 
+        (-1), #'BloodlinesR', 
+        (1751), 
+        (1753), 
+        (38), 
+        (283), 
+        (569), 
+        (1370), 
+        (1372), 
+        (86, 101, 153), 
+        (1755), 
+        (329), 
+        (330), 
+        (207), 
+        (1132), 
+        (1134), 
+        (-1), #'HusbandryR', 
+        (35), 
+        (422), 
+        (548), 
+        (1744), 
+        (1746), 
+        (-1), #'Flaming CamelX', 
+        (49, 150), 
+        (280), 
+        (550), 
+        (588), 
+        (279), 
+        (542), 
+        (885), 
+        (36), 
+        (1709), 
+        (-1), #'Padded Archer ArmorR', 
+        (-1), #'Leather Archer ArmorR', 
+        (-1), #'Ring Archer ArmorR', 
+        (-1), #'FletchingR', 
+        (-1), #'Bodkin ArrowR', 
+        (-1), #'BracerR', 
+        (18, 19, 103, 105), 
+        (-1), #'ForgingR', 
+        (-1), #'Iron CastingR', 
+        (-1), #'Blast FurnaceR', 
+        (-1), #'Scale Barding ArmorR', 
+        (-1), #'Chain Barding ArmorR', 
+        (-1), #'Plate Barding ArmorR', 
+        (-1), #'Scale Mail ArmorR', 
+        (-1), #'Chain Mail ArmorR', 
+        (-1), #'Plate Mail ArmorR', 
+        (13), 
+        (1103), 
+        (529), 
+        (532), 
+        (545), 
+        (17), 
+        (-1), #'GillnetsR', 
+        (420), 
+        (691), 
+        (1104), 
+        (527), 
+        (528), 
+        (539), 
+        (21), 
+        (442), 
+        (1795), 
+        (45, 47, 51, 133, 805, 806, 807, 808), 
+        (831), 
+        (832), 
+        (-1), #'CareeningR', 
+        (-1), #'Dry DockR', 
+        (-1), #'ShipwrightR', 
+        (199), 
+        (-1), #'MasonryR', 
+        (-1), #'ArchitectureR', 
+        (-1), #'Fortified WallR', 
+        (-1), #'ChemistryR', 
+        (-1), #'Bombard TowerR', 
+        (-1), #'BallisticsR', 
+        (-1), #'Siege EngineersR', 
+        (209, 210), 
+        (-1), #'Guard TowerR', 
+        (-1), #'KeepR', 
+        (-1), #'Heated ShotR', 
+        (-1), #'ArrowslitsR', 
+        (-1), #'Murder HolesR', 
+        (-1), #'Treadmill CraneR', 
+        (598), 
+        (79), 
+        (234), 
+        (235), 
+        (236), 
+        (72), 
+        (789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804), 
+        (64, 78, 81, 88, 91, 95, 487, 490, 661, 663, 665, 667, 669, 671, 673, 1192), 
+        (117), 
+        (115), 
+        (-1), #'Unique UnitX', 
+        (-1), #'Elite Unique UnitX', 
+        (440), 
+        (331), 
+        (-1), #'Castle TechR', 
+        (-1), #'Imperial TechR', 
+        (82), 
+        (-1), #'HoardingsR', 
+        (-1), #'SappersR', 
+        (-1), #'ConscriptionR', 
+        (-1), #'SpiesR', 
+        (1251), 
+        (-1), #'KonnikX', 
+        (-1), #'Elite KonnikX', 
+        (1665), 
+        (-1), #'SerjeantX', 
+        (-1), #'Elite SerjeantX',
+        (125), 
+        (-1), #'IlluminationR', 
+        (775), 
+        (-1), #'Block PrintingR', 
+        (-1), #'DevotionR', 
+        (-1), #'FaithR', 
+        (-1), #'RedemptionR', 
+        (-1), #'TheocracyR', 
+        (30, 31, 32, 104), 
+        (-1), #'AtonementR', 
+        (-1), #'Herbal MedicineR', 
+        (-1), #'HeresyR', 
+        (-1), #'SanctityR', 
+        (-1), #'FervorR', 
+        (1806), 
+        (1811), 
+        (70, 191, 192, 463, 464, 465), 
+        (83), 
+        (-1), #'Town WatchR', 
+        (-1), #'Town PatrolR', 
+        (-1), #'Town CenterB', 
+        (-1), #'Feudal AgeR', 
+        (-1), #'Castle AgeR', 
+        (-1), #'Imperial AgeR', 
+        (-1), #'LoomR', 
+        (-1), #'WheelbarrowR', 
+        (-1), #'Hand CartR', 
+        (276), 
+        (1021), 
+        (1754), 
+        (584, 585, 586, 587), 
+        (-1), #'Gold MiningR', 
+        (-1), #'Gold Shaft MiningR', 
+        (-1), #'Stone MiningR', 
+        (-1), #'Stone Shaft MiningR', 
+        (1808), 
+        (562, 563, 564, 565), 
+        (-1), #'Double-Bit AxeR', 
+        (-1), #'Bow SawR', 
+        (-1), #'Two-Man SawR', 
+        (84, 116, 137, 1646), 
+        (128, 204), 
+        (-1), #'CoinageR', 
+        (-1), #'BankingR', 
+        (-1), #'CaravanR', 
+        (-1), #'GuildsR', 
+        (1711, 1720, 1734), 
+        (50), 
+        (68, 129, 130, 131), 
+        (-1), #'Horse CollarR', 
+        (-1), #'Heavy PlowR', 
+        (-1), #'Crop RotationR'
+    ]
+
     block_index = 0
     for unit in ['ArcherU', 'CrossbowmanU', 'ArbalesterU', 'SkirmisherU', 'Elite SkirmisherU', 'Imperial SkirmisherX', 'SlingerX', 'Hand CannoneerU', 'Cavalry ArcherU', 'Heavy Cavalry ArcherU', 'Elephant ArcherU', 'Elite Elephant ArcherU', 'GenitourX', 'Elite GenitourX', 'Thumb RingR', 'Parthian TacticsR', 'Archery RangeB', 'MilitiaU', 'Man-at-ArmsU', 'Long SwordsmanU', 'Two-Handed SwordsmanU', 'ChampionU', 'SuppliesR', 'GambesonsR', 'SpearmanU', 'PikemanU', 'HalberdierU', 'BarracksB', 'Eagle ScoutU', 'Eagle WarriorU', 'Elite Eagle WarriorU', 'SquiresR', 'CondottieroX', 'ArsonR', 'Scout CavalryU', 'Light CavalryU', 'HussarU', 'BloodlinesR', 'Shrivamsha RiderX', 'Elite Shrivamsha RiderX', 'KnightU', 'CavalierU', 'PaladinU', 'Steppe LancerU', 'Elite Steppe LancerU', 'StableB', 'Camel ScoutX', 'Camel RiderU', 'Heavy Camel RiderU', 'Imperial Camel RiderX', 'Battle ElephantU', 'Elite Battle ElephantU', 'HusbandryR', 'Battering RamU', 'Capped RamU', 'Siege RamU', 'Armored ElephantU', 'Siege ElephantU', 'Flaming CamelX', 'Siege WorkshopB', 'MangonelU', 'OnagerU', 'Siege OnagerU', 'ScorpionU', 'Heavy ScorpionU', 'Siege TowerU', 'Bombard CannonU', 'HoufniceX', 'Padded Archer ArmorR', 'Leather Archer ArmorR', 'Ring Archer ArmorR', 'FletchingR', 'Bodkin ArrowR', 'BracerR', 'BlacksmithB', 'ForgingR', 'Iron CastingR', 'Blast FurnaceR', 'Scale Barding ArmorR', 'Chain Barding ArmorR', 'Plate Barding ArmorR', 'Scale Mail ArmorR', 'Chain Mail ArmorR', 'Plate Mail ArmorR', 'Fishing ShipU', 'Fire GalleyU', 'Fire ShipU', 'Fast Fire ShipU', 'Transport ShipU', 'Trade CogU', 'GillnetsR', 'Cannon GalleonU', 'Elite Cannon GalleonU', 'Demolition RaftU', 'Demolition ShipU', 'Heavy Demolition ShipU', 'GalleyU', 'War GalleyU', 'GalleonU', 'DromonU', 'DockB', 'Turtle ShipU', 'Elite Turtle ShipU', 'CareeningR', 'Dry DockR', 'ShipwrightR', 'Fish TrapB', 'MasonryR', 'ArchitectureR', 'Fortified WallR', 'ChemistryR', 'Bombard TowerR', 'BallisticsR', 'Siege EngineersR', 'UniversityB', 'Guard TowerR', 'KeepR', 'Heated ShotR', 'ArrowslitsR', 'Murder HolesR', 'Treadmill CraneR', 'OutpostB', 'Watch TowerB', 'Guard TowerBB', 'KeepBB', 'Bombard TowerBB', 'Palisade WallB', 'Palisade GateB', 'GateB', 'Stone WallB', 'Fortified WallBB', 'Unique UnitX', 'Elite Unique UnitX', 'PetardU', 'TrebuchetU', 'Castle TechR', 'Imperial TechR', 'CastleB', 'HoardingsR', 'SappersR', 'ConscriptionR', 'SpiesR', 'KrepostB', 'KonnikX', 'Elite KonnikX', 'DonjonB', 'SerjeantX', 'Elite SerjeantX', 'MonkU', 'IlluminationR', 'MissionaryX', 'Block PrintingR', 'DevotionR', 'FaithR', 'RedemptionR', 'TheocracyR', 'MonasteryB', 'AtonementR', 'Herbal MedicineR', 'HeresyR', 'SanctityR', 'FervorR', 'Fortified ChurchB', 'Warrior PriestX', 'HouseB', 'VillagerU', 'Town WatchR', 'Town PatrolR', 'Town CenterB', 'Feudal AgeR', 'Castle AgeR', 'Imperial AgeR', 'LoomR', 'WheelbarrowR', 'Hand CartR', 'WonderB', 'FeitoriaB', 'CaravanseraiB', 'Mining CampB', 'Gold MiningR', 'Gold Shaft MiningR', 'Stone MiningR', 'Stone Shaft MiningR', 'Mule CartB', 'Lumber CampB', 'Double-Bit AxeR', 'Bow SawR', 'Two-Man SawR', 'MarketB', 'Trade CartU', 'CoinageR', 'BankingR', 'CaravanR', 'GuildsR', 'FolwarkB', 'FarmB', 'MillB', 'Horse CollarR', 'Heavy PlowR', 'Crop RotationR']:
         try:
@@ -1069,7 +1223,7 @@ if __name__ == "__main__":
             disable_label.setScaledContents(True)
 
             # Add new block to the list
-            new_block = UnitBlock(block_index, unit_name, type, -1, True)
+            new_block = UnitBlock(block_index, unit_name, type, unit_codes[block_index], True)
             unit_blocks.append(new_block)
             block_index += 1
 
@@ -1081,7 +1235,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(rf'Failed Block: {unit} : {str(e)}')
 
-    '''unit_list = [
         'Archer',                # 0
         'Crossbowman',           # 1
         'Arbalester',            # 2
@@ -1230,60 +1383,58 @@ if __name__ == "__main__":
         'Donjon',                # 145
         'Serjeant',              # 146
         'Elite Serjeant',        # 147
-        
-        'Monk',                  # 151
-        'Illumination',          # 152
-        'Missionary',            # 153
-        'Block Printing',        # 154
-        'Devotion',              # 155
-        'Faith',                 # 156
-        'Redemption',            # 157
-        'Theocracy',             # 158
-        'Monastery',             # 159
-        'Atonement',             # 160
-        'Herbal Medicine',       # 161
-        'Heresy',                # 162
-        'Sanctity',              # 163
-        'Fervor',                # 164
-        'Fortified Church',      # 165
-        'Warrior Priest',        # 166
-        'House',                 # 167
-        'Villager',              # 168
-        'Town Watch',            # 169
-        'Town Patrol',           # 170
-        'Town Center',           # 171
-        'Feudal Age',            # 172
-        'Castle Age',            # 173
-        'Imperial Age',          # 174
-        'Loom',                  # 175
-        'Wheelbarrow',           # 176
-        'Hand Cart',             # 177
-        'Wonder',                # 178
-        'Feitoria',              # 179
-        'Caravanserai',          # 180
-        'Mining Camp',           # 181
-        'Gold Mining',           # 182
-        'Gold Shaft Mining',     # 183
-        'Stone Mining',          # 184
-        'Stone Shaft Mining',    # 185
-        'Mule Cart',             # 186
-        'Lumber Camp',           # 187
-        'Double-Bit Axe',        # 188
-        'Bow Saw',               # 189
-        'Two-Man Saw',           # 190
-        'Market',                # 191
-        'Trade Cart',            # 192
-        'Coinage',               # 193
-        'Banking',               # 194
-        'Caravan',               # 195
-        'Guilds',                # 196
-        'Folwark',               # 197
-        'Farm',                  # 198
-        'Mill',                  # 199
-        'Horse Collar',          # 200
-        'Heavy Plow',            # 201
-        'Crop Rotation'          # 202
-    ]'''
+        'Monk',                  # 148
+        'Illumination',          # 149
+        'Missionary',            # 150
+        'Block Printing',        # 151
+        'Devotion',              # 152
+        'Faith',                 # 153
+        'Redemption',            # 154
+        'Theocracy',             # 155
+        'Monastery',             # 156
+        'Atonement',             # 157
+        'Herbal Medicine',       # 158
+        'Heresy',                # 159
+        'Sanctity',              # 160
+        'Fervor',                # 161
+        'Fortified Church',      # 162
+        'Warrior Priest',        # 163
+        'House',                 # 164
+        'Villager',              # 165
+        'Town Watch',            # 166
+        'Town Patrol',           # 167
+        'Town Center',           # 168
+        'Feudal Age',            # 169
+        'Castle Age',            # 170
+        'Imperial Age',          # 171
+        'Loom',                  # 172
+        'Wheelbarrow',           # 173
+        'Hand Cart',             # 174
+        'Wonder',                # 175
+        'Feitoria',              # 176
+        'Caravanserai',          # 177
+        'Mining Camp',           # 178
+        'Gold Mining',           # 179
+        'Gold Shaft Mining',     # 180
+        'Stone Mining',          # 181
+        'Stone Shaft Mining',    # 182
+        'Mule Cart',             # 183
+        'Lumber Camp',           # 184
+        'Double-Bit Axe',        # 185
+        'Bow Saw',               # 186
+        'Two-Man Saw',           # 187
+        'Market',                # 188
+        'Trade Cart',            # 189
+        'Coinage',               # 190
+        'Banking',               # 191
+        'Caravan',               # 192
+        'Guilds',                # 193
+        'Folwark',               # 194
+        'Farm',                  # 195
+        'Mill',                  # 196
+        'Horse Collar',          # 197
+        'Heavy Plow',            # 198
+        'Crop Rotation'          # 199
 
     # Show the main window
     MainWindow.setWindowTitle(f"Talofa")
