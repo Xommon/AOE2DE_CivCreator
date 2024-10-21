@@ -370,6 +370,7 @@ def new_project(project_name):
                     elif '\"Name\":' in line and current_civilisation is not None:
                         # Enter new unit name
                         currentUnit = line[18:].replace('"', '').replace(',', '')
+
                     elif '\"Node Status\":' in line and current_civilisation is not None:
                         # Determine the unit's availability status and store it
                         status = line[25:].replace('"', '').replace(',', '')
@@ -490,20 +491,17 @@ def open_project(path = None):
                 with open('data.pkl', 'wb') as serialized_file:
                     pickle.dump(DATA, serialized_file)
 
-            #print(DATA.civs[1].units[86].language_dll_name, DATA.civs[1].units[86].standing_graphic[0])
-            #DATA.civs[1].units[86].standing_graphic[0] = 10068
-            #DATA.civs[1].units[101].standing_graphic[0] = 10061
-            #DATA.civs[1].units[153].standing_graphic[0] = 10068
             #DATA.techs[22].resource_costs[0].amount = 69 --- THIS STILL WORKS
 
         # Import civilisations and create objects for them with unit values
         with open(CIV_TECH_TREES_FILE, 'r', encoding='utf-8') as file:
-            lines = file.read().splitlines()
+            global JSON_DATA
+            JSON_DATA = json.dumps(json.load(file), indent=2).splitlines()
             MAIN_WINDOW.civilisation_dropdown.clear()  # Clear the dropdown before adding new items
             current_civilisation = None  # Initialize this to track the current civilisation
             civ_read_offset = 0
 
-            for line in lines:
+            for line in JSON_DATA:
                 if '\"civ_id\":' in line:
                     # Get the true name of the civilisation
                     true_name = line[16:].replace('"', '').replace(',', '').capitalize()
@@ -554,7 +552,7 @@ def open_project(path = None):
         # Clear dropdowns and populate with new data
         MAIN_WINDOW.architecture_dropdown.clear()
         MAIN_WINDOW.language_dropdown.clear()
-        MAIN_WINDOW.architecture_dropdown.addItems(["Britons", "Franks", "Goths", "Teutons", "Japanese", "Chinese", "Byzantines", "Persians", "Saracens", "Turks", "Vikings", "Mongols", "Celts", "Spanish", "Aztecs", "Mayans", "Huns", "Koreans", "Italians", "Indians", "Incas", "Magyar", "Slavs", "Portuguese", "Ethiopians", "Malians", "Berbers", "Khmer", "Malay", "Burmese", "Vietnamese", "Bulgarians", "Tatars", "Cumans", "Lithuanians", "Burgundians", "Sicilians", "Poles", "Bohemians", "Dravidians", "Bengalis", "Gurjaras", "Romans", "Armenians", "Georgians"])
+        MAIN_WINDOW.architecture_dropdown.addItems(["Britons", "Franks", "Goths", "Teutons", "Japanese", "Chinese", "Byzantines", "Persians", "Saracens", "Turks", "Vikings", "Mongols", "Celts", "Spanish", "Aztecs", "Mayans", "Huns", "Koreans", "Italians", "Hindustanis", "Incas", "Magyar", "Slavs", "Portuguese", "Ethiopians", "Malians", "Berbers", "Khmer", "Malay", "Burmese", "Vietnamese", "Bulgarians", "Tatars", "Cumans", "Lithuanians", "Burgundians", "Sicilians", "Poles", "Bohemians", "Dravidians", "Bengalis", "Gurjaras", "Romans", "Armenians", "Georgians"])
         MAIN_WINDOW.language_dropdown.addItems(
             ["Armenians [Armenian]", "Aztecs [Nahuatl]", "Bengalis [Shadhu Bengali]", "Berbers [Taqbaylit]",
             "Bohemians [Czech]", "Britons [Middle English]", "Bulgarians [South Slavic]", "Burgundians [Burgundian]",
@@ -872,21 +870,15 @@ def update_architecture_dropdown():
             pass
 
 def save_project():
-    #open_saving_window('Saving project...')
+    open_saving_window('Saving project...')
 
     # Save changes to .dat file
     DATA.save(rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat')
 
     # Write changes to tech tree JSON
-    
-
-    '''with open('civTechTrees.json', 'w') as file:
-        #lines = file.readlines()
-        #current_civ, current_item = ''
-
-        #for line in lines:
-
-        json.dump(JSON_DATA, file, indent=4)'''
+    json_string = '\n'.join(JSON_DATA)
+    with open(CIV_TECH_TREES_FILE, 'w', encoding='utf-8') as file:
+        file.write(json_string)
 
     print("Project Saved!")
 
@@ -901,27 +893,6 @@ class PixmapLabel(QtWidgets.QLabel):
 
     def getPixmapPath(self):
         return self._pixmap_path  # Return the stored path
-
-def enable_disable_tech(enable, index):
-    # Create disabling effect
-    #disable_effect = genieutils.effect.Effect('disable', )
-    #effect_command = genieutils.effect.EffectCommand(102, 0, 0, 0, index) # Index of research that's disabled
-    #disable_effect = genieutils.effect.Effect('Disable Tech', effect_command)
-    #effect_command.type = 102
-    #effect_command.d = index 
-    #disable_effect.effect_commands.append(effect_command)
-    #DATA.effects.append(disable_effect)
-    #disabling_tech = genieutils.tech.Tech()
-    #disabling_tech.civ = CURRENT_CIV_INDEX + 1 # Civ index
-    #disabling_tech.effect_id = len(DATA.effects) - 1 # Index of disable effect
-
-    '''try:
-        if enable:
-            DATA.techs.pop(disabling_tech)
-        else:
-            DATA.techs.append(disabling_tech)
-    except Exception as e:
-        print(str(e))'''
 
 # Unit blocks
 unit_blocks = []
@@ -1063,103 +1034,55 @@ class UnitBlock():
         self.disable_label.setGraphicsEffect(self.opacity_effect)
 
         if not setup:
+            # Change units dictionary
+            if status:
+                civilisation_objects[CURRENT_CIV_INDEX].units[self.name] = 1
+            else:
+                civilisation_objects[CURRENT_CIV_INDEX].units[self.name] = 2
+
             # Change data
             tech_tree_techs = [254, 258, 259, 262, 255, 257, 256, 260, 261, 263, 276, 277, 275, 446, 447, 449, 448, 504, 10, 1, 3, 5, 7, 31, 48, 42, 37, 646, 648, 650, 652, 706, 708, 710, 712, 782, 784, 801, 803, 838, 840, 842, 890, 925, 927]
             if status:
                 for i, effect_command in enumerate(DATA.effects[tech_tree_techs[CURRENT_CIV_INDEX]].effect_commands):
-                    if effect_command.type == 102 and effect_command.d == float(self.unit_code):
+                    if effect_command.type == 102 and effect_command.d == self.unit_code:
                         DATA.effects[tech_tree_techs[CURRENT_CIV_INDEX]].effect_commands.pop(i)
             else:
-                DATA.effects[tech_tree_techs[CURRENT_CIV_INDEX]].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, float(self.unit_code)))
+                DATA.effects[tech_tree_techs[CURRENT_CIV_INDEX]].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, self.unit_code))
 
-        # Change the JSON
-        '''with open(CIV_TECH_TREES_FILE, 'r+', encoding='utf-8') as file:
-            data = json.load(file)
-            # Find the civilization based on the current civilization's true name
-            civ = next((civ for civ in data['civs'] if civ['civ_id'] == civilisation_objects[CURRENT_CIV_INDEX].true_name.upper()), None)
-            if civ:
-                # Search each category for self.name
-                for category in ['civ_techs_buildings', 'civ_techs_units', 'civ_techs_research']:
-                    for item in civ.get(category, []):
-                        if item.get('Name') == self.name:
-                            if self.enabled:
-                                item['Node Status'] = 'ResearchedCompleted'
-                            else:
-                                item['Node Status'] = 'NotAvailable'
-                            break
-                        
-            # Write the updated data back to the file
-            file.seek(0)  # Move to the start of the file
-            json.dump(data, file, indent=2)  # Write the updated JSON
-            file.truncate()  # Truncate the remaining part of the file'''
-
-
-        '''if not setup:
-            # Change unit status in .dat
-            if status and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code[0]].enabled != 1 and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code[0]].disabled != 0:
-                for i, code in enumerate(self.unit_code):
-                    if len(self.unit_code) == 1: # Technology
-                        #DATA.techs[22].resource_costs[0].amount = 69
-                        enable_disable_tech(False, code)
-                    elif len(self.unit_code) == 2: # Unit
-                        if i == 0:
-                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].enabled = 0
-                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].disabled = 1
-                        elif i == 1:
-                            if self.unit_code[i] == -1:
-                                pass
-                            enable_disable_tech(False, code)
-                    elif len(self.unit_code) > 2: # Building
-                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].enabled = 0
-                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].disabled = 1
-            elif not status and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code[0]].enabled != 0 and DATA.civs[CURRENT_CIV_INDEX + 1].units[self.unit_code[0]].disabled != 1:
-                for i, code in enumerate(self.unit_code):
-                    if len(self.unit_code) == 1: # Technology
-                        enable_disable_tech(True, code)
-                    elif len(self.unit_code) == 2: # Unit
-                        if i == 0:
-                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].enabled = 1
-                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].disabled = 0
-                        elif i == 1:
-                            if self.unit_code[i] == -1:
-                                pass
-                            enable_disable_tech(True, code)
-                    elif len(self.unit_code) > 2: # Building
-                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].enabled = 1
-                            DATA.civs[CURRENT_CIV_INDEX + 1].units[code].disabled = 0
-
-            # Change unit status in .json
-            with open(CIV_TECH_TREES_FILE, 'r+') as file:
-                parser = ijson.items(file, 'civs.item')
-                for civ in parser:
-                    if civ['civ_id'] == civilisation_objects[CURRENT_CIV_INDEX].true_name.upper():
-                        # Check through both buildings and units, or any tech node
-                        for category in ['civ_techs_buildings', 'civ_techs_units', 'civ_techs_research']:
-                            if category in civ:
-                                for item in civ[category]:
-                                    if item['Name'] == self.name:
-                                        if status:
-                                            item['Node Status'] = 'ResearchedCompleted'
-                                        else:
-                                            item['Node Status'] = 'NotAvailable'
-                                        break
-                                    
-                # Enable/disable connected blocks
-                if first:
-                    try:
-                        for hierarchy in self.hierarchies:
-                            if self.index in hierarchy:
-                                if not status:
-                                    hierarchy.reverse()
-                                for unit_index in hierarchy:
-                                    if unit_index != self.index:
-                                        unit_blocks[unit_index].enable_disable(status, False, False)
+            # Change the JSON
+            for i, line in enumerate(JSON_DATA):
+                if civilisation_objects[CURRENT_CIV_INDEX].true_name.upper() in line:
+                    # Start searching from this point onward for the unit
+                    for i2, line in enumerate(JSON_DATA[i:]):
+                        if self.name in line:
+                            # Start searching from this point onward for "Node Status"
+                            for i3, line in enumerate(JSON_DATA[i + i2:]):
+                                if 'Node Status' in line:
+                                    # Update the line based on self.enabled
+                                    if self.enabled:
+                                        JSON_DATA[i + i2 + i3] = '          "Node Status": "ResearchedCompleted",'
                                     else:
-                                        if not status:
-                                            hierarchy.reverse()
-                                        break
-                    except:
-                        pass'''
+                                        JSON_DATA[i + i2 + i3] = '          "Node Status": "NotAvailable",'
+                                    break
+                            break
+                    break
+
+            # Enable/disable connected blocks
+            if first:
+                try:
+                    for hierarchy in self.hierarchies:
+                        if self.index in hierarchy:
+                            if not status:
+                                hierarchy.reverse()
+                            for unit_index in hierarchy:
+                                if unit_index != self.index:
+                                    unit_blocks[unit_index].enable_disable(status, False, False)
+                                else:
+                                    if not status:
+                                        hierarchy.reverse()
+                                    break
+                except:
+                    pass
 
     def on_button_clicked(self):
         self.enable_disable(not self.enabled, False, True)
