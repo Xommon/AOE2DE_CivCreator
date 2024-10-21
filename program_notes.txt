@@ -105,4 +105,3 @@ guilds:
 horse collar
 heavy plow
 crop rotation
-
