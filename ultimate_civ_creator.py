@@ -1017,14 +1017,10 @@ class UnitBlock():
             [197, 198, 199]
         ]
 
-        #self.equals = [(24, 148), (25, 149), (26, 150), (111, 125), (109, 130), (115, 123), (116, 124)]
+        self.equals = [(24, 148), (25, 149), (26, 150), (111, 125), (109, 130), (115, 123), (116, 124)]
         #self.opposites = [(6, 7), (8, 10), (9, 10), (10, 8), (11, 8), (53, 56), (54, 56), (55, 56), (56, 53), (57, 53), (186, 181), (186, 187), (199, 197)]
 
     def enable_disable(self, status, setup, first):
-        # status = enabled or disabled (true/false)
-        # setup = only cosmetic
-        # first = first button in a series to change
-
         # Set the visuals
         self.enabled = status
         if status:
@@ -1066,6 +1062,14 @@ class UnitBlock():
                                     break
                             break
                     break
+
+            # Link blocks
+            if first:
+                for equal in self.equals:
+                    if self.index in equal:
+                        for pair in equal:
+                            unit_blocks[pair].enable_disable(status, False, False)
+                        
 
             # Enable/disable connected blocks
             if first:
