@@ -1,6 +1,8 @@
 from PyQt5 import QtWidgets
+import genieutils.civ
 import genieutils.effect
 import genieutils.sound
+import genieutils.tech
 import genieutils.techtree
 from main_window import Ui_MainWindow
 from create_project_window import Ui_CreateProjectWindow
@@ -37,6 +39,9 @@ import asyncio
 import traceback
 import pyperclip
 import requests
+from PyQt5.QtWidgets import QPlainTextEdit, QApplication
+from openai import OpenAI
+from PyQt5.QtCore import Qt
 
 # Constants
 civilisation_objects = []
@@ -679,30 +684,69 @@ def update_civilisation_dropdown():
             line_index = 0
             altered_desc_text = ''
 
+            # Function to count the visual lines in the QPlainTextEdit
+            def count_visual_lines(pte):
+                doc = pte.document()
+                font_metrics = pte.fontMetrics()
+                line_height = font_metrics.lineSpacing()
+                editor_width = pte.viewport().width()
+
+                total_lines = 0
+                block = doc.begin()
+                while block.isValid():
+                    text = block.text()
+                    text_width = font_metrics.horizontalAdvance(text)
+                    wrapped_lines = max(1, text_width // editor_width + 1)
+                    total_lines += wrapped_lines
+                    block = block.next()
+
+                return total_lines
+
+            def adjust_height(pte):
+                num_visual_lines = count_visual_lines(pte)
+                line_height = pte.fontMetrics().lineSpacing()
+                pte.setFixedHeight(num_visual_lines * line_height + pte.contentsMargins().top() + pte.contentsMargins().bottom() + 10)
+                pte.updateGeometry()  # Force update
+
+            # Connect textChanged signal to adjust height function
+            MAIN_WINDOW.description_bonuses.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_bonuses))
+            MAIN_WINDOW.description_unique_unit_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_unique_unit_text))
+            MAIN_WINDOW.description_unique_techs_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_unique_techs_text))
+            MAIN_WINDOW.description_team_bonus_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_team_bonus_text))
+
             # Civilisation title
             MAIN_WINDOW.description_title.setText(new_description_lines[0])
             line_index += 2
 
             # Bonuses
+            MAIN_WINDOW.description_bonuses.setPlainText('')
             while '•' in new_description_lines[line_index]:
-                altered_desc_text += new_description_lines[line_index] + '\n'
+                MAIN_WINDOW.description_bonuses.appendPlainText(new_description_lines[line_index])
                 line_index += 1
-            MAIN_WINDOW.description_bonuses.setText(altered_desc_text)
+            adjust_height(MAIN_WINDOW.description_bonuses)  # Adjust height initially
             line_index += 2
 
             # Unique unit(s) text
-            MAIN_WINDOW.description_unique_unit_text.setText(new_description_lines[line_index] + '\n')
+            MAIN_WINDOW.description_unique_unit_text.setPlainText(new_description_lines[line_index])
+            adjust_height(MAIN_WINDOW.description_unique_unit_text)
+            MAIN_WINDOW.description_unique_unit_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_unique_unit_text))
 
             # Unique unit(s) title
-            MAIN_WINDOW.description_unique_unit_title.setText(new_description_lines[line_index -1] + '\n')
+            MAIN_WINDOW.description_unique_unit_title.setText(new_description_lines[line_index - 1])
             line_index += 3
 
             # Unique techs
-            MAIN_WINDOW.description_unique_techs_text.setText(new_description_lines[line_index] + '\n' + new_description_lines[line_index + 1]+ '\n')
+            MAIN_WINDOW.description_unique_techs_title.setText('Unique Techs:')
+            MAIN_WINDOW.description_unique_techs_text.setPlainText(new_description_lines[line_index] + '\n' + new_description_lines[line_index + 1])
+            adjust_height(MAIN_WINDOW.description_unique_techs_text)
+            MAIN_WINDOW.description_unique_techs_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_unique_techs_text))
             line_index += 4
 
             # Team bonus
-            MAIN_WINDOW.description_team_bonus_text.setText(new_description_lines[line_index])
+            MAIN_WINDOW.description_team_bonus_title.setText('Team Bonus:')
+            MAIN_WINDOW.description_team_bonus_text.setPlainText(new_description_lines[line_index])
+            adjust_height(MAIN_WINDOW.description_team_bonus_text)
+            MAIN_WINDOW.description_team_bonus_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_team_bonus_text))
 
             # Set the civilisation icon
             MAIN_WINDOW.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
@@ -761,11 +805,11 @@ def update_civilisation_dropdown():
                     break
 
             # Set default language
-            print(DATA.sounds[295].items)
+            '''print(DATA.sounds[295].items)
             saved_language_name = DATA.sounds[295].items[CURRENT_CIV_INDEX].filename.split('_')[0]
             all_languages = [MAIN_WINDOW.language_dropdown.itemText(i) for i in range(MAIN_WINDOW.language_dropdown.count())]
             default_language_index = all_languages.index(saved_language_name)
-            MAIN_WINDOW.language_dropdown.setCurrentIndex(default_language_index)
+            MAIN_WINDOW.language_dropdown.setCurrentIndex(default_language_index)'''
 
 def update_architecture_dropdown():
     selected_architecture = MAIN_WINDOW.architecture_dropdown.currentIndex()  # Get the current text
@@ -936,7 +980,131 @@ def save_project():
     with open(CIV_TECH_TREES_FILE, 'w', encoding='utf-8') as file:
         file.write(json_string)
 
+    # Convert bonuses
+    bonuses = MAIN_WINDOW.description_bonuses.toPlainText().split('\n')
+    team_bonus = MAIN_WINDOW.description_team_bonus_text.toPlainText()
+
+
+
     print("Project Saved!")
+
+def null():
+    bonus_unit_lines = {
+        # Categories
+        #'all units' : [-1, 0, 6, 12, 13, 18, 43, 19, 22, 2, 36, 51, 44, 54, 55, 35],
+        #'military' : [-1, 0, 35, 6, 36, 47, 12, 44, 23],
+        #'infantry' : [-1, 6],
+        #'villager' : [-1, 4],
+        #'monk' : [-1, 18, 43],
+        #'cavalry' : [-1, 12, 23, 47, 36],
+        #'ship' : [-1, 2, 21, 22, 20, 53],
+        #'boat' : [-1, 2, 21, 22, 20, 53],
+        #'stable' : [-1, 12, 47],
+        #'tower' : [-1, 52],
+        #'building' : [-1, 3],
+
+        # Unit lines
+        'foot archer' : [4, 24, 492, 7, 6, 1155, 185, 8, 530, 73, 559, 763, 765, 866, 868, 1129, 1131, 1800, 1802, 850, -1, 493, -1],
+        'archer' : [4, 24, 492],
+        'skirmisher' : [7, 6, 1155],
+        'slinger' : [185],
+        'elephant archer' : [873, 875],
+        'militia' : [74, 75, 76, 473, 567],
+        'spearman' : [93, 358, 359, 1786, 1787, 1788],
+        'spearmen' : [93, 358, 359, 1786, 1787, 1788],
+        'eagle' : [751, 753, 752],
+        'flemish militia' : [1699, 1663, 1697],
+        'war elephant' : [239, 558],
+        'elephant' : [873, 875, 239, 558, 1120, 1122, 1132, 1134, 1744, 1746],
+        'ballista elephant' : [1120, 1122],
+        'battle elephant' : [1132, 1134],
+        'armored elephant' : [1744, 1746],
+        'armoured elephant' : [1744, 1746],
+        'gunpowder' : [5, 36, 420, 46, 691, 771, 773, 557, 1001, 1003, 831, 832, 1709, 1704, 1706],
+        'hand cannoneer' : [5],
+        'demolition ship' : [1104, 527, 528],
+        'galley' : [539, 21, 442],
+        'gallies' : [539, 21, 442],
+        'dromon' : [1795],
+        'warrior priest' : [1811, 1831],
+        'monk' : [1811, 1826, 1827],
+        'non-unique barracks' : [74, 75, 76, 473, 567, 93, 358, 359, 1786, 1787, 1788, 751, 753, 752],
+        'scout' : [448, 546, 441, 1707],
+        'ratha' : [1738, 1740, 1759, 1761],
+        'trade' : [],
+        'canoe' : [],
+        'camel' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
+        'shepherd' : [590, 592],
+        'lumberjack' : [123, 218],
+        'hunter' : [122, 216],
+        'fisherman' : [56, 57],
+        'forager' : [120, 354],
+        'builder' : [118, 212],
+        'repairer' : [156, 222],
+        'farmer' : [214, 259],
+        'trebuchet' : [331, 42],
+
+        # Buildings
+        'buildings' : [109, 82, 103, 105, 18, 19, 209, 210, 84, 116, 137, 10, 14, 87, 49, 150, 12, 20, 132, 498, 86, 101, 153, 45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189, 598, 79, 234, 235, 236, 72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192, 1251, 1665, 70, 191, 192, 463, 464, 465, 584, 585, 586, 587, 1808, 562, 563, 564, 565, 1646, 1711, 1720, 1734, 68, 129, 130, 131, 50],
+        'town center' : [109],
+        'town centre' : [109],
+        'castle' : [82],
+        'blacksmith' : [103, 105, 18, 19],
+        'university' : [209, 210],
+        'universities' : [209, 210],
+        'market' : [84, 116, 137],
+        'archery range' : [10, 14, 87],
+        'siege workshop' : [49, 150],
+        'barracks' : [12, 20, 132, 498],
+        'stable' : [86, 101, 153],
+        'dock' : [45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189],
+        'outpost' : [598],
+        'watch tower' : [79],
+        'guard tower' : [234],
+        'keep' : [235],
+        'bombard tower' : [236],
+        'palisade wall' : [72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804], # Including gates
+        'wall' : [117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491,659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192], # Including gates
+        'krepost' : [1251],
+        'donjon' : [1665],
+        'house' : [70, 191, 192, 463, 464, 465],
+        'mining camp' : [584, 585, 586, 587],
+        'mule cart' : [1808],
+        'lumber camp' : [562, 563, 564, 565],
+        'market' : [84, 116, 137, 1646],
+        'folwark' : [1711, 1720, 1734],
+        'mill' : [68, 129, 130, 131],
+        'farm' : [50],
+
+        # Technology
+        #'chemistry' : [-2, 47],
+        #'fervor' : [-2, 252],
+        #'sanctity' : [-2, 231],
+        #'gold mining' : [-2, 55, 182],
+        #'stone mining' : [-2, 278, 279],
+        #'mining camp technologies' : [-2, 55, 182, 278, 279],
+        #'mining technologies' : [-2, 55, 182, 278, 279],
+        #'mining camp technology' : [-2, 55, 182, 278, 279],
+        #'mining technology' : [-2, 55, 182, 278, 279],
+        #'monastery technologies' : [-2, 233, 230, 46, 45, 316, 438, 319, 441, 439, 231, 252],
+        #'monastery technology' : [-2, 233, 230, 46, 45, 316, 438, 319, 441, 439, 231, 252],
+        #'gillnets' : [-2, 24],
+        #'economic upgrade' : [-2, 24, 24, 200, 238, 55, 182, 278, 279, 192, 196, 210, 482, 15, 14, 13, 12],
+        #'lumber camp technology' : [-2, 192, 196, 210],
+        #'lumber camp technologies' : [-2, 192, 196, 210],
+        #'mill technology' : [-2, 14, 13, 12],
+        #'mill technologies' : [-2, 14, 13, 12],
+        #'stable technology' : [-2, 450, 39],
+        #'stable technologies' : [-2, 450, 39],
+        }
+
+
+import openai
+import os
+
+
+
+    #bonus_unit_lines = ['archer', 'skirmisher', 'slinger', 'hand cannoneer', 'cavalry archer', 'elephant archer', 'genitour', 'militia', 'spearman', 'eagle', 'condottiero', 'scout', 'shrivamsha', 'knight', 'lancer', 'camel', 'battle elephant', 'elite battle elephant', 'battering ram', 'capped ram', 'siege ram', 'armored elephant', 'siege elephant', 'flaming camel', 'mangonel', 'onager', 'siege onager', 'scorpion', 'heavy scorpion', 'siege tower', 'bombard cannon', 'houfnice', 'fishing ship', 'fire galley', 'fire ship', 'fast fire ship', 'transport ship', 'trade cog', 'cannon galleon', 'elite cannon galleon', 'demolition raft', 'demolition ship', 'heavy demolition ship', 'galley', 'war galley', 'galleon', 'dromon', 'turtle ship', 'elite turtle ship', 'petard', 'trebuchet', 'unique unit', 'elite unique unit', 'konnik', 'elite konnik', 'serjeant', 'elite serjeant', 'missionary', 'monk', 'villager', 'warrior priest', 'fishing ship']
 
 class PixmapLabel(QtWidgets.QLabel):
     def __init__(self, parent=None):
@@ -952,6 +1120,7 @@ class PixmapLabel(QtWidgets.QLabel):
 
 # Unit blocks
 unit_blocks = []
+scout_unit_blocks = []
 class UnitBlock():
     def __init__(self, index, name, type, unit_code, enabled):
         self.index = index
@@ -1085,7 +1254,29 @@ class UnitBlock():
             self.opacity_effect.setOpacity(0.75)
         self.disable_label.setGraphicsEffect(self.opacity_effect)
 
+        '''print(DATA.civs[CURRENT_CIV_INDEX + 1].resources[263])
+        if next((obj for obj in unit_blocks if obj.name == "Camel Scout"), None).enabled and (self.unit_code == 1755 or self.unit_code == 448 or self.unit_code == 751):
+            DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] == 1755
+            print('Set to camel scout')
+        elif next((obj for obj in unit_blocks if obj.name == "Scout Cavalry"), None).enabled:
+            DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] == 448
+            print('Set to scout cavalry')
+        elif next((obj for obj in unit_blocks if obj.name == "Eagle Scout"), None).enabled:
+            DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] == 751
+            print('Set to eagle scout')
+        else:
+            DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] == -1
+            print('No scout')'''
+
         if not setup:
+            # Change scout unit
+            if scout_unit_blocks[2].enabled:
+                DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] = 1755 # Camel Scout
+            elif scout_unit_blocks[1].enabled:
+                DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] = 448 # Scout Cavalry
+            elif scout_unit_blocks[0].enabled:
+                DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] = 751 # Eagle Scout
+
             # Change units dictionary
             if status:
                 civilisation_objects[CURRENT_CIV_INDEX].units[self.name] = 1
@@ -1428,6 +1619,8 @@ if __name__ == "__main__":
             # Add new block to the list
             new_block = UnitBlock(block_index, unit_name, type, unit_codes[block_index], True)
             unit_blocks.append(new_block)
+            if new_block.name == 'Scout Cavalry' or new_block.name == 'Camel Scout' or new_block.name == 'Eagle Scout':
+                scout_unit_blocks.append(new_block)
             block_index += 1
 
             # Connect the button click to a function
@@ -1649,6 +1842,9 @@ if __name__ == "__main__":
     MAIN_WINDOW.actionOpen_Project.triggered.connect(open_project)
     MAIN_WINDOW.actionSave_Project.triggered.connect(save_project)
     MAIN_WINDOW.actionRevert_To_Original.triggered.connect(revert_project)
+
+    # DEBUG: Test bonus
+    #create_bonus('• Town Centers cost -50% wood starting in the Castle Age', 0)
 
 # Update the stats when the civilisation dropdown is changed
 MAIN_WINDOW.civilisation_dropdown.currentIndexChanged.connect(update_civilisation_dropdown)
