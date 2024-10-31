@@ -645,6 +645,7 @@ def open_project(path = None):
         set_default_sound(480, 3, 'King', 'Move')'''
             
         update_civilisation_dropdown()
+        create_bonus(r'• Foot archers and villagers move 50% slower', 0)
 
     except Exception as e:
         error_details = traceback.format_exc()
@@ -988,8 +989,7 @@ def save_project():
 
     print("Project Saved!")
 
-def null():
-    bonus_unit_lines = {
+bonus_unit_lines = {
         # Categories
         #'all units' : [-1, 0, 6, 12, 13, 18, 43, 19, 22, 2, 36, 51, 44, 54, 55, 35],
         #'military' : [-1, 0, 35, 6, 36, 47, 12, 44, 23],
@@ -1004,77 +1004,111 @@ def null():
         #'building' : [-1, 3],
 
         # Unit lines
-        'foot archer' : [4, 24, 492, 7, 6, 1155, 185, 8, 530, 73, 559, 763, 765, 866, 868, 1129, 1131, 1800, 1802, 850, -1, 493, -1],
-        'archer' : [4, 24, 492],
-        'skirmisher' : [7, 6, 1155],
-        'slinger' : [185],
-        'elephant archer' : [873, 875],
+        'foot archers' : [4, 24, 492, 7, 6, 1155, 185, 8, 530, 73, 559, 763, 765, 866, 868, 1129, 1131, 1800, 1802, 850, -1, 493, -1],
+        'archers' : [4, 24, 492],
+        'archer-line' : [4, 24, 492],
+        'archer line' : [4, 24, 492],
+        'skirmishers' : [7, 6, 1155],
+        'skirmishers-line' : [7, 6, 1155],
+        'skirmishers line' : [7, 6, 1155],
+        'slingers' : [185],
+        'elephant archers' : [873, 875],
+        'elephant archer-line' : [873, 875],
+        'elephant archer line' : [873, 875],
         'militia' : [74, 75, 76, 473, 567],
-        'spearman' : [93, 358, 359, 1786, 1787, 1788],
+        'militia-line' : [74, 75, 76, 473, 567],
+        'militia line' : [74, 75, 76, 473, 567],
         'spearmen' : [93, 358, 359, 1786, 1787, 1788],
-        'eagle' : [751, 753, 752],
+        'spearmen-line' : [93, 358, 359, 1786, 1787, 1788],
+        'spearmen line' : [93, 358, 359, 1786, 1787, 1788],
+        'eagles' : [751, 753, 752],
+        'eagle-line' : [751, 753, 752],
+        'eagle line' : [751, 753, 752],
+        'eagle units' : [751, 753, 752],
         'flemish militia' : [1699, 1663, 1697],
-        'war elephant' : [239, 558],
-        'elephant' : [873, 875, 239, 558, 1120, 1122, 1132, 1134, 1744, 1746],
-        'ballista elephant' : [1120, 1122],
-        'battle elephant' : [1132, 1134],
-        'armored elephant' : [1744, 1746],
-        'armoured elephant' : [1744, 1746],
-        'gunpowder' : [5, 36, 420, 46, 691, 771, 773, 557, 1001, 1003, 831, 832, 1709, 1704, 1706],
-        'hand cannoneer' : [5],
-        'demolition ship' : [1104, 527, 528],
-        'galley' : [539, 21, 442],
+        'war elephants' : [239, 558],
+        'war elephant-line' : [239, 558],
+        'war elephant line' : [239, 558],
+        'elephants' : [873, 875, 239, 558, 1120, 1122, 1132, 1134, 1744, 1746],
+        'elephant units' : [873, 875, 239, 558, 1120, 1122, 1132, 1134, 1744, 1746],
+        'ballista elephants' : [1120, 1122],
+        'battle elephants' : [1132, 1134],
+        'battle elephant-line' : [1132, 1134],
+        'battle elephant line' : [1132, 1134],
+        'armored elephants' : [1744, 1746],
+        'armored elephant-line' : [1744, 1746],
+        'armored elephant line' : [1744, 1746],
+        'armoured elephants' : [1744, 1746],
+        'armoured elephant-line' : [1744, 1746],
+        'armoured elephant line' : [1744, 1746],
+        'gunpowder units' : [5, 36, 420, 46, 691, 771, 773, 557, 1001, 1003, 831, 832, 1709, 1704, 1706],
+        'hand cannoneers' : [5],
+        'demolition ships' : [1104, 527, 528],
+        'demolition ship-line' : [1104, 527, 528],
+        'demolition ship line' : [1104, 527, 528],
+        'demolition-line' : [1104, 527, 528],
+        'demolition line' : [1104, 527, 528],
+        'demo-line' : [1104, 527, 528],
+        'demo line' : [1104, 527, 528],
+        'galley-line' : [539, 21, 442],
+        'galley line' : [539, 21, 442],
         'gallies' : [539, 21, 442],
         'dromon' : [1795],
         'warrior priest' : [1811, 1831],
         'monk' : [1811, 1826, 1827],
-        'non-unique barracks' : [74, 75, 76, 473, 567, 93, 358, 359, 1786, 1787, 1788, 751, 753, 752],
-        'scout' : [448, 546, 441, 1707],
-        'ratha' : [1738, 1740, 1759, 1761],
-        'trade' : [],
-        'canoe' : [],
-        'camel' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
-        'shepherd' : [590, 592],
-        'lumberjack' : [123, 218],
-        'hunter' : [122, 216],
-        'fisherman' : [56, 57],
-        'forager' : [120, 354],
-        'builder' : [118, 212],
-        'repairer' : [156, 222],
-        'farmer' : [214, 259],
-        'trebuchet' : [331, 42],
+        'non-unique barracks units' : [74, 75, 76, 473, 567, 93, 358, 359, 1786, 1787, 1788, 751, 753, 752],
+        'scouts' : [448, 546, 441, 1707],
+        'scout-line' : [448, 546, 441, 1707],
+        'scout line' : [448, 546, 441, 1707],
+        'rathas' : [1738, 1740, 1759, 1761],
+        'trade units' : [],
+        'canoes' : [],
+        'canoe-line' : [],
+        'canoe line' : [],
+        'camels' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
+        'camel units' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
+        'villagers' : [83, 293, 590, 592, 123, 218, 122, 216, 56, 57, 120, 354, 118, 212, 156, 222, 214, 259],
+        'shepherds' : [590, 592],
+        'lumberjacks' : [123, 218],
+        'hunters' : [122, 216],
+        'fishermen' : [56, 57],
+        'foragers' : [120, 354],
+        'builders' : [118, 212],
+        'repairers' : [156, 222],
+        'farmers' : [214, 259],
+        'trebuchets' : [331, 42],
 
         # Buildings
         'buildings' : [109, 82, 103, 105, 18, 19, 209, 210, 84, 116, 137, 10, 14, 87, 49, 150, 12, 20, 132, 498, 86, 101, 153, 45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189, 598, 79, 234, 235, 236, 72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192, 1251, 1665, 70, 191, 192, 463, 464, 465, 584, 585, 586, 587, 1808, 562, 563, 564, 565, 1646, 1711, 1720, 1734, 68, 129, 130, 131, 50],
-        'town center' : [109],
-        'town centre' : [109],
-        'castle' : [82],
-        'blacksmith' : [103, 105, 18, 19],
-        'university' : [209, 210],
+        'town centers' : [109],
+        'town centres' : [109],
+        'castles' : [82],
+        'blacksmiths' : [103, 105, 18, 19],
         'universities' : [209, 210],
-        'market' : [84, 116, 137],
-        'archery range' : [10, 14, 87],
-        'siege workshop' : [49, 150],
+        'archery ranges' : [10, 14, 87],
+        'siege workshops' : [49, 150],
         'barracks' : [12, 20, 132, 498],
-        'stable' : [86, 101, 153],
-        'dock' : [45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189],
-        'outpost' : [598],
-        'watch tower' : [79],
-        'guard tower' : [234],
-        'keep' : [235],
-        'bombard tower' : [236],
-        'palisade wall' : [72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804], # Including gates
-        'wall' : [117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491,659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192], # Including gates
-        'krepost' : [1251],
-        'donjon' : [1665],
-        'house' : [70, 191, 192, 463, 464, 465],
-        'mining camp' : [584, 585, 586, 587],
-        'mule cart' : [1808],
-        'lumber camp' : [562, 563, 564, 565],
-        'market' : [84, 116, 137, 1646],
-        'folwark' : [1711, 1720, 1734],
-        'mill' : [68, 129, 130, 131],
-        'farm' : [50],
+        'stables' : [86, 101, 153],
+        'docks' : [45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189],
+        'outposts' : [598],
+        'watch towers' : [79],
+        'guard towers' : [234],
+        'keeps' : [235],
+        'bombard towers' : [236],
+        'towers' : [79, 234, 235, 236],
+        'palisade walls' : [72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804], # Including gates
+        'walls' : [117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491,659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192], # Including gates
+        'stone walls' : [117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491,659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192], # Including gates
+        'kreposts' : [1251],
+        'donjons' : [1665],
+        'houses' : [70, 191, 192, 463, 464, 465],
+        'mining camps' : [584, 585, 586, 587],
+        'mule carts' : [1808],
+        'lumber camps' : [562, 563, 564, 565],
+        'markets' : [84, 116, 137, 1646],
+        'folwarks' : [1711, 1720, 1734],
+        'mills' : [68, 129, 130, 131],
+        'farms' : [50],
 
         # Technology
         #'chemistry' : [-2, 47],
@@ -1098,9 +1132,69 @@ def null():
         #'stable technologies' : [-2, 450, 39],
         }
 
+def create_bonus(bonus_text, civ_index):
+    # Reformat sentence
+    bonus_text = bonus_text.lower().strip("• ").replace(', and ', ', ')
 
-import openai
-import os
+    # Patterns to capture different structures
+    patterns = [
+        r'(\b\w+(?:\s*\w*)?(?:,\s*\w+(?:\s*\w*)?)*(?:\s*,?\s+|\s+and\s+)?\w+(?:\s*\w*)?)\s+(?:move|are)\s+(-?\d+%)\s+(faster|slower)',
+        r'(\b\w+(?:\s*\w*)?(?:,\s*\w+(?:\s*\w*)?)*(?:\s*,?\s+|\s+and\s+)?\w+(?:\s*\w*)?)\s*(?:\(except\s+([\w\s,]+)\))?\s+costs?\s+(-?\d+%?)\s*(less|more|faster|slower|cheaper|none)?\s*(wood|gold|stone|food)?(?:\s+starting in the\s+(dark|feudal|castle|imperial)\s+age)?',
+        r'((?:\b\w+\s*\w*\b)(?:[\s,]*and\s+\b\w+\s*\w*)*)\s*(?:\(except\s+([\w\s,]+)\))?\s+([+-]?\d+/?\d*%?)\s*(\w+)?\s*(?:in\s+(dark|feudal|castle|imperial)(?:\s+and\s+(dark|feudal|castle|imperial))*)?',
+    ]
+
+    for i, pattern in enumerate(patterns):
+        match = re.search(pattern, bonus_text, re.IGNORECASE)
+        if match:
+            groups = list(match.groups())
+
+            # Separate units by commas and "and"
+            units = re.split(r',\s*|\s+and\s+', groups[0]) if groups[0] else []
+            groups[0] = units  # Replace with list of units
+
+            # Format exceptions if present
+            if groups[1]:
+                exceptions = [f"({item.strip()})" for item in re.split(r',\s*|\s+and\s+', groups[1])]
+                groups[1] = ', '.join(exceptions)
+            
+            #print(f"Pattern {i}:", tuple(groups))
+
+            # Create new tech and effect
+            new_bonus_tech = DATA.techs[1101]
+            new_bonus_tech.civ = civ_index + 1
+            new_bonus_tech.effect_id = len(DATA.effects)
+            new_bonus_effect = genieutils.effect.Effect('', [])
+
+            if i == 0: # Movement speed
+                # Name new Tech
+                new_bonus_tech.name = rf'{civilisation_objects[civ_index].true_name}-Bonus: {[unit.strip().title() for unit in groups[0]]} Speed'
+                new_bonus_effect.name = new_bonus_tech.name
+
+                # Convert the percentage into a float
+                bonus_number = float(re.sub(r'\D', '', groups[1]))
+                if groups[2] == 'faster':
+                    bonus_number = 1 + (bonus_number / 100)
+                elif groups[2] == 'slower':
+                    bonus_number = (100 - bonus_number) / 100
+
+                # Negate if negative
+                if '-' in groups[1]:
+                    bonus_number *= -1
+
+                # Create an effect command for each unit
+                for unit_name in groups[0]:
+                    for unit_index in bonus_unit_lines[unit_name]:
+                        new_bonus_effect.effect_commands.append(genieutils.effect.EffectCommand(5, unit_index, -1, 5, bonus_number))
+
+                # Add the new tech and effect to the DATA file
+                DATA.techs.append(new_bonus_tech)
+                DATA.effects.append(new_bonus_effect)
+                print('Bonus 0 added')
+            else:
+                print("INVALID BONUS")
+            break
+    else:
+        print("No match found.")
 
 
 
@@ -1254,20 +1348,6 @@ class UnitBlock():
             self.opacity_effect.setOpacity(0.75)
         self.disable_label.setGraphicsEffect(self.opacity_effect)
 
-        '''print(DATA.civs[CURRENT_CIV_INDEX + 1].resources[263])
-        if next((obj for obj in unit_blocks if obj.name == "Camel Scout"), None).enabled and (self.unit_code == 1755 or self.unit_code == 448 or self.unit_code == 751):
-            DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] == 1755
-            print('Set to camel scout')
-        elif next((obj for obj in unit_blocks if obj.name == "Scout Cavalry"), None).enabled:
-            DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] == 448
-            print('Set to scout cavalry')
-        elif next((obj for obj in unit_blocks if obj.name == "Eagle Scout"), None).enabled:
-            DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] == 751
-            print('Set to eagle scout')
-        else:
-            DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] == -1
-            print('No scout')'''
-
         if not setup:
             # Change scout unit
             if scout_unit_blocks[2].enabled:
@@ -1276,6 +1356,8 @@ class UnitBlock():
                 DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] = 448 # Scout Cavalry
             elif scout_unit_blocks[0].enabled:
                 DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] = 751 # Eagle Scout
+            else:
+                DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] = -1 # No Scout
 
             # Change units dictionary
             if status:
@@ -1844,7 +1926,7 @@ if __name__ == "__main__":
     MAIN_WINDOW.actionRevert_To_Original.triggered.connect(revert_project)
 
     # DEBUG: Test bonus
-    #create_bonus('• Town Centers cost -50% wood starting in the Castle Age', 0)
+    
 
 # Update the stats when the civilisation dropdown is changed
 MAIN_WINDOW.civilisation_dropdown.currentIndexChanged.connect(update_civilisation_dropdown)
