@@ -136,17 +136,20 @@ def revert_project():
     response = msg_box.exec_()  # Execute the dialog and get the response
 
     if response == QMessageBox.Ok:
-        # Copy JSON file
-        if os.path.exists(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json'):
-            os.remove(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json')
-            shutil.copy(rf'{ORIGINAL_FOLDER}/\resources\_common\dat\civTechTrees.json', rf'{MOD_FOLDER}/resources/_common/dat/')
+        try:
+            # Copy JSON file
+            if os.path.exists(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json'):
+                os.remove(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json')
+                shutil.copy(rf'{ORIGINAL_FOLDER}/\resources\_common\dat\civTechTrees.json', rf'{MOD_FOLDER}/resources/_common/dat/')
 
-        # Copy DAT file
-        if os.path.exists(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'):
-            os.remove(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-            shutil.copy(rf'{ORIGINAL_FOLDER}/\resources\_common\dat\empires2_x2_p1.dat', rf'{MOD_FOLDER}/resources/_common/dat/')
-        
-        update_civilisation_dropdown()
+            # Copy DAT file
+            if os.path.exists(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'):
+                os.remove(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                shutil.copy(rf'{ORIGINAL_FOLDER}/\resources\_common\dat\empires2_x2_p1.dat', rf'{MOD_FOLDER}/resources/_common/dat/')
+
+            update_civilisation_dropdown()
+        except Exception as e:
+            show_error_message("ERROR: " + str(e))  # Convert exception to string
 
 def open_saving_window(title):
     saving_dialog = QtWidgets.QDialog()
@@ -554,8 +557,8 @@ def open_project(path = None):
                 civilisation_objects[i].description = strings_lines[total_civ_count + i][7:]
 
         # Populate inactive civilisations
-        MAIN_WINDOW.civilisation_dropdown.insertSeparator(MAIN_WINDOW.civilisation_dropdown.count())
-        MAIN_WINDOW.civilisation_dropdown.addItem('New...')
+        #MAIN_WINDOW.civilisation_dropdown.insertSeparator(MAIN_WINDOW.civilisation_dropdown.count())
+        #MAIN_WINDOW.civilisation_dropdown.addItem('New...')
 
         # Clear dropdowns and populate with new data
         MAIN_WINDOW.architecture_dropdown.clear()
@@ -563,10 +566,10 @@ def open_project(path = None):
         MAIN_WINDOW.architecture_dropdown.addItems(["Britons", "Franks", "Goths", "Teutons", "Japanese", "Chinese", "Byzantines", "Persians", "Saracens", "Turks", "Vikings", "Mongols", "Celts", "Spanish", "Aztecs", "Mayans", "Huns", "Koreans", "Italians", "Hindustanis", "Incas", "Magyars", "Slavs", "Portuguese", "Ethiopians", "Malians", "Berbers", "Khmer", "Malay", "Burmese", "Vietnamese", "Bulgarians", "Tatars", "Cumans", "Lithuanians", "Burgundians", "Sicilians", "Poles", "Bohemians", "Dravidians", "Bengalis", "Gurjaras", "Romans", "Armenians", "Georgians"])
         MAIN_WINDOW.language_dropdown.addItems(["Britons", "Franks", "Goths", "Teutons", "Japanese", "Chinese", "Byzantines", "Persians", "Saracens", "Turks", "Vikings", "Mongols", "Celts", "Spanish", "Aztecs", "Mayans", "Huns", "Koreans", "Italians", "Hindustanis", "Incas", "Magyars", "Slavs", "Portuguese", "Ethiopians", "Malians", "Berbers", "Khmer", "Malay", "Burmese", "Vietnamese", "Bulgarians", "Tatars", "Cumans", "Lithuanians", "Burgundians", "Sicilians", "Poles", "Bohemians", "Dravidians", "Bengalis", "Gurjaras", "Romans", "Armenians", "Georgians"])
         
-        #MAIN_WINDOW.architecture_dropdown.insertSeparator(MAIN_WINDOW.architecture_dropdown.count())
-        #MAIN_WINDOW.language_dropdown.insertSeparator(MAIN_WINDOW.language_dropdown.count())
-        #MAIN_WINDOW.architecture_dropdown.addItems(["Northeast American", "Nomadic", "Pacific", "South African", "South American"])
+        MAIN_WINDOW.architecture_dropdown.insertSeparator(MAIN_WINDOW.architecture_dropdown.count())
+        MAIN_WINDOW.language_dropdown.insertSeparator(MAIN_WINDOW.language_dropdown.count())
         #MAIN_WINDOW.language_dropdown.addItems(["Aromanian", "Cantonese", "Catalan", "Javanese", "Lakota", "Mohawk", "Somali", "Thai", "Tibetan", "Zapotec", "Zulu"])
+        MAIN_WINDOW.language_dropdown.addItems(['Greek'])
         #MAIN_WINDOW.update_civs(civilisation_objects)
         #MAIN_WINDOW.changed_civilisation_dropdown()
 
@@ -612,40 +615,45 @@ def open_project(path = None):
                     # Append the new sound to the list
                     DATA.sounds[sound_index].items.append(new_sound)
         
-        '''set_default_sound(303, 4, 'Villager_Male', 'Select')
-        set_default_sound(301, 4, 'Villager_Male', 'Task')
-        set_default_sound(295, 1, 'Villager_Male', 'Build')
-        set_default_sound(299, 1, 'Villager_Male', 'Chop')
-        set_default_sound(455, 1, 'Villager_Male', 'Farm')
-        set_default_sound(448, 1, 'Villager_Male', 'Fish')
-        set_default_sound(297, 1, 'Villager_Male', 'Forage')
-        set_default_sound(298, 1, 'Villager_Male', 'Hunt')
-        set_default_sound(300, 1, 'Villager_Male', 'Mine')
-        set_default_sound(302, 1, 'Villager_Male', 'Repair')
+        if 'Hunt' not in DATA.sounds[298].items[0].filename:
+            print('No Hunt')
+            # Reformat the sounds so that they can be more easily edited in the future
+            set_default_sound(303, 4, 'Villager_Male', 'Select')
+            set_default_sound(301, 4, 'Villager_Male', 'Task')
+            set_default_sound(295, 1, 'Villager_Male', 'Build')
+            set_default_sound(299, 1, 'Villager_Male', 'Chop')
+            set_default_sound(455, 1, 'Villager_Male', 'Farm')
+            set_default_sound(448, 1, 'Villager_Male', 'Fish')
+            set_default_sound(297, 1, 'Villager_Male', 'Forage')
+            set_default_sound(298, 1, 'Villager_Male', 'Hunt')
+            set_default_sound(300, 1, 'Villager_Male', 'Mine')
+            set_default_sound(302, 1, 'Villager_Male', 'Repair')
 
-        set_default_sound(435, 4, 'Villager_Female', 'Select')
-        set_default_sound(434, 4, 'Villager_Female', 'Task')
-        set_default_sound(437, 1, 'Villager_Female', 'Build')
-        set_default_sound(442, 1, 'Villager_Female', 'Chop')
-        set_default_sound(438, 1, 'Villager_Female', 'Farm')
-        set_default_sound(487, 1, 'Villager_Female', 'Fish')
-        set_default_sound(440, 1, 'Villager_Female', 'Forage')
-        set_default_sound(441, 1, 'Villager_Female', 'Hunt')
-        set_default_sound(443, 1, 'Villager_Female', 'Mine')
-        set_default_sound(444, 1, 'Villager_Female', 'Repair')
+            set_default_sound(435, 4, 'Villager_Female', 'Select')
+            set_default_sound(434, 4, 'Villager_Female', 'Task')
+            set_default_sound(437, 1, 'Villager_Female', 'Build')
+            set_default_sound(442, 1, 'Villager_Female', 'Chop')
+            set_default_sound(438, 1, 'Villager_Female', 'Farm')
+            set_default_sound(487, 1, 'Villager_Female', 'Fish')
+            set_default_sound(440, 1, 'Villager_Female', 'Forage')
+            set_default_sound(441, 1, 'Villager_Female', 'Hunt')
+            set_default_sound(443, 1, 'Villager_Female', 'Mine')
+            set_default_sound(444, 1, 'Villager_Female', 'Repair')
 
-        set_default_sound(420, 3, 'Soldier', 'Select')
-        set_default_sound(421, 3, 'Soldier', 'Move')
-        set_default_sound(422, 3, 'Soldier', 'Attack')
+            set_default_sound(420, 3, 'Soldier', 'Select')
+            set_default_sound(421, 3, 'Soldier', 'Move')
+            set_default_sound(422, 3, 'Soldier', 'Attack')
 
-        set_default_sound(423, 3, 'Monk', 'Select')
-        set_default_sound(424, 3, 'Monk', 'Move')
+            set_default_sound(423, 3, 'Monk', 'Select')
+            set_default_sound(424, 3, 'Monk', 'Move')
 
-        set_default_sound(479, 3, 'King', 'Select')
-        set_default_sound(480, 3, 'King', 'Move')'''
+            set_default_sound(479, 3, 'King', 'Select')
+            set_default_sound(480, 3, 'King', 'Move')
+        else:
+            print('Yes Hunt')
             
         update_civilisation_dropdown()
-        create_bonus(r'• Foot archers and villagers move 50% slower', 0)
+        #create_bonus(r'• Foot archers and villagers move 50% slower', 0)
 
     except Exception as e:
         error_details = traceback.format_exc()
@@ -674,80 +682,9 @@ def update_civilisation_dropdown():
             global CURRENT_CIV_INDEX
             CURRENT_CIV_INDEX = i
 
-            # Reformat the string and split it into lines
-            new_description = civ.description[1:-1].replace('\\n', '\n').replace('<b>', '')
-            new_description.splitlines()
-
-            # Split the description into lines
-            new_description_lines = new_description.splitlines()
-
             # Display description
-            line_index = 0
-            altered_desc_text = ''
-
-            # Function to count the visual lines in the QPlainTextEdit
-            def count_visual_lines(pte):
-                doc = pte.document()
-                font_metrics = pte.fontMetrics()
-                line_height = font_metrics.lineSpacing()
-                editor_width = pte.viewport().width()
-
-                total_lines = 0
-                block = doc.begin()
-                while block.isValid():
-                    text = block.text()
-                    text_width = font_metrics.horizontalAdvance(text)
-                    wrapped_lines = max(1, text_width // editor_width + 1)
-                    total_lines += wrapped_lines
-                    block = block.next()
-
-                return total_lines
-
-            def adjust_height(pte):
-                num_visual_lines = count_visual_lines(pte)
-                line_height = pte.fontMetrics().lineSpacing()
-                pte.setFixedHeight(num_visual_lines * line_height + pte.contentsMargins().top() + pte.contentsMargins().bottom() + 10)
-                pte.updateGeometry()  # Force update
-
-            # Connect textChanged signal to adjust height function
-            MAIN_WINDOW.description_bonuses.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_bonuses))
-            MAIN_WINDOW.description_unique_unit_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_unique_unit_text))
-            MAIN_WINDOW.description_unique_techs_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_unique_techs_text))
-            MAIN_WINDOW.description_team_bonus_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_team_bonus_text))
-
-            # Civilisation title
-            MAIN_WINDOW.description_title.setText(new_description_lines[0])
-            line_index += 2
-
-            # Bonuses
-            MAIN_WINDOW.description_bonuses.setPlainText('')
-            while '•' in new_description_lines[line_index]:
-                MAIN_WINDOW.description_bonuses.appendPlainText(new_description_lines[line_index])
-                line_index += 1
-            adjust_height(MAIN_WINDOW.description_bonuses)  # Adjust height initially
-            line_index += 2
-
-            # Unique unit(s) text
-            MAIN_WINDOW.description_unique_unit_text.setPlainText(new_description_lines[line_index])
-            adjust_height(MAIN_WINDOW.description_unique_unit_text)
-            MAIN_WINDOW.description_unique_unit_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_unique_unit_text))
-
-            # Unique unit(s) title
-            MAIN_WINDOW.description_unique_unit_title.setText(new_description_lines[line_index - 1])
-            line_index += 3
-
-            # Unique techs
-            MAIN_WINDOW.description_unique_techs_title.setText('Unique Techs:')
-            MAIN_WINDOW.description_unique_techs_text.setPlainText(new_description_lines[line_index] + '\n' + new_description_lines[line_index + 1])
-            adjust_height(MAIN_WINDOW.description_unique_techs_text)
-            MAIN_WINDOW.description_unique_techs_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_unique_techs_text))
-            line_index += 4
-
-            # Team bonus
-            MAIN_WINDOW.description_team_bonus_title.setText('Team Bonus:')
-            MAIN_WINDOW.description_team_bonus_text.setPlainText(new_description_lines[line_index])
-            adjust_height(MAIN_WINDOW.description_team_bonus_text)
-            MAIN_WINDOW.description_team_bonus_text.textChanged.connect(lambda: adjust_height(MAIN_WINDOW.description_team_bonus_text))
+            new_description = civ.description[1:-1].replace('\\n', '\n').replace('<b>', '')
+            MAIN_WINDOW.description.setPlainText(new_description)
 
             # Set the civilisation icon
             MAIN_WINDOW.civilisation_icon_image.setPixmap(QtGui.QPixmap(civ.image_path))
@@ -806,13 +743,15 @@ def update_civilisation_dropdown():
                     break
 
             # Set default language
-            '''print(DATA.sounds[295].items)
-            saved_language_name = DATA.sounds[295].items[CURRENT_CIV_INDEX].filename.split('_')[0]
             all_languages = [MAIN_WINDOW.language_dropdown.itemText(i) for i in range(MAIN_WINDOW.language_dropdown.count())]
-            default_language_index = all_languages.index(saved_language_name)
-            MAIN_WINDOW.language_dropdown.setCurrentIndex(default_language_index)'''
+            for sound in DATA.sounds[298].items:
+                if sound.civilization == CURRENT_CIV_INDEX + 1:
+                    for i, language in enumerate(all_languages):
+                        if language == sound.filename.split('_')[0]:
+                            MAIN_WINDOW.language_dropdown.setCurrentIndex(i)
 
 def update_architecture_dropdown():
+    return # Channel
     selected_architecture = MAIN_WINDOW.architecture_dropdown.currentIndex()  # Get the current text
 
     # DEBUG: Create new architecture graphic sets
@@ -980,12 +919,6 @@ def save_project():
     json_string = '\n'.join(JSON_DATA)
     with open(CIV_TECH_TREES_FILE, 'w', encoding='utf-8') as file:
         file.write(json_string)
-
-    # Convert bonuses
-    bonuses = MAIN_WINDOW.description_bonuses.toPlainText().split('\n')
-    team_bonus = MAIN_WINDOW.description_team_bonus_text.toPlainText()
-
-
 
     print("Project Saved!")
 
@@ -1357,7 +1290,7 @@ class UnitBlock():
             elif scout_unit_blocks[0].enabled:
                 DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] = 751 # Eagle Scout
             else:
-                DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] = -1 # No Scout
+                DATA.civs[CURRENT_CIV_INDEX + 1].resources[263] = 448 # Default Scout
 
             # Change units dictionary
             if status:
@@ -1932,5 +1865,8 @@ if __name__ == "__main__":
 MAIN_WINDOW.civilisation_dropdown.currentIndexChanged.connect(update_civilisation_dropdown)
 MAIN_WINDOW.architecture_dropdown.currentIndexChanged.connect(update_architecture_dropdown)
 MAIN_WINDOW.language_dropdown.currentIndexChanged.connect(update_language_dropdown)
+
+# DEBUG: Open new project when the program opens
+open_project(r'C:\Users\Micheal Q\Games\Age of Empires 2 DE\76561198021486964\mods\local\15eFq\15eFq.txt')
 
 sys.exit(app.exec_())  # Run the application's event loop

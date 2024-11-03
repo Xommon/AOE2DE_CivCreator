@@ -1,1 +1,1 @@
-'(\b\w+\s*\w*)\s*(?:\((?:except\s+([\w\s,]+?))\))?\s+costs?\s+(-?\d+%?)\s*(\w+)?(?:\s+starting in the\s+(dark|feudal|castle|imperial)\s+age)?'
+DATA.

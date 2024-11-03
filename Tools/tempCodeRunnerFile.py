@@ -1,0 +1,1 @@
+https://ageofempires.fandom.com/wiki/Villager_(Age_of_Empires_IV)/Byzantine_dialogue_lines#Gather_from_Berry_Bushes
