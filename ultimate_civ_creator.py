@@ -52,6 +52,9 @@ MOD_FOLDER = ''
 DATA = ''
 DATA_FILE_DAT = ''
 unique_unit = ''
+PROJECT_NAME = ''
+PROJECT_FILE = ''
+SOUND_PROFILES = []
 global JSON_DATA
 
 # Civilisation object
@@ -259,16 +262,17 @@ def new_project(project_name):
         # Try to create a new project
         try:
             # Create the project folder inside the mod path (with the project name)
+            PROJECT_NAME = project_name
             ORIGINAL_FOLDER = original_folder_location
-            MOD_FOLDER = os.path.join(mod_folder_location, project_name)
+            MOD_FOLDER = os.path.join(mod_folder_location, PROJECT_NAME)
             os.makedirs(MOD_FOLDER, exist_ok=True)
             os.chdir(MOD_FOLDER)
 
             # Write the project file
-            with open(f'{project_name}.txt', 'w') as file:
+            with open(f'{PROJECT_NAME}.txt', 'w') as file:
                 file.write(rf"{original_folder_location}")
                 file.write('\n')
-                file.write(rf"{mod_folder_location}\{project_name}")
+                file.write(rf"{mod_folder_location}\{PROJECT_NAME}")
 
             files_to_copy = [
                 'resources/_common/dat/civilizations.json', 
@@ -466,7 +470,7 @@ def new_project(project_name):
     CreateProjectWindow.exec_()  # This makes the dialog modal and prevents the main window from being responsive until closed
 
 def open_project(path = None):
-    global ORIGINAL_FOLDER, MOD_FOLDER
+    global ORIGINAL_FOLDER, MOD_FOLDER, PROJECT_FILE
 
     try:
         # Use QFileDialog to open a modal file explorer
@@ -489,6 +493,9 @@ def open_project(path = None):
             global CIV_TECH_TREES_FILE
             CIV_TECH_TREES_FILE = rf'{MOD_FOLDER}\resources\_common\dat\civTechTrees.json'
             CIV_IMAGE_FOLDER = rf'{MOD_FOLDER}\widgetui\textures\menu\civs'
+            extracted_project_name = MOD_FOLDER.split('\\')
+            extracted_project_name = extracted_project_name[len(extracted_project_name) - 1]
+            PROJECT_FILE = extracted_project_name + rf'.txt'
             
             global DATA
             if os.path.exists('data.pkl'):
@@ -614,44 +621,113 @@ def open_project(path = None):
 
                     # Append the new sound to the list
                     DATA.sounds[sound_index].items.append(new_sound)
+
+        # Convert the project file's saved sounds into a variable that can be read by the program
+        with open(rf'{MOD_FOLDER}/{PROJECT_FILE}', 'r+') as project_file:
+            project_lines = project_file.readlines()
+
+            try:
+                # Populate the sounds list
+                global sounds_list
+                sounds_list = project_lines[2].split(',')
+
+                # Load all of the sounds
+                age_sounds = [[303, 4, 'Villager_Male', 'Select'], [301, 4, 'Villager_Male', 'Task'], [295, 1, 'Villager_Male', 'Build'], [299, 1, 'Villager_Male', 'Chop'], [455, 1, 'Villager_Male', 'Farm'], [448, 1, 'Villager_Male', 'Fish'], [297, 1, 'Villager_Male', 'Forage'], [298, 1, 'Villager_Male', 'Hunt'], [300, 1, 'Villager_Male', 'Mine'], [302, 1, 'Villager_Male', 'Repair'], [435, 4, 'Villager_Female', 'Select'], [434, 4, 'Villager_Female', 'Task'], [437, 1, 'Villager_Female', 'Build'], [442, 1, 'Villager_Female', 'Chop'], [438, 1, 'Villager_Female', 'Farm'], [487, 1, 'Villager_Female', 'Fish'], [440, 1, 'Villager_Female', 'Forage'], [441, 1, 'Villager_Female', 'Hunt'], [443, 1, 'Villager_Female', 'Mine'], [444, 1, 'Villager_Female', 'Repair'], [420, 3, 'Soldier', 'Select'], [421, 3, 'Soldier', 'Move'], [422, 3, 'Soldier', 'Attack'], [423, 3, 'Monk', 'Select'], [424, 3, 'Monk', 'Move'], [479, 3, 'King', 'Select'], [480, 3, 'King', 'Move']]
+
+                for sound_index in age_sounds:
+                    # Clear the existing sounds
+                    DATA.sounds[sound_index[0]].items.clear()
+
+                    # Repopulate the previously created sounds
+                    for j, saved_lang in enumerate(sounds_list):
+                        # Get base sound for reference
+                        base_sound = genieutils.sound.SoundItem('', 0, 0, 0, -1)
+
+                        # Create the base sound name
+                        base_sound_name = rf'{sounds_list[j]}_{sound_index[2]}_{sound_index[3]}'
+
+                        # Add extra probability
+                        probabilities = [0] * sound_index[1]
+
+                        # Update each element in the probabilities list
+                        for i in range(sound_index[1]):
+                            probabilities[i] = int(100 / sound_index[1])
+
+                        # Adjust the first probability if the sum is less than 100
+                        if sum(probabilities) < 100:
+                            probabilities[0] += 100 - sum(probabilities)
+
+                        # Convert the first element to an integer after adjustment (just in case)
+                        probabilities[0] = int(probabilities[0])
+                        for i in range(sound_index[1]):
+                            # Build new name
+                            new_sound_name = base_sound_name + '_' + str(i + 1) if sound_index[1] > 1 else base_sound_name
+
+                            # Create a new sound item for each iteration
+                            new_sound = genieutils.sound.SoundItem(new_sound_name, 0, probabilities[i], j + 1, -1)
+
+                            # Append the new sound to the list
+                            DATA.sounds[sound_index[0]].items.append(new_sound)
+
+                # Save the new, default sounds
+                DATA.save(rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat')
+
+            except IndexError:
+                # Default sounds need to be created
+                # Add the default sounds
+                sounds_list = [
+                    MAIN_WINDOW.language_dropdown.itemText(i) 
+                    for i in range(min(MAIN_WINDOW.language_dropdown.count(), len(civilisation_objects)))
+                ]
+
+                # Ensure all lines end with a newline
+                project_lines = [line if line.endswith('\n') else line + '\n' for line in project_lines]
+                
+                # Add new lines if the file has fewer than 3 lines
+                while len(project_lines) < 3:
+                    project_lines.append('\n')
+                
+                # Write the default sounds to the third line (index 2)
+                project_lines[2] = ','.join(sounds_list) + '\n'  # Add newline to ensure it ends properly
+                
+                # Move the file pointer to the beginning of the file
+                project_file.seek(0)
+                
+                # Write the modified lines back to the file
+                project_file.writelines(project_lines)
+
+                # Reformat the sounds so that they can be more easily edited in the future
+                set_default_sound(303, 4, 'Villager_Male', 'Select')
+                set_default_sound(301, 4, 'Villager_Male', 'Task')
+                set_default_sound(295, 1, 'Villager_Male', 'Build')
+                set_default_sound(299, 1, 'Villager_Male', 'Chop')
+                set_default_sound(455, 1, 'Villager_Male', 'Farm')
+                set_default_sound(448, 1, 'Villager_Male', 'Fish')
+                set_default_sound(297, 1, 'Villager_Male', 'Forage')
+                set_default_sound(298, 1, 'Villager_Male', 'Hunt')
+                set_default_sound(300, 1, 'Villager_Male', 'Mine')
+                set_default_sound(302, 1, 'Villager_Male', 'Repair')
+                set_default_sound(435, 4, 'Villager_Female', 'Select')
+                set_default_sound(434, 4, 'Villager_Female', 'Task')
+                set_default_sound(437, 1, 'Villager_Female', 'Build')
+                set_default_sound(442, 1, 'Villager_Female', 'Chop')
+                set_default_sound(438, 1, 'Villager_Female', 'Farm')
+                set_default_sound(487, 1, 'Villager_Female', 'Fish')
+                set_default_sound(440, 1, 'Villager_Female', 'Forage')
+                set_default_sound(441, 1, 'Villager_Female', 'Hunt')
+                set_default_sound(443, 1, 'Villager_Female', 'Mine')
+                set_default_sound(444, 1, 'Villager_Female', 'Repair')
+                set_default_sound(420, 3, 'Soldier', 'Select')
+                set_default_sound(421, 3, 'Soldier', 'Move')
+                set_default_sound(422, 3, 'Soldier', 'Attack')
+                set_default_sound(423, 3, 'Monk', 'Select')
+                set_default_sound(424, 3, 'Monk', 'Move')
+                set_default_sound(479, 3, 'King', 'Select')
+                set_default_sound(480, 3, 'King', 'Move')
+
+                # Save the new, default sounds
+                DATA.save(rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat')
         
-        if 'Hunt' not in DATA.sounds[298].items[0].filename:
-            print('No Hunt')
-            # Reformat the sounds so that they can be more easily edited in the future
-            set_default_sound(303, 4, 'Villager_Male', 'Select')
-            set_default_sound(301, 4, 'Villager_Male', 'Task')
-            set_default_sound(295, 1, 'Villager_Male', 'Build')
-            set_default_sound(299, 1, 'Villager_Male', 'Chop')
-            set_default_sound(455, 1, 'Villager_Male', 'Farm')
-            set_default_sound(448, 1, 'Villager_Male', 'Fish')
-            set_default_sound(297, 1, 'Villager_Male', 'Forage')
-            set_default_sound(298, 1, 'Villager_Male', 'Hunt')
-            set_default_sound(300, 1, 'Villager_Male', 'Mine')
-            set_default_sound(302, 1, 'Villager_Male', 'Repair')
-
-            set_default_sound(435, 4, 'Villager_Female', 'Select')
-            set_default_sound(434, 4, 'Villager_Female', 'Task')
-            set_default_sound(437, 1, 'Villager_Female', 'Build')
-            set_default_sound(442, 1, 'Villager_Female', 'Chop')
-            set_default_sound(438, 1, 'Villager_Female', 'Farm')
-            set_default_sound(487, 1, 'Villager_Female', 'Fish')
-            set_default_sound(440, 1, 'Villager_Female', 'Forage')
-            set_default_sound(441, 1, 'Villager_Female', 'Hunt')
-            set_default_sound(443, 1, 'Villager_Female', 'Mine')
-            set_default_sound(444, 1, 'Villager_Female', 'Repair')
-
-            set_default_sound(420, 3, 'Soldier', 'Select')
-            set_default_sound(421, 3, 'Soldier', 'Move')
-            set_default_sound(422, 3, 'Soldier', 'Attack')
-
-            set_default_sound(423, 3, 'Monk', 'Select')
-            set_default_sound(424, 3, 'Monk', 'Move')
-
-            set_default_sound(479, 3, 'King', 'Select')
-            set_default_sound(480, 3, 'King', 'Move')
-        else:
-            print('Yes Hunt')
-            
         update_civilisation_dropdown()
         #create_bonus(r'• Foot archers and villagers move 50% slower', 0)
 
@@ -743,12 +819,10 @@ def update_civilisation_dropdown():
                     break
 
             # Set default language
-            all_languages = [MAIN_WINDOW.language_dropdown.itemText(i) for i in range(MAIN_WINDOW.language_dropdown.count())]
-            for sound in DATA.sounds[298].items:
-                if sound.civilization == CURRENT_CIV_INDEX + 1:
-                    for i, language in enumerate(all_languages):
-                        if language == sound.filename.split('_')[0]:
-                            MAIN_WINDOW.language_dropdown.setCurrentIndex(i)
+            selected_lang = sounds_list[CURRENT_CIV_INDEX] # Get the string from sounds_list at the CURRENT_CIV_INDEX
+            lang_index = MAIN_WINDOW.language_dropdown.findText(selected_lang) # Find the index in the dropdown that matches this string
+            if lang_index != -1:  # Set the current index if the string was found
+                MAIN_WINDOW.language_dropdown.setCurrentIndex(lang_index)
 
 def update_architecture_dropdown():
     return # Channel
@@ -868,13 +942,24 @@ def update_architecture_dropdown():
             pass
 
 def update_language_dropdown():
-    selected_language = MAIN_WINDOW.language_dropdown.currentIndex()  # Get the current index
+    # Get the current index
+    selected_language = MAIN_WINDOW.language_dropdown.currentIndex()
 
     def change_sound(sound_index, amount):
         for i in range(amount):
-            edit_name = DATA.sounds[sound_index].items[CURRENT_CIV_INDEX * amount + i].filename.split('_')
-            edit_name[0] = MAIN_WINDOW.language_dropdown.currentText()
-            DATA.sounds[sound_index].items[CURRENT_CIV_INDEX * amount + i].filename = '_'.join(edit_name)
+            try:
+                edit_name = DATA.sounds[sound_index].items[CURRENT_CIV_INDEX * amount + i].filename.split('_')
+                edit_name[0] = MAIN_WINDOW.language_dropdown.currentText()
+                DATA.sounds[sound_index].items[CURRENT_CIV_INDEX * amount + i].filename = '_'.join(edit_name)
+            except:
+                show_error_message(rf"Sounds for {civilisation_objects[CURRENT_CIV_INDEX].true_name} have been corrupted.")
+                break
+
+            # Update language in sounds list
+            try:
+                sounds_list[CURRENT_CIV_INDEX] = MAIN_WINDOW.language_dropdown.currentText()
+            except:
+                pass
 
     # Change the sounds for each unit
     change_sound(303, 4)
@@ -910,8 +995,6 @@ def update_language_dropdown():
     change_sound(480, 3)
 
 def save_project():
-    open_saving_window('Saving project...')
-
     # Save changes to .dat file
     DATA.save(rf'{MOD_FOLDER}\resources\_common\dat\empires2_x2_p1.dat')
 
@@ -920,7 +1003,12 @@ def save_project():
     with open(CIV_TECH_TREES_FILE, 'w', encoding='utf-8') as file:
         file.write(json_string)
 
-    print("Project Saved!")
+    # Save sounds
+    with open(rf'{MOD_FOLDER}/{PROJECT_FILE}', 'r+') as project_file:
+        project_lines = project_file.readlines()
+        project_lines[2] = ','.join(sounds_list)
+        project_file.seek(0)  # Move the file pointer to the beginning
+        project_file.writelines(project_lines)  # Write the modified lines back to the file
 
 bonus_unit_lines = {
         # Categories

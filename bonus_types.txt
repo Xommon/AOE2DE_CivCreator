@@ -1,0 +1,47 @@
+[Unit] cost [%] ++ [Resource] ++ starting in the [Age]
+
+[Unit] (Exception) [#/%][Stat] ++ in [Age] and [Age]
+[#][Unit][Stat]
+
+[Unit] (Exception) [#/%][Att/Def] vs. [Unit]
+
+[Villager/Building] work [%] faster
+
+[Villager] carry [#/%]
+
+[Unit] do blast damage
+
+[Exploding Unit] [%] blast radius
+
+[Building] technologies are [%] more effective
+
+First [Fortified Church/Monastery] receives a free Relic
+
+[Unit] (Exception) available one age earlier
+
+[Unit] fire an additional projectile
+
+[#] [Unit] [Stat] for each [Building] technology
+
+Start with [#] [Resource]
+
+Relics generate [%] gold
+
+[Unit] receive [%] less bonus damage
+
+[Unit] are more resistant to conversion
+
+Town Centers spawn [#] villagers when the next Age is reached
+
+Town Centers spawn [#] villagers when reaching the [Age]
+
+[Unit] regenerate [#]HP per minute
+
+[Unit] take [%] less population space
+
+Trade units yield [%] [Resource] in addition to gold
+
+0 HP
+1 LOS
+5 Movement speed
+8 Armour
