@@ -1053,6 +1053,7 @@ bonus_unit_lines = {
         'elephant archers' : [873, 875],
         'elephant archer-line' : [873, 875],
         'elephant archer line' : [873, 875],
+        'infantry' : [74, 75, 76, 473, 567, 93, 358, 359, 1786, 1787, 1788, 751, 753, 752, 1699, 1663, 1697, 184],
         'militia' : [74, 75, 76, 473, 567],
         'militia-line' : [74, 75, 76, 473, 567],
         'militia line' : [74, 75, 76, 473, 567],
@@ -1156,145 +1157,181 @@ bonus_unit_lines = {
         'folwarks' : [1711, 1720, 1734],
         'mills' : [68, 129, 130, 131],
         'farms' : [50],
-
-        # Technology
-        #'chemistry' : [-2, 47],
-        #'fervor' : [-2, 252],
-        #'sanctity' : [-2, 231],
-        #'gold mining' : [-2, 55, 182],
-        #'stone mining' : [-2, 278, 279],
-        #'mining camp technologies' : [-2, 55, 182, 278, 279],
-        #'mining technologies' : [-2, 55, 182, 278, 279],
-        #'mining camp technology' : [-2, 55, 182, 278, 279],
-        #'mining technology' : [-2, 55, 182, 278, 279],
-        #'monastery technologies' : [-2, 233, 230, 46, 45, 316, 438, 319, 441, 439, 231, 252],
-        #'monastery technology' : [-2, 233, 230, 46, 45, 316, 438, 319, 441, 439, 231, 252],
-        #'gillnets' : [-2, 24],
-        #'economic upgrade' : [-2, 24, 24, 200, 238, 55, 182, 278, 279, 192, 196, 210, 482, 15, 14, 13, 12],
-        #'lumber camp technology' : [-2, 192, 196, 210],
-        #'lumber camp technologies' : [-2, 192, 196, 210],
-        #'mill technology' : [-2, 14, 13, 12],
-        #'mill technologies' : [-2, 14, 13, 12],
-        #'stable technology' : [-2, 450, 39],
-        #'stable technologies' : [-2, 450, 39],
         }
+
+bonus_technologies = {
+    # Technology
+    'chemistry' : [-2, 47],
+    'fervor' : [-2, 252],
+    'sanctity' : [-2, 231],
+    'gold mining' : [-2, 55, 182],
+    'stone mining' : [-2, 278, 279],
+    'mining camp technologies' : [-2, 55, 182, 278, 279],
+    'mining technologies' : [-2, 55, 182, 278, 279],
+    'mining camp technology' : [-2, 55, 182, 278, 279],
+    'mining technology' : [-2, 55, 182, 278, 279],
+    'monastery technologies' : [-2, 233, 230, 46, 45, 316, 438, 319, 441, 439, 231, 252],
+    'monastery technology' : [-2, 233, 230, 46, 45, 316, 438, 319, 441, 439, 231, 252],
+    'gillnets' : [-2, 24],
+    'economic upgrade' : [-2, 24, 24, 200, 238, 55, 182, 278, 279, 192, 196, 210, 482, 15, 14, 13, 12],
+    'lumber camp technology' : [-2, 192, 196, 210],
+    'lumber camp technologies' : [-2, 192, 196, 210],
+    'mill technology' : [-2, 14, 13, 12],
+    'mill technologies' : [-2, 14, 13, 12],
+    'stable technology' : [-2, 450, 39],
+    'stable technologies' : [-2, 450, 39],
+}
+
+def find_bonus_units(line):
+    units = []
+    for unit in bonus_unit_lines:
+        # Check if unit is mentioned in "(except ...)"
+        pattern = rf"\(except .*?{unit}.*?\)"
+        if re.search(pattern, line, re.IGNORECASE):
+            units.append(f"!{unit}")  # Add "!" before the unit name
+        elif unit in line:  # Add unit normally if it's in the line
+            units.append(unit)
+    
+    return units
+
+def find_bonus_techs(line):
+    techs = []
+    for tech in bonus_technologies:
+        # Check if unit is mentioned in "(except ...)"
+        pattern = rf"\(except .*?{unit}.*?\)"
+        if re.search(pattern, line, re.IGNORECASE):
+            techs.append(f"!{tech}")  # Add "!" before the unit name
+        elif tech in line:  # Add unit normally if it's in the line
+            techs.append(tech)
+
+    return techs
 
 def create_bonus(bonus_text, civ_index):
     try:
         # Reformat sentence
         bonus_text = bonus_text.lower().strip("• ").replace(', and ', ', ')
 
-        # Patterns to capture different structures
-        patterns = [
-            r'(\b\w+(?:\s*\w*)?(?:,\s*\w+(?:\s*\w*)?)*(?:\s*,?\s+|\s+and\s+)?\w+(?:\s*\w*)?)\s+(?:move|are)\s+(-?\d+%)\s+(faster|slower)',
-            r'(\b\w+(?:\s*\w*)?(?:,\s*\w+(?:\s*\w*)?)*(?:\s*,?\s+|\s+and\s+)?\w+(?:\s*\w*)?)\s*(?:\(except\s+([\w\s,]+)\))?\s+costs?\s+(-?\d+%?)\s*(less|more|faster|slower|cheaper|none)?\s*(wood|gold|stone|food)?(?:\s+starting in the\s+(dark|feudal|castle|imperial)\s+age)?',
-            r'((?:\b\w+\s*\w*\b)(?:[\s,]*and\s+\b\w+\s*\w*)*)\s*(?:\(except\s+([\w\s,]+)\))?\s+([+-]?\d+/?\d*%?)\s*(\w+)?\s*(?:in\s+(dark|feudal|castle|imperial)(?:\s+and\s+(dark|feudal|castle|imperial))*)?',
-        ]
+        # Split each bonus on the line into its own bonus
+        bonus_lines = bonus_text.split(';')
 
-        for i, pattern in enumerate(patterns):
-            match = re.search(pattern, bonus_text, re.IGNORECASE)
-            if match:
-                groups = list(match.groups())
+        # Create new tech and effect
+        new_bonus_tech = DATA.techs[1101]
+        new_bonus_tech.civ = civ_index + 1
+        new_bonus_tech.effect_id = len(DATA.effects) - 1
+        new_bonus_effect = genieutils.effect.Effect('', [])
 
-                # Separate units by commas and "and"
-                units = re.split(r',\s*|\s+and\s+', groups[0]) if groups[0] else []
-                groups[0] = units  # Replace with list of units
+        # Apply the bonuses
+        for bonus_line in bonus_lines:
+            # Gather units and technologies
+            units = find_bonus_units(bonus_line)
+            techs = find_bonus_techs(bonus_line)
 
-                # Format exceptions if present
-                if groups[1]:
-                    exceptions = [f"({item.strip()})" for item in re.split(r',\s*|\s+and\s+', groups[1])]
-                    groups[1] = ', '.join(exceptions)
+            # Split sentence into words
+            words = bonus_line.split()
 
-                #print(f"Pattern {i}:", tuple(groups))
+            # Find the number if it exists
+            number = -1
+            for word in words:
+                if re.search(r'\d', word):
+                    number = word
 
-                # Create new tech and effect
-                new_bonus_tech = DATA.techs[1101]
-                new_bonus_tech.civ = civ_index + 1
-                new_bonus_tech.effect_id = len(DATA.effects) - 1
-                new_bonus_effect = genieutils.effect.Effect('', [])
-
-                if i == 0: # Movement speed
-                    # Name new Tech
-                    new_bonus_tech.name = rf'{civilisation_objects[civ_index].true_name}-Bonus: {[unit.strip().title() for unit in groups[0]]} Speed'
-                    new_bonus_effect.name = new_bonus_tech.name
-
-                    # Convert the percentage into a float
-                    bonus_number = float(re.sub(r'\D', '', groups[1]))
-                    if groups[2] == 'faster':
-                        bonus_number = 1 + (bonus_number / 100)
-                    elif groups[2] == 'slower':
-                        bonus_number = (100 - bonus_number) / 100
-
-                    # Negate if negative
-                    if '-' in groups[1]:
-                        bonus_number *= -1
-
-                    # Create an effect command for each unit
-                    for unit_name in groups[0]:
-                        for unit_index in bonus_unit_lines[unit_name]:
-                            new_bonus_effect.effect_commands.append(genieutils.effect.EffectCommand(5, unit_index, -1, 5, bonus_number))
-
-                    # Add the new tech and effect to the DATA file
-                    DATA.techs.append(new_bonus_tech)
-                    DATA.effects.append(new_bonus_effect)
-                    print(rf'BONUS 0 ADDED: {bonus_text}')
-
-                elif i == 1: # Change cost
-                    # Name new Tech
-                    new_bonus_tech.name = rf'{civilisation_objects[civ_index].true_name}-Bonus: {[unit.strip().title() for unit in groups[0]]} Cost'
-                    new_bonus_effect.name = new_bonus_tech.name
-
-                    # Convert the percentage into a float
-                    bonus_number = float(re.sub(r'\D', '', groups[2]))
-
-                    # Negate if negative
-                    if '-' in groups[2]:
-                        bonus_number = (100 - bonus_number) / 100
-                    else:
-                        bonus_number = 1 + (bonus_number / 100)
-
-                    # Determine the resources
-                    resource = 100
-                    if groups[4] == 'food':
-                        resource = 103
-                    elif groups[4] == 'wood':
-                        resource = 104
-                    elif groups[4] == 'gold':
-                        resource = 105
-                    elif groups[4] == 'stone':
-                        resource = 106
-
-                    # Use the age if it exists
-                    try:
-                        if groups[5] == 'dark':
-                            new_bonus_tech.required_techs = [104, -1, -1, -1, -1, -1]
-                            new_bonus_tech.required_tech_count = 1
-                        elif groups[5] == 'feudal':
-                            new_bonus_tech.required_techs = [101, -1, -1, -1, -1, -1]
-                            new_bonus_tech.required_tech_count = 1
-                        elif groups[5] == 'castle':
-                            new_bonus_tech.required_techs = [102, -1, -1, -1, -1, -1]
-                            new_bonus_tech.required_tech_count = 1
-                        elif groups[5] == 'imperial':
-                            new_bonus_tech.required_techs = [103, -1, -1, -1, -1, -1]
-                            new_bonus_tech.required_tech_count = 1
-                    except:
-                        pass
-
-                    # Create an effect command for each unit
-                    for unit_name in groups[0]:
-                        for unit_index in bonus_unit_lines[unit_name]:
-                            new_bonus_effect.effect_commands.append(genieutils.effect.EffectCommand(5, unit_index, -1, resource, bonus_number))
-
-                    # Add the new tech and effect to the DATA file
-                    DATA.techs.append(new_bonus_tech)
-                    DATA.effects.append(new_bonus_effect)
-                    print(rf'BONUS 1 ADDED: {bonus_text}')
+            # Convert the number into a decimal
+            if '%' in str(number):
+                number = int(number.strip('%'))
+                if '-' in str(number):
+                    number = (100 - (number * -1)) / 100
                 else:
-                    print(rf"INVALID BONUS: {bonus_text}")
-                break
-        else:
-            print("No match found.")
+                    number = 1 + (number / 100)
+
+            # Set the resource
+            resource = ''
+            resource_types = ['food', 'wood', 'gold', 'stone']
+            for res in resource_types:
+                if res in bonus_line:
+                    resource = res
+
+            if 'cost' in bonus_line or 'costs' in bonus_line: # Change cost
+                # Set the name of the bonus
+                for unit in units:
+                    if '!' not in unit:
+                        name_unit = unit
+                        break
+                new_bonus_tech.name = rf'{civilisation_objects[civ_index].true_name}-Bonus: {name_unit} {resource} Cost'
+                new_bonus_effect.name = new_bonus_tech.name
+
+                # Convert unit names into unit indexes
+                unit_indexes = []
+                tech_indexes = []
+
+                # Get existing units
+                for unit in units:
+                    if '!' not in unit:
+                        unit_indexes.append(bonus_unit_lines[unit])
+
+                # Remove exception units
+                for unit in units:
+                    if '!' in unit:
+                        unit_indexes.pop(unit)
+                unit_indexes = unit_indexes[0]
+
+                # Get existing techs
+                for tech in techs:
+                    if '!' not in unit:
+                        tech_indexes.append(bonus_technologies[tech])
+
+                # Remove exception units
+                for tech in techs:
+                    if '!' in tech:
+                        tech_indexes.pop(tech)
+
+                # Get the resource id for units
+                resource_id = 100
+                if resource == 'food':
+                    resource_id = 103
+                elif resource == 'wood':
+                    resource_id = 104
+                elif resource == 'gold':
+                    resource_id = 105
+                elif resource == 'stone':
+                    resource_id = 106
+
+                # Get the resource id for techs
+                '''resource_id_tech = []
+                if resource == 'food':
+                    resource_id_tech.append(0)
+                elif resource == 'wood':
+                    resource_id_tech.append(1)
+                elif resource == 'gold':
+                    resource_id_tech.append(3)
+                elif resource == 'stone':
+                    resource_id_tech.append(2)
+                else:
+                    resource_id_tech.append(0)
+                    resource_id_tech.append(1)
+                    resource_id_tech.append(2)
+                    resource_id_tech.append(3)'''
+                
+                # Starting age
+                if 'starting in the feudal age' in bonus_line:
+                    new_bonus_tech.required_techs = [101, -1, -1, -1, -1, -1]
+                    new_bonus_tech.required_tech_count = 1
+                elif 'starting in the castle age' in bonus_line:
+                    new_bonus_tech.required_techs = [102, -1, -1, -1, -1, -1]
+                    new_bonus_tech.required_tech_count = 1
+                elif 'starting in the imperial age' in bonus_line:
+                    new_bonus_tech.required_techs = [103, -1, -1, -1, -1, -1]
+                    new_bonus_tech.required_tech_count = 1
+
+                # Create an effect-command for each unit and tech
+                for unit_i in unit_indexes:
+                    new_effect_command = genieutils.effect.EffectCommand(5, unit_i, -1, resource_id, number)
+                    new_bonus_effect.effect_commands.append(new_effect_command)
+
+                # Add the new tech and effect to the DATA file
+                DATA.techs.append(new_bonus_tech)
+                DATA.effects.append(new_bonus_effect)
+                print(rf'COST BONUS ADDED: {bonus_text}')
+
     except Exception as e:
         traceback.print_exc()
 
