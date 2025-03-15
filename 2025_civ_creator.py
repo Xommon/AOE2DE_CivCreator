@@ -13,7 +13,10 @@ import genieutils
 from genieutils.datfile import DatFile
 import genieutils.sound
 import genieutils.unit
+import genieutils.effect
 import pickle
+import json
+import re
 
 def open_mod(mod_folder):
     print('\nLoading mod...')
@@ -124,17 +127,19 @@ def new_mod():
 def main():
     # Main menu
     print('---- AOE2DE Civilisation Creator ----')
-    print('1: Open Mod')
-    print('2: New Mod')
+    print('0: Open Mod')
+    print('1: New Mod')
     selection = input("Selection: ")
 
     # Open
-    if selection == "1":
+    if selection == "0":
         global MOD_FOLDER
-        MOD_FOLDER = input("\nMod folder location: ")
+        # DEBUG
+        MOD_FOLDER = '/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test'
+        #MOD_FOLDER = input("\nMod folder location: ")
         open_mod(MOD_FOLDER)
     # New
-    elif selection == "2":
+    elif selection == "1":
         new_mod()
 
     # Mod menu
@@ -158,7 +163,7 @@ def main():
             if 0 <= edit_civ_index < len(DATA.civs):
                 print(f'\n-- Edit {selected_civ_name} --')
                 print('0: Name')
-                print('1: Description')
+                print('1: Description (Bonuses/Unique Units)')
                 print('2: Architecture')
                 print('3: Language')
                 print('4: Tech Tree')
@@ -180,12 +185,24 @@ def main():
 
                 # Description
                 elif selection == "1":
-                    new_description = input(f"Enter new description for {selected_civ_name}: ")
+                    # Get user input
+                    new_title = input(f"Enter new title for {selected_civ_name} (ex. Archer civilization): ")
 
-                    # Change description
+                    #primary_unique_units = [8,530,281,531,41,555,291,560,]
+                    #for i in []:
+
+                    new_castle_unit = '?'
+                    while new_castle_unit == '?':
+                        new_castle_unit = input(f"Enter unique Castle unit for {selected_civ_name} (leave blank for original): ")
+
+                    # Change Title
                     with open(MOD_STRINGS, 'r+') as file:
                         lines = file.readlines()  # Read all lines
-                        lines[selected_civ_index + len(DATA.civs) - 1] = lines[selected_civ_index + len(DATA.civs) - 1][:6] + f' "{new_description}"\n'  # Modify the specific line
+                        line_index = selected_civ_index + len(DATA.civs) - 1
+                        line = lines[line_index]
+                        newline = line[:6] + f' "{new_title}"' + line[line.find('\n'):]  # Modify the specific line up to the first \n
+
+                        lines[line_index] = newline
 
                         file.seek(0)  # Move to the beginning of the file
                         file.writelines(lines)  # Overwrite the file with modified lines
@@ -204,6 +221,11 @@ def main():
                         all_arcs += DATA.civs[i].name.lower()
                         if i < len(DATA.civs) - 1:
                             all_arcs += ', '
+                    custom_arcs = [
+                        [],
+                        ['poenari castle'],
+                        ['aachen cathedral', 'dome of the rock', 'dormition cathedral', 'gol gumbaz', 'minaret of jam', 'pyramid', 'quimper cathedral', 'sankore madrasah', 'tower of london']
+                    ]
 
                     # User prompts
                     architecture_types = ["General", "Castle", "Wonder"]
@@ -214,7 +236,14 @@ def main():
                         while architecture_selection == '?':
                             architecture_selection = input(f"Enter {architecture_types[i]} architecture for {selected_civ_name} (leave blank for original): ").lower()
                             if architecture_selection == '?':
-                                print(all_arcs)
+                                additional_arcs = ''
+                                if i == 0:
+                                    additional_arcs += ''
+                                elif i == 1:
+                                    additional_arcs += ', poenari castle'
+                                elif i == 2:
+                                    additional_arcs += ', aachen cathedral, dome of the rock, dormition cathedral, gol gumbaz, minaret of jam, pyramid, quimper cathedral, sankore madrasah, tower of london'
+                                print(all_arcs + additional_arcs)
                                 continue
                             for i_arc in range(len(architecture_names)):
                                 if architecture_selection.lower() == architecture_names[i_arc].lower():
@@ -226,6 +255,8 @@ def main():
                             elif architecture_changes[i] == -1:
                                 architecture_selection = '?'
                                 print(f'{architecture_types[i]} architecture type not valid.\n')
+
+                    print(architecture_changes)
 
                     for arc_db in range(3):
                         # Load architecture graphics
@@ -240,17 +271,27 @@ def main():
                             all_units_to_change = [276, 1445]
 
                         for unit_id in all_units_to_change:
+                            # Select which unit will be the basis for change
+                            unit_to_change_to = -1
+                            for j in enumerate(custom_arcs[arc_db]):
+                                if architecture_selection == custom_arcs[arc_db][j]:
+                                    unit_to_change_to = DATA.civs[selected_civ_index].units.index(custom_arcs[arc_db][j])
+                                    print(unit_to_change_to)
+                                    break
+                            if unit_to_change_to == -1:
+                                unit_to_change_to = original_units[unit_id]
+                            
                             # Standing graphic
                             try:
                                 standing_graphic_list = list(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic)  # Convert to list for modification
-                                standing_graphic_list[0] = int(original_units[unit_id].standing_graphic[0])  # Ensure it's an integer
+                                standing_graphic_list[0] = int(unit_to_change_to.standing_graphic[0])  # Ensure it's an integer
                                 DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = tuple(standing_graphic_list)  # Convert back to tuple
                             except:
                                 pass
 
                             # Dying graphic
                             try:
-                                DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = original_units[unit_id].dying_graphic  # Ensure it's an integer
+                                DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = unit_to_change_to.dying_graphic  # Ensure it's an integer
                             except:
                                 pass
 
@@ -258,7 +299,7 @@ def main():
                             try:
                                 for j in range(3):  # Loop through the first 3 damage graphics
                                     if j < len(DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics):
-                                        DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics[j].graphic_id = original_units[unit_id].damage_graphics[j].graphic_id # Ensure it's an integer
+                                        DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics[j].graphic_id = unit_to_change_to.damage_graphics[j].graphic_id # Ensure it's an integer
                             except:
                                 pass
 
@@ -269,6 +310,262 @@ def main():
                 # Language
                 elif selection == "3":
                     pass
+
+                # Tech Tree
+                elif selection == '4':
+                    # Import the tech tree
+                    tech_tree = {}
+                    with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
+                        # Get the line of the selected civ
+                        lines = file.readlines()
+                        civ_id_line_indexes = [i for i, line in enumerate(lines) if '"civ_id":' in line]
+                        index = civ_id_line_indexes[selected_civ_index] + 1
+
+                        # Get the tech tree of the selected civ
+                        for line in lines[index:]:
+                            if '\"Name\":' in line:
+                                selected_unit = line.split('\"Name\": "')[1].split('",')[0].lower()
+                            elif '\"Node Status\":' in line:
+                                selected_status = line.split('\"Node Status\": "')[1].split('",')[0]
+
+                                # Convert status to integer
+                                if selected_status == 'NotAvailable':
+                                    selected_status = 0
+                                elif selected_status == 'ResearchedCompleted':
+                                    selected_status = 1
+                                elif selected_status == 'ResearchRequired':
+                                    selected_status = 2
+
+                                # Add to tech tree
+                                tech_tree[selected_unit] = selected_status
+
+                            # Check for the end of the tech tree section
+                            if 'civ_id' in line:
+                                break
+
+                    # Tech tree menu
+                    while selection != 3:
+                        with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
+                            # Get index of selected civ
+                            lines = file.readlines()
+                            tech_tree_indexes = []
+                            for i, line in enumerate(lines):
+                                if "civ_id" in line:
+                                    tech_tree_indexes.append(i)
+                            tech_tree_index = tech_tree_indexes[selected_civ_index]
+                            tech_tree_indexes = [254, 258, 259, 262, 255, 257, 256, 260, 261, 263, 276, 277, 275, 446, 447, 449, 448, 504, 10, 1, 3, 5, 7, 31, 48, 42, 37, 646, 648, 650, 652, 706, 708, 710, 712, 782, 784, 801, 803, 838, 840, 842, 890, 925, 927]
+
+                            # Show menu
+                            print(f'\n- Tech Tree Menu -')
+                            print('0: View Tech Tree')
+                            print('1: Enable Items')
+                            print('2: Disable Items')
+                            selection = input("Selection: ")
+
+                            # Exit
+                            if selection == '':
+                                break
+
+                            # Enable or Disable Items
+                            elif selection == '1' or selection == '2':
+                                # Choose whether enabling or disabling
+                                if selection == '1':
+                                    enable_disable = 'enable'
+                                else:
+                                    enable_disable = 'disable'
+
+                                unit = 'X'
+                                while unit != '':
+                                    unit = input(f'\nEnter the unit, building, or technology name to {enable_disable}: ').lower()
+                                    if unit in tech_tree:
+                                        # Update .json file
+                                        for i in range(tech_tree_index, len(lines)):
+                                            if f'\"Name\": \"{unit.title()}\"' in lines[i]:
+                                                if enable_disable == 'enable':
+                                                    lines[i + 3] = f'          \"Node Status\": \"ResearchedCompleted\",\n'
+                                                else:
+                                                    lines[i + 3] = f'          \"Node Status\": \"NotAvailable\",\n'
+                                                break
+                                        file.seek(0)
+                                        file.writelines(lines)
+                                        file.truncate()
+
+                                        # Get unit index
+                                        match = re.search(r'\d+', lines[i + 2])
+                                        if match:
+                                            unit_index = int(match.group())
+
+                                        # Get tech index
+                                        found = False
+                                        for i, tech in enumerate(DATA.techs):
+                                            for ec in DATA.effects[tech.effect_id].effect_commands:
+                                                if (ec.type == 2 and ec.a == unit_index) or (ec.type == 3 and ec.b == unit_index):
+                                                    tech_index = i
+                                                    print(tech_index)
+                                                    found = True
+                                                    break
+                                            if found:
+                                                break
+
+                                        # Update .dat file
+                                        unit_changed = False
+                                        if enable_disable == 'enable':
+                                            for i, effect_command in enumerate(DATA.effects[tech_tree_indexes[selected_civ_index + 1]].effect_commands):
+                                                if effect_command.type == 102 and effect_command.d == tech_index:
+                                                    DATA.effects[tech_tree_indexes[selected_civ_index + 1]].effect_commands.pop(i)
+                                                    unit_changed = True
+                                        elif enable_disable == 'disable':
+                                            DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))
+                                            unit_changed = True
+
+                                        if unit_changed:
+                                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                            print(f'{unit.title()} {enable_disable}d.')
+                                        else:
+                                            print(f'{unit.title()} was already {enable_disable}d.')
+                                    elif unit != '':
+                                        print(f'{unit.title()} not found.')
+
+                            # View Tech Tree
+                            if selection == '0':
+                                print('\nKEY: 0 = Disabled, 1 = Enabled, 2 = Enabled (Research Required)')
+                                time.sleep(2)
+                                print(f'\n-- ARCHERY RANGE -- [{tech_tree["Archery Range"]}]')
+                                print(f'Archer [{tech_tree["Archer"]}] --> Crossbowman [{tech_tree["Crossbowman"]}] --> Arbalester [{tech_tree["Arbalester"]}]')
+                                print(f'Skirmisher [{tech_tree["Skirmisher"]}] --> Elite Skirmisher [{tech_tree["Elite Skirmisher"]}]')
+                                print(f'Hand Cannoneer [{tech_tree["Hand Cannoneer"]}]')
+                                print(f'Cavalry Archer [{tech_tree["Cavalry Archer"]}] --> Heavy Cavalry Archer [{tech_tree["Heavy Cavalry Archer"]}]')
+                                print(f'Elephant Archer [{tech_tree["Elephant Archer"]}] --> Elite Elephant Archer [{tech_tree["Elite Elephant Archer"]}]')
+                                print(f'Thumb Ring [{tech_tree["Thumb Ring"]}]')
+                                print(f'Parthian Tactics [{tech_tree["Parthian Tactics"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- BARRACKS -- [{tech_tree["Barracks"]}]')
+                                print(f'Militia [{tech_tree["Militia"]}] --> Man-at-Arms [{tech_tree["Man-at-Arms"]}] --> Long Swordsman [{tech_tree["Long Swordsman"]}] --> Two-Handed Swordsman [{tech_tree["Two-Handed Swordsman"]}] --> Champion [{tech_tree["Champion"]}]')
+                                print(f'Supplies [{tech_tree["Supplies"]}] --> Gambesons [{tech_tree["Gambesons"]}]')
+                                print(f'Spearman [{tech_tree["Spearman"]}] --> Pikeman [{tech_tree["Pikeman"]}] --> Halberdier [{tech_tree["Halberdier"]}]')
+                                print(f'Eagle Scout [{tech_tree["Eagle Scout"]}] --> Eagle Warrior [{tech_tree["Eagle Warrior"]}] --> Elite Eagle Warrior [{tech_tree["Elite Eagle Warrior"]}]')
+                                print(f'Squires [{tech_tree["Squires"]}]')
+                                print(f'Arson [{tech_tree["Arson"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- STABLE -- [{tech_tree["Stable"]}]')
+                                print(f'Scout Cavalry [{tech_tree["Scout Cavalry"]}] --> Light Cavalry [{tech_tree["Light Cavalry"]}] --> Hussar [{tech_tree["Hussar"]}]')
+                                print(f'Bloodlines [{tech_tree["Bloodlines"]}]')
+                                print(f'Knight [{tech_tree["Knight"]}] --> Cavalier [{tech_tree["Cavalier"]}] --> Paladin [{tech_tree["Paladin"]}]')
+                                print(f'Steppe Lancer [{tech_tree["Steppe Lancer"]}] --> Elite Steppe Lancer [{tech_tree["Elite Steppe Lancer"]}]')
+                                print(f'Camel Rider [{tech_tree["Camel Rider"]}] --> Heavy Camel Rider [{tech_tree["Heavy Camel Rider"]}]')
+                                print(f'Battle Elephant [{tech_tree["Battle Elephant"]}] --> Elite Battle Elephant [{tech_tree["Elite Battle Elephant"]}]')
+                                print(f'Husbandry [{tech_tree["Husbandry"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- SIEGE WORKSHOP -- [{tech_tree["Siege Workshop"]}]')
+                                print(f'Battering Ram [{tech_tree["Battering Ram"]}] --> Capped Ram [{tech_tree["Capped Ram"]}] --> Siege Ram [{tech_tree["Siege Ram"]}]')
+                                print(f'Armored Elephant [{tech_tree["Armored Elephant"]}] --> Siege Elephant [{tech_tree["Siege Elephant"]}]')
+                                print(f'Mangonel [{tech_tree["Mangonel"]}] --> Onager [{tech_tree["Onager"]}] --> Siege Onager [{tech_tree["Siege Onager"]}]')
+                                print(f'Scorpion [{tech_tree["Scorpion"]}] --> Heavy Scorpion [{tech_tree["Heavy Scorpion"]}]')
+                                print(f'Siege Tower [{tech_tree["Siege Tower"]}]')
+                                print(f'Bombard Cannon [{tech_tree["Bombard Cannon"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- BLACKSMITH -- [{tech_tree["Blacksmith"]}]')
+                                print(f'Padded Archer Armor [{tech_tree["Padded Archer Armor"]}] --> Leather Archer Armor [{tech_tree["Leather Archer Armor"]}] --> Ring Archer Armor [{tech_tree["Ring Archer Armor"]}]')
+                                print(f'Fletching [{tech_tree["Fletching"]}] --> Bodkin Arrow [{tech_tree["Bodkin Arrow"]}] --> Bracer [{tech_tree["Bracer"]}]')
+                                print(f'Forging [{tech_tree["Forging"]}] --> Iron Casting [{tech_tree["Iron Casting"]}] --> Blast Furnace [{tech_tree["Blast Furnace"]}]')
+                                print(f'Scale Barding Armor [{tech_tree["Scale Barding Armor"]}] --> Chain Barding Armor [{tech_tree["Chain Barding Armor"]}] --> Plate Barding Armor [{tech_tree["Plate Barding Armor"]}]')
+                                print(f'Scale Mail Armor [{tech_tree["Scale Mail Armor"]}] --> Chain Mail Armor [{tech_tree["Chain Mail Armor"]}] --> Plate Mail Armor [{tech_tree["Plate Mail Armor"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- DOCK -- [{tech_tree["Dock"]}]')
+                                print(f'Fishing Ship [{tech_tree["Fishing Ship"]}]')
+                                print(f'Transport Ship [{tech_tree["Transport Ship"]}]')
+                                print(f'Fire Galley [{tech_tree["Fire Galley"]}] --> Fire Ship [{tech_tree["Fire Ship"]}] --> Fast Fire Ship [{tech_tree["Fast Fire Ship"]}]')
+                                print(f'Trade Cog [{tech_tree["Trade Cog"]}]')
+                                print(f'Gillnets [{tech_tree["Gillnets"]}]')
+                                print(f'Cannon Galleon [{tech_tree["Cannon Galleon"]}] --> Elite Cannon Galleon [{tech_tree["Elite Cannon Galleon"]}]')
+                                print(f'Demolition Raft [{tech_tree["Demolition Raft"]}] --> Demolition Ship [{tech_tree["Demolition Ship"]}] --> Heavy Demolition Ship [{tech_tree["Heavy Demolition Ship"]}]')
+                                print(f'Galley [{tech_tree["Galley"]}] --> War Galley [{tech_tree["War Galley"]}] --> Galleon [{tech_tree["Galleon"]}]')
+                                print(f'Dromon [{tech_tree["Dromon"]}]')
+                                print(f'Careening [{tech_tree["Careening"]}] --> Dry Dock [{tech_tree["Dry Dock"]}]')
+                                print(f'Shipwright [{tech_tree["Shipwright"]}]')
+                                print(f'Fish Trap [{tech_tree["Fish Trap"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- UNIVERSITY -- [{tech_tree["University"]}]')
+                                print(f'Masonry [{tech_tree["Masonry"]}] --> Architecture [{tech_tree["Architecture"]}]')
+                                print(f'Fortified Wall [{tech_tree["Fortified Wall"]}]')
+                                print(f'Chemistry [{tech_tree["Chemistry"]}] --> Bombard Tower [{tech_tree["Bombard Tower"]}]')
+                                print(f'Ballistics [{tech_tree["Ballistics"]}]')
+                                print(f'Siege Engineers [{tech_tree["Siege Engineers"]}]')
+                                print(f'Guard Tower [{tech_tree["Guard Tower"]}] --> Keep [{tech_tree["Keep"]}]')
+                                print(f'Heated Shot [{tech_tree["Heated Shot"]}]')
+                                print(f'Arrowslits [{tech_tree["Arrowslits"]}]')
+                                print(f'Murder Holes [{tech_tree["Murder Holes"]}]')
+                                print(f'Treadmill Crane [{tech_tree["Treadmill Crane"]}]')
+
+                                time.sleep(1)
+                                print(f'OUTPOST [{tech_tree["Outpost"]}]')
+                                print(f'WATCH TOWER [{tech_tree["Watch Tower"]}]')
+                                print(f'GUARD TOWER [{tech_tree["Guard Tower"]}]')
+                                print(f'KEEP [{tech_tree["Keep"]}]')
+                                print(f'BOMBARD TOWER [{tech_tree["Bombard Tower"]}]')
+                                print(f'PALISADE WALL [{tech_tree["Palisade Wall"]}]')
+                                print(f'STONE WALL [{tech_tree["Stone Wall"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- CASTLE -- [{tech_tree["Castle"]}]')
+                                print(f'Petard [{tech_tree["Petard"]}]')
+                                print(f'Trebuchet [{tech_tree["Trebuchet (Packed)"]}]')
+                                print(f'Hoardings [{tech_tree["Hoardings"]}]')
+                                print(f'Sappers [{tech_tree["Sappers"]}]')
+                                print(f'Conscription [{tech_tree["Conscription"]}]')
+                                print(f'Spies/Treason [{tech_tree["Spies/Treason"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- MONASTERY -- [{tech_tree["Monastery"]}]')
+                                print(f'Monk [{tech_tree["Monk"]}]')
+                                print(f'Illumination [{tech_tree["Illumination"]}]')
+                                print(f'Block Printing [{tech_tree["Block Printing"]}]')
+                                print(f'Devotion [{tech_tree["Devotion"]}] --> Faith [{tech_tree["Faith"]}]')
+                                print(f'Redemption [{tech_tree["Redemption"]}]')
+                                print(f'Theocracy [{tech_tree["Theocracy"]}]')
+                                print(f'Atonement [{tech_tree["Atonement"]}]')
+                                print(f'Herbal Medicine [{tech_tree["Herbal Medicine"]}]')
+                                print(f'Heresy [{tech_tree["Heresy"]}]')
+                                print(f'Sanctity [{tech_tree["Sanctity"]}]')
+                                print(f'Fervor [{tech_tree["Fervor"]}]')
+
+                                time.sleep(1)
+                                print(f'HOUSE [{tech_tree["House"]}]')
+                                print(f'\n-- TOWN CENTER -- [{tech_tree["Town Center"]}]')
+                                print(f'Villager [{tech_tree["Villager"]}]')
+                                print(f'Town Watch [{tech_tree["Town Watch"]}] --> Town Patrol [{tech_tree["Town Patrol"]}]')
+                                print(f'Loom [{tech_tree["Loom"]}]')
+                                print(f'Wheelbarrow [{tech_tree["Wheelbarrow"]}] --> Hand Cart [{tech_tree["Hand Cart"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- MINING CAMP -- [{tech_tree["Mining Camp"]}]')
+                                print(f'Gold Mining [{tech_tree["Gold Mining"]}] --> Gold Shaft Mining [{tech_tree["Gold Shaft Mining"]}]')
+                                print(f'Stone Mining [{tech_tree["Stone Mining"]}] --> Stone Shaft Mining [{tech_tree["Stone Shaft Mining"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- LUMBER CAMP -- [{tech_tree["Lumber Camp"]}]')
+                                print(f'Double-Bit Axe [{tech_tree["Double-Bit Axe"]}] --> Bow Saw [{tech_tree["Bow Saw"]}] --> Two-Man Saw [{tech_tree["Two-Man Saw"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- MARKET -- [{tech_tree["Market"]}]')
+                                print(f'Trade Cart [{tech_tree["Trade Cart"]}]')
+                                print(f'Coinage [{tech_tree["Coinage"]}] --> Banking [{tech_tree["Banking"]}]')
+                                print(f'Caravan [{tech_tree["Caravan"]}]')
+                                print(f'Guilds [{tech_tree["Guilds"]}]')
+
+                                time.sleep(1)
+                                print(f'\n-- MILL -- [{tech_tree["Mill"]}]')
+                                print(f'Farm [{tech_tree["Farm"]}]')
+                                print(f'Horse Collar [{tech_tree["Horse Collar"]}] --> Heavy Plow [{tech_tree["Heavy Plow"]}] --> Crop Rotation [{tech_tree["Crop Rotation"]}]')
+
+                            else:
+                                print("Invalid selection. Try again.")
             else:
                 print("Invalid selection. Try again.")
         except ValueError:
