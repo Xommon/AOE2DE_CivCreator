@@ -12,6 +12,7 @@ import ast
 import genieutils
 from genieutils.datfile import DatFile
 import genieutils.sound
+import genieutils.tech
 import genieutils.unit
 import genieutils.effect
 import pickle
@@ -24,6 +25,8 @@ def open_mod(mod_folder):
     DATA = DatFile.parse(rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat')
     global MOD_STRINGS
     MOD_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-modded-strings-utf8.txt'
+    global ORIGINAL_STRINGS
+    ORIGINAL_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-strings-utf8.txt'
     global MOD_FOLDER
     MOD_FOLDER = mod_folder
 
@@ -124,11 +127,64 @@ def new_mod():
     print(mod_name, "created!")
     open_mod(MOD_FOLDER)
 
+def revert():
+    print('\nWARNING: Reverting the mod will completely erase all changes made to the modded files. THIS CHANGE IS IRREVERSIBLE.')
+    yes = input("Enter 'yes' to continue: ")
+    
+    if yes.lower() == 'yes':
+        # Get the original AoE2DE folder from the user
+        modded_folder = input('Enter the mod folder location: ').strip()
+        if not modded_folder:
+            modded_folder = '/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test'
+        aoe2_folder = input("Enter the original 'AoE2DE' folder location: ").strip()
+        if not aoe2_folder:
+            aoe2_folder = '/home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE'
+
+        # List of files to restore
+        files_to_restore = [
+            'resources/_common/dat/civilizations.json', 
+            'resources/_common/dat/civTechTrees.json', 
+            'resources/_common/dat/empires2_x2_p1.dat', 
+            'resources/_common/wpfg/resources/civ_techtree',
+            'resources/_common/wpfg/resources/uniticons',
+            'resources/en/strings/key-value/key-value-strings-utf8.txt',
+            'resources/en/strings/key-value/key-value-modded-strings-utf8.txt',
+            'widgetui/textures/menu/civs'
+        ]
+
+        # Delete current modded files
+        for item in files_to_restore:
+            modded_path = os.path.join(modded_folder, item)
+
+            if os.path.exists(modded_path):
+                if os.path.isfile(modded_path):
+                    os.remove(modded_path)  # Delete file
+                elif os.path.isdir(modded_path):
+                    shutil.rmtree(modded_path)  # Delete folder
+            
+        # Reinstall original files
+        for item in files_to_restore:
+            source_path = os.path.join(aoe2_folder, item)
+            destination_path = os.path.join(modded_folder, item)
+
+            # Ensure destination directory exists
+            os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+
+            if os.path.exists(source_path):
+                if os.path.isfile(source_path):
+                    shutil.copy(source_path, destination_path)  # Restore file
+                elif os.path.isdir(source_path):
+                    shutil.copytree(source_path, destination_path)  # Restore folder
+
+        print("Mod reverted successfully!\n")
+        main()
+
 def main():
     # Main menu
     print('---- AOE2DE Civilisation Creator ----')
     print('0: Open Mod')
     print('1: New Mod')
+    print('2: Revert Mod')
     selection = input("Selection: ")
 
     # Open
@@ -141,6 +197,9 @@ def main():
     # New
     elif selection == "1":
         new_mod()
+    # Revert
+    elif selection == "2":
+        revert()
 
     # Mod menu
     mod_name = MOD_FOLDER.split('/')[-1]
@@ -186,27 +245,97 @@ def main():
                 # Description
                 elif selection == "1":
                     # Get user input
-                    new_title = input(f"Enter new title for {selected_civ_name} (ex. Archer civilization): ")
+                    #new_title = input(f"Enter new title for {selected_civ_name} (ex. Archer civilization): ")
 
                     #primary_unique_units = [8,530,281,531,41,555,291,560,]
                     #for i in []:
 
+                    all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "cretan archer", "crusader knight", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "xolotl warrior", "sun warrior", "island sentinel"]
                     new_castle_unit = '?'
                     while new_castle_unit == '?':
-                        new_castle_unit = input(f"Enter unique Castle unit for {selected_civ_name} (leave blank for original): ")
+                        new_castle_unit = input(f"Enter unique Castle unit for {selected_civ_name} (leave blank for original): ").lower()
+
+                        if new_castle_unit not in all_castle_units:
+                            new_castle_unit = '?'
+                            print('ERROR: Unit not found.')
+                        elif new_castle_unit == '?':
+                            print(all_castle_units)
+                            continue
+
+                    # Get unit indexes
+                    castle_unit_indexes = [-1, -1, -1, -1]
+                    with open(ORIGINAL_STRINGS, 'r') as file:
+                        lines = file.readlines()
+                        for i, unit in enumerate(DATA.civs[selected_civ_index + 1].units):
+                            try:
+                                # Get the name of the unit
+                                unit_name_id = int(unit.language_dll_name)
+                                unit_name = None
+                                # Extract unit name from ORIGINAL_STRINGS
+                                for line in lines:
+                                    if line.startswith(f"{unit_name_id} "):
+                                        unit_name = line.split('"')[1].lower()
+                                        break
+                                    
+                                if unit_name:
+                                    if unit_name == all_castle_units[selected_civ_index]:
+                                        castle_unit_indexes[0] = i
+                                    elif unit_name == f'elite {all_castle_units[selected_civ_index]}':
+                                        castle_unit_indexes[1] = i
+                                    elif unit_name == new_castle_unit:
+                                        castle_unit_indexes[2] = i
+                                    elif unit_name == f'elite {new_castle_unit}':
+                                        castle_unit_indexes[3] = i
+                            except:
+                                pass
 
                     # Change Title
-                    with open(MOD_STRINGS, 'r+') as file:
-                        lines = file.readlines()  # Read all lines
-                        line_index = selected_civ_index + len(DATA.civs) - 1
-                        line = lines[line_index]
-                        newline = line[:6] + f' "{new_title}"' + line[line.find('\n'):]  # Modify the specific line up to the first \n
+                    #with open(MOD_STRINGS, 'r+') as file:
+                    #    lines = file.readlines()  # Read all lines
+                    #    line_index = selected_civ_index + len(DATA.civs) - 1
+                    #    line = lines[line_index]
+                    #    newline = line[:6] + f' "{new_title}"' + line[line.find('\n'):]  # Modify the specific line up to the first \n
+#
+                    #    lines[line_index] = newline
+#
+                    #    file.seek(0)  # Move to the beginning of the file
+                    #    file.writelines(lines)  # Overwrite the file with modified lines
+                    #    file.truncate()  # Ensure any remaining old content is removed
 
-                        lines[line_index] = newline
+                    # Change Castle Unit
+                    effect_commands = [
+                        genieutils.effect.EffectCommand(3, castle_unit_indexes[0], castle_unit_indexes[2], -1, 0),
+                        genieutils.effect.EffectCommand(3, castle_unit_indexes[1], castle_unit_indexes[3], -1, 0)
+                    ]
 
-                        file.seek(0)  # Move to the beginning of the file
-                        file.writelines(lines)  # Overwrite the file with modified lines
-                        file.truncate()  # Ensure any remaining old content is removed
+                    effect_found = False
+                    effect_name = selected_civ_name + " (Castle Unit)"
+
+                    for i, effect in enumerate(DATA.effects):
+                        if effect.name == effect_name:
+                            effect.effect_commands = effect_commands
+                            effect_found = True
+                            effect_index = i
+                            break
+                        
+                    if not effect_found:
+                        new_effect = genieutils.effect.Effect(effect_name, effect_commands)
+                        DATA.effects.append(new_effect)
+                        effect_index = len(DATA.effects) - 1
+                    
+                    new_tech = DATA.techs[1101]
+                    new_tech.effect_id = effect_index
+                    new_tech.name = effect_name
+                    new_tech.civ = selected_civ_index + 1
+
+                    for tech in DATA.techs:
+                        if tech.name == effect_name:
+                            DATA.techs.remove(tech)
+                    DATA.techs.append(new_tech)
+
+                    # Save changes
+                    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                    print(f"{selected_civ_name.title()} unique unit set to {new_castle_unit.title()}.")
 
                 # Architecture
                 elif selection == "2":
@@ -254,7 +383,7 @@ def main():
                                 architecture_changes[i] = selected_civ_index
                             elif architecture_changes[i] == -1:
                                 architecture_selection = '?'
-                                print(f'{architecture_types[i]} architecture type not valid.\n')
+                                print(f'ERROR: {architecture_types[i]} architecture type not valid.\n')
 
                     print(architecture_changes)
 
