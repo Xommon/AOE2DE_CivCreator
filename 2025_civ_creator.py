@@ -222,14 +222,16 @@ def main():
             if 0 <= edit_civ_index < len(DATA.civs):
                 print(f'\n-- Edit {selected_civ_name} --')
                 print('0: Name')
-                print('1: Description (Bonuses/Unique Units)')
-                print('2: Architecture')
-                print('3: Language')
-                print('4: Tech Tree')
+                print('1: Title')
+                print('2: Bonuses')
+                print('3: Unique Unit')
+                print('4: Architecture')
+                print('5: Language')
+                print('6: Tech Tree')
                 selection = input("Selection: ")
 
                 # Name
-                if selection == "0":
+                if selection == '0':
                     new_name = input(f"Enter new name for {selected_civ_name}: ")
 
                     # Change name
@@ -242,18 +244,35 @@ def main():
                         file.writelines(lines)  # Overwrite the file with modified lines
                         file.truncate()  # Ensure any remaining old content is removed
 
-                # Description
-                elif selection == "1":
+                # Title
+                if selection == '1':
                     # Get user input
-                    #new_title = input(f"Enter new title for {selected_civ_name} (ex. Archer civilization): ")
+                    new_title = input(f"\nEnter new civilization title for {selected_civ_name} (ex. Infantry and Monk): ")
 
-                    #primary_unique_units = [8,530,281,531,41,555,291,560,]
-                    #for i in []:
+                    with open(MOD_STRINGS, 'r+') as file:
+                        # Read and separate the lines
+                        lines = file.readlines()
+                        line_index = selected_civ_index + len(DATA.civs) - 1
+                        line = lines[line_index]
+                        line_code = line[:6]
+                        split_lines = line.split(r'\n')
+                        
+                        # Replace the title
+                        split_lines[0] = f'{line_code} \"{new_title.title()} civilization'
+                        lines[line_index] = rf'\n'.join(split_lines)
 
+                        # Overwrite the file with modified content
+                        file.seek(0)
+                        file.writelines(lines)
+                        file.truncate()  # Ensure remaining old content is removed
+
+                # Unique Unit
+                elif selection == '3':
+                    # Populate all castle units
                     all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "cretan archer", "crusader knight", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "xolotl warrior", "sun warrior", "island sentinel"]
                     new_castle_unit = '?'
                     while new_castle_unit == '?':
-                        new_castle_unit = input(f"Enter unique Castle unit for {selected_civ_name} (leave blank for original): ").lower()
+                        new_castle_unit = input(f"\nEnter unique Castle unit for {selected_civ_name} (leave blank for original): ").lower()
 
                         if new_castle_unit not in all_castle_units:
                             new_castle_unit = '?'
@@ -288,19 +307,6 @@ def main():
                                         castle_unit_indexes[3] = i
                             except:
                                 pass
-
-                    # Change Title
-                    #with open(MOD_STRINGS, 'r+') as file:
-                    #    lines = file.readlines()  # Read all lines
-                    #    line_index = selected_civ_index + len(DATA.civs) - 1
-                    #    line = lines[line_index]
-                    #    newline = line[:6] + f' "{new_title}"' + line[line.find('\n'):]  # Modify the specific line up to the first \n
-#
-                    #    lines[line_index] = newline
-#
-                    #    file.seek(0)  # Move to the beginning of the file
-                    #    file.writelines(lines)  # Overwrite the file with modified lines
-                    #    file.truncate()  # Ensure any remaining old content is removed
 
                     # Change Castle Unit
                     effect_commands = [
@@ -338,7 +344,7 @@ def main():
                     print(f"{selected_civ_name.title()} unique unit set to {new_castle_unit.title()}.")
 
                 # Architecture
-                elif selection == "2":
+                elif selection == '4':
                     # Populate architecture names
                     architecture_names = []
                     for i in range(1, len(DATA.civs)):
@@ -437,11 +443,11 @@ def main():
                     print(f"Architecture changed.")
 
                 # Language
-                elif selection == "3":
+                elif selection == '5':
                     pass
 
                 # Tech Tree
-                elif selection == '4':
+                elif selection == '6':
                     # Import the tech tree
                     tech_tree = {}
                     with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
