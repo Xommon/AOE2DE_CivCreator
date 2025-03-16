@@ -394,6 +394,10 @@ def main():
                     print(architecture_changes)
 
                     for arc_db in range(3):
+                        # Skip if unspecified
+                        if architecture_changes[arc_db] == -1:
+                            continue
+                        
                         # Load architecture graphics
                         original_units = ARCHITECTURE_SETS[architecture_changes[arc_db] + 1]
 
