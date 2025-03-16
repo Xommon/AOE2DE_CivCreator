@@ -181,10 +181,10 @@ def revert():
 
 def main():
     # Main menu
-    print('---- AOE2DE Civilisation Creator ----')
-    print('0: Open Mod')
-    print('1: New Mod')
-    print('2: Revert Mod')
+    print("\033[32m--- AOE2DE Civilisation Creator ---\033[0m")
+    print("\033[33m0: Open Mod\033[0m")
+    print("\033[33m1: New Mod\033[0m")
+    print("\033[33m2: Revert Mod\033[0m")
     selection = input("Selection: ")
 
     # Open
@@ -220,14 +220,14 @@ def main():
         try:
             edit_civ_index = int(selection)
             if 0 <= edit_civ_index < len(DATA.civs):
-                print(f'\n-- Edit {selected_civ_name} --')
-                print('0: Name')
-                print('1: Title')
-                print('2: Bonuses')
-                print('3: Unique Unit')
-                print('4: Architecture')
-                print('5: Language')
-                print('6: Tech Tree')
+                print("\033[32m\n--- Edit {selected_civ_name} ---\033[0m")
+                print("\033[33m0: Name\033[0m")
+                print("\033[33m1: Title\033[0m")
+                print("\033[33m2: Bonuses\033[0m")
+                print("\033[33m3: Unique Unit\033[0m")
+                print("\033[33m4: Architecture\033[0m")
+                print("\033[33m5: Language\033[0m")
+                print("\033[33m6: Tech Tree\033[0m")
                 selection = input("Selection: ")
 
                 # Name
@@ -265,6 +265,17 @@ def main():
                         file.seek(0)
                         file.writelines(lines)
                         file.truncate()  # Ensure remaining old content is removed
+
+                # Bonuses
+                elif selection == '2':
+                    print("\033[32m--- Bonuses ---\033[0m")
+                    print("\033[33m0: View Bonuses\033[0m")
+                    print("\033[33m1: Title\033[0m")
+                    print("\033[33m2: Bonuses\033[0m")
+                    print("\033[33m3: Unique Unit\033[0m")
+                    print("\033[33m4: Architecture\033[0m")
+                    print("\033[33m5: Language\033[0m")
+                    print("\033[33m6: Tech Tree\033[0m")
 
                 # Unique Unit
                 elif selection == '3':
@@ -397,7 +408,7 @@ def main():
                         # Skip if unspecified
                         if architecture_changes[arc_db] == -1:
                             continue
-                        
+
                         # Load architecture graphics
                         original_units = ARCHITECTURE_SETS[architecture_changes[arc_db] + 1]
 
@@ -495,10 +506,10 @@ def main():
                             tech_tree_indexes = [254, 258, 259, 262, 255, 257, 256, 260, 261, 263, 276, 277, 275, 446, 447, 449, 448, 504, 10, 1, 3, 5, 7, 31, 48, 42, 37, 646, 648, 650, 652, 706, 708, 710, 712, 782, 784, 801, 803, 838, 840, 842, 890, 925, 927]
 
                             # Show menu
-                            print(f'\n- Tech Tree Menu -')
-                            print('0: View Tech Tree')
-                            print('1: Enable Items')
-                            print('2: Disable Items')
+                            print("\033[32m--- Tech Tree Menu ---\033[0m")
+                            print("\033[33m0: View Tech Tree\033[0m")
+                            print("\033[33m1: Enable Items\033[0m")
+                            print("\033[33m2: Disable Items\033[0m")
                             selection = input("Selection: ")
 
                             # Exit
