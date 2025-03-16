@@ -128,10 +128,10 @@ def new_mod():
     open_mod(MOD_FOLDER)
 
 def revert():
-    print('\nWARNING: Reverting the mod will completely erase all changes made to the modded files. THIS CHANGE IS IRREVERSIBLE.')
-    yes = input("Enter 'yes' to continue: ")
+    print("\033[31mWARNING: Reverting the mod will completely erase all changes made to the modded files. THIS CHANGE IS IRREVERSIBLE.\033[0m")
+    yes = input("Enter 'Y' to continue: ")
     
-    if yes.lower() == 'yes':
+    if yes.lower() == 'y':
         # Get the original AoE2DE folder from the user
         modded_folder = input('Enter the mod folder location: ').strip()
         if not modded_folder:
@@ -268,14 +268,38 @@ def main():
 
                 # Bonuses
                 elif selection == '2':
-                    print("\033[32m--- Bonuses ---\033[0m")
-                    print("\033[33m0: View Bonuses\033[0m")
-                    print("\033[33m1: Title\033[0m")
-                    print("\033[33m2: Bonuses\033[0m")
-                    print("\033[33m3: Unique Unit\033[0m")
-                    print("\033[33m4: Architecture\033[0m")
-                    print("\033[33m5: Language\033[0m")
-                    print("\033[33m6: Tech Tree\033[0m")
+                    bonus_selection = '?'
+                    while bonus_selection != '':
+                        print("\033[32m\n--- Bonuses Menu ---\033[0m")
+                        print("\033[33m0: View Bonuses\033[0m")
+                        print("\033[33m1: Add Bonus\033[0m")
+                        print("\033[33m2: Remove Bonus\033[0m")
+                        bonus_selection = input("Selection: ")
+
+                        with open(MOD_STRINGS, 'r+') as file:
+                            # Read and separate the lines
+                            lines = file.readlines()
+                            line_index = selected_civ_index + len(DATA.civs) - 1
+                            line = lines[line_index]
+                            line_code = line[:6]
+                            split_lines = line.split(r'\n')
+
+                            # View Bonuses
+                            if bonus_selection == '0':
+                                bonus_count = 0
+                                searching_for_dots = True
+                                next_line = False
+                                print('\n')
+                                for line in split_lines:
+                                    if 'Unique' in line:
+                                        searching_for_dots = False
+                                    elif '•' in line and searching_for_dots:
+                                        print(str(bonus_count) + ': ' + line[2:])
+                                        bonus_count += 1
+                                    elif 'Team Bonus' in line:
+                                        next_line = True
+                                    elif next_line:
+                                        print('Team Bonus:', line)
 
                 # Unique Unit
                 elif selection == '3':
