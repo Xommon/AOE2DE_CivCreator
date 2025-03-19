@@ -178,14 +178,14 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
 
 def main():
     # Import settings
-    with open('settings.pkl', 'rb') as file:
-        previous_mod_folder = ''
-        previous_mod_name = ''
-        try:
+    previous_mod_folder = ''
+    previous_mod_name = ''
+    try:
+        with open('settings.pkl', 'rb') as file:
             previous_mod_folder = pickle.load(file)
             previous_mod_name = previous_mod_folder.split('/')[-1]
-        except:
-            pass
+    except:
+        pass
 
     # Main menu
     print("\033[32m--- AOE2DE Civilization Creator ---\033[0m")
@@ -262,6 +262,16 @@ def main():
                     print("\033[33m6: Tech Tree\033[0m")
                     selection = input("Selection: ")
 
+                    # Info
+                    if selection == '?':
+                        print('0: Change the name of the civilization.')
+                        print('1: Change the title of the civilization in its description (ex. Archer civilization).')
+                        print('2: Add, remove, or change the civilization bonuses and the team bonus.')
+                        print('3: Change the unique unit that can be trained from the civilization\'s castle')
+                        print('4: Change the civilization\'s graphics for the general architecture, castle, wonder, and monk.')
+                        print('5: Change the language spoken by the units of the civilization.')
+                        print('6: Enable or disable units, buildings, and technologies for the civilization. Add additional unique/regional units.')
+
                     # Name
                     if selection == '0':
                         new_name = input(f"\nEnter new name for {selected_civ_name}: ")
@@ -337,6 +347,83 @@ def main():
                                             next_line = True
                                         elif next_line:
                                             print('Team Bonus:', line[:-1])
+
+                                # Add bonus
+                                elif bonus_selection == '1':
+                                    # Get user prompt
+                                    bonus_to_add_ORIGINAL = input('\nType a bonus to add: ')
+                                    bonus_to_add = bonus_to_add_ORIGINAL.lower()
+                                    effect_commands = []
+
+                                    # [Technology] free
+                                    if 'free' in bonus_to_add:
+                                        # Strip useless words using regex
+                                        useless_words = ["free", "is", "are", "upgrade", "upgrades"]
+                                        cleaned_bonus = re.sub(r'\b(?:' + '|'.join(useless_words) + r')\b', '', bonus_to_add).strip()
+
+                                        # Extract the interactable parts
+                                        bonus_parts = re.split(r',\s*|\s+and\s+', cleaned_bonus)
+
+                                        # Remove any empty strings from the list
+                                        bonus_parts = [part.strip() for part in bonus_parts if part.strip()]
+
+                                        # Extract the techs from the description
+                                        tech_ids = []
+                                        for i, tech_id in enumerate(DATA.techs):
+                                            for part in bonus_parts:
+                                                if part == DATA.techs[i].name.lower():
+                                                    tech_ids.append(i)
+
+                                        # Exit if nothing was found
+                                        if len(tech_ids) == 0:
+                                            print("\033[31mERROR: No techs with the names given found.\033[0m")
+                                            break
+
+                                        # Create effect commands
+                                        for id in tech_ids:
+                                            # Remove cost
+                                            effect_commands.append(genieutils.effect.EffectCommand(101, id, 0, 0, 0))
+                                            effect_commands.append(genieutils.effect.EffectCommand(101, id, 1, 0, 0))
+                                            effect_commands.append(genieutils.effect.EffectCommand(101, id, 2, 0, 0))
+                                            effect_commands.append(genieutils.effect.EffectCommand(101, id, 3, 0, 0))
+
+                                            # Remove time
+                                            effect_commands.append(genieutils.effect.EffectCommand(103, id, 0, 0, 0))
+
+                                        # Exit if nothing was found
+                                        if len(effect_commands) == 0:
+                                            print("\033[31mERROR: No techs with the names given found.\033[0m")
+                                            break
+
+                                        # Create new effect if it doesn't already exist
+                                        effect_found = False
+                                        effect_name = selected_civ_name.upper() + ": " + bonus_to_add_ORIGINAL
+                                        for i, effect in enumerate(DATA.effects):
+                                            if effect.name == effect_name:
+                                                effect.effect_commands = effect_commands
+                                                effect_found = True
+                                                effect_index = i
+                                                break
+                                            
+                                        if not effect_found:
+                                            new_effect = genieutils.effect.Effect(effect_name, effect_commands)
+                                            DATA.effects.append(new_effect)
+                                            effect_index = len(DATA.effects) - 1
+
+                                        # Create the tech that replaces the old unit
+                                        new_tech = DATA.techs[1101]
+                                        new_tech.effect_id = effect_index
+                                        new_tech.name = effect_name
+                                        new_tech.civ = selected_civ_index + 1
+                                        for tech in DATA.techs:
+                                            if tech.name == effect_name:
+                                                DATA.techs.remove(tech)
+                                        DATA.techs.append(new_tech)
+
+                                        # Save changes
+                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                        print(f"Added new bonus.")
+                                        time.sleep(0.5)
 
                                 # Add Bonus
                                 elif bonus_selection == '1':
