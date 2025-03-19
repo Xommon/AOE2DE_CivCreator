@@ -189,17 +189,18 @@ def main():
 
     # Main menu
     print("\033[32m--- AOE2DE Civilization Creator ---\033[0m")
-    if previous_mod_folder:
+    global MOD_FOLDER
+    if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
         print(f"\033[33m0: Open {previous_mod_name}\033[0m")
-        print("\033[33m1: Open Mod\033[0m")
-        print("\033[33m2: New Mod\033[0m")
+        print("\033[33m1: Open Mod...\033[0m")
+        print("\033[33m2: New Mod...\033[0m")
     else:
-        print("\033[33m0: Open Mod\033[0m")
-        print("\033[33m1: New Mod\033[0m")
+        print("\033[33m0: Open Mod...\033[0m")
+        print("\033[33m1: New Mod...\033[0m")
     selection = input("Selection: ")
 
-    global MOD_FOLDER
-    if previous_mod_folder:
+    
+    if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
         if selection == '0': # Open last mod
             open_mod(previous_mod_folder)
         elif selection == '1': # Open mod
@@ -436,7 +437,7 @@ def main():
 
                             if new_castle_unit not in all_castle_units:
                                 new_castle_unit = '?'
-                                print('ERROR: Unit not found.')
+                                print("\033[31mERROR: Unit not found.")
                             elif new_castle_unit == '?':
                                 print(all_castle_units)
                                 continue
@@ -507,17 +508,16 @@ def main():
 
                     # Architecture
                     elif selection == '4':
-                        # Populate architecture names
-                        architecture_names = []
+                        # Gather base architectures
+                        base_architectures = []
                         for i in range(1, len(DATA.civs)):
-                            architecture_names.append(DATA.civs[i].name.lower())
-                        
-                        # Assemble all architecture names
-                        all_arcs = ', '.join([civ.name for civ in DATA.civs])
+                            base_architectures.append(DATA.civs[i].name)
+
+                        # Gather custom architectures
                         custom_arcs = [
                             [],
-                            ['poenari castle'],
-                            ['aachen cathedral', 'dome of the rock', 'dormition cathedral', 'gol gumbaz', 'minaret of jam', 'pyramid', 'quimper cathedral', 'sankore madrasah', 'tower of london']
+                            ['Poenari Castle'],
+                            ['Aachen Cathedral', 'Dome of the Rock', 'Dormition Cathedral', 'Gol Gumbaz', 'Minaret of Jam', 'Pyramid', 'Quimper Cathedral', 'Sankore Madrasah', 'Tower of London']
                         ]
 
                         # User prompts
@@ -525,48 +525,77 @@ def main():
                         architecture_changes = [-1, -1, -1]
                         print('\n')
                         for i in range(3):
+                            # Assemble all architecture options
+                            all_architectures = base_architectures + custom_arcs[i]
+
                             architecture_selection = '?'
                             while architecture_selection == '?':
-                                architecture_selection = input(f"Enter {architecture_types[i]} architecture for {selected_civ_name} (leave blank for original): ").lower()
+                                architecture_selection = input(f"Enter {architecture_types[i]} architecture for {selected_civ_name}: ").lower()
                                 
                                 if architecture_selection == '?':
-                                    additional_arcs = ', '.join(custom_arcs[i])
-                                    print(all_arcs + additional_arcs)
+                                    # Print all available options
+                                    print(', '.join(all_architectures))
+                                    print('Leave blank to leave the architecture type unchanged')
+                                    print('Type \'default\' to switch back to the Civilization\'s original architecture.')
                                     continue
-                                for i_arc in range(len(architecture_names)):
-                                    if architecture_selection.lower() == architecture_names[i_arc].lower():
-                                        architecture_changes[i] = architecture_names.index(architecture_selection.lower())
+                                
+                                # Check against architecture options
+                                for i2 in range(len(all_architectures)):
+                                    if architecture_selection == all_architectures[i2].lower():
+                                        architecture_changes[i] = i2
                                         break
-
+                                
+                                # Use previous architecture if blank
                                 if architecture_selection == '':
+                                    architecture_changes[i] = -1
+
+                                # Use default architecture
+                                elif architecture_selection == 'default':
                                     architecture_changes[i] = selected_civ_index
+
+                                # Check if architecture is invalid
                                 elif architecture_changes[i] == -1:
                                     architecture_selection = '?'
-                                    print(f'ERROR: {architecture_types[i]} architecture type not valid.\n')
+                                    print(f'\033[31mERROR: {architecture_types[i]} architecture type not valid.\n\033[0m')
+                        print(architecture_changes)
 
-                        for arc_db in range(3):
+                        for i in range(3):
                             # Skip if unspecified
-                            if architecture_changes[arc_db] == -1:
+                            if architecture_changes[i] == -1:
                                 continue
 
                             # Load architecture graphics
-                            original_units = ARCHITECTURE_SETS[architecture_changes[arc_db] + 1]
+                            try:
+                                original_units = ARCHITECTURE_SETS[architecture_changes[i] + 1]
+                            except:
+                                original_units = ARCHITECTURE_SETS[architecture_changes[1]]
 
-                            # Change architecture
-                            if arc_db == 0:
+                            # Specify which unit IDs need to change
+                            if i == 0:
                                 all_units_to_change = range(0, len(DATA.civs[1].units))
-                            elif arc_db == 1:
+                            elif i == 1:
                                 all_units_to_change = [82, 1430]
-                            elif arc_db == 2:
+                            elif i == 2:
                                 all_units_to_change = [276, 1445]
 
                             for unit_id in all_units_to_change:
                                 # Select which unit will be the basis for change
-                                unit_to_change_to = original_units[unit_id]
+                                if (architecture_changes[i] < len(DATA.civs) - 1):
+                                    unit_to_change_to = original_units[unit_id]
+                                else:
+                                    # Custom unit
+                                    custom_ids = [
+                                        [],
+                                        [[445, 1488]],
+                                        [[1622, 1517], [690, 1482], [1369, 1493], [1217, 1487], [1773, 1530], [689, 1515], [873, 1489], [1367, 1491], [1368, 1492]]
+                                    ]
+
+                                    custom_unit_id = custom_ids[i][architecture_changes[i] - len(DATA.civs) + 1][all_units_to_change.index(unit_id)]
+                                    unit_to_change_to = original_units[custom_unit_id]
 
                                 # Look for custom unit
-                                if len(custom_arcs[arc_db]) > 0:
-                                    for j, custom_arc in enumerate(custom_arcs[arc_db]):
+                                if len(custom_arcs[i]) > 0:
+                                    for j, custom_arc in enumerate(custom_arcs[i]):
                                         if architecture_selection == custom_arc:
                                             unit_to_change_to = DATA.civs[selected_civ_index].units.index(custom_arc)
                                             print(unit_to_change_to)
@@ -597,6 +626,7 @@ def main():
                         # Save changes
                         DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
                         print(f"Architecture changed.")
+                        time.sleep(1)
 
                     # Language / Sound
                     elif selection == '5':
