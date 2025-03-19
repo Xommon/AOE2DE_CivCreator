@@ -32,11 +32,14 @@ def open_mod(mod_folder):
     global MOD_NAME
     MOD_NAME = mod_folder.split('/')[-1]
 
+    # Save program settings
+    with open('settings.pkl', 'wb') as settings:
+        pickle.dump(mod_folder, settings)
+
     # Load important links
     global ORIGINAL_FOLDER
     with open(f'{MOD_FOLDER}/links.pkl', 'rb') as file:
         data = pickle.load(file)  # Unpickle the file
-
         if isinstance(data, str):  # Ensure it's a string before splitting
             lines = data.splitlines()  # Split by newlines
             if lines:  # Check if the list is not empty
@@ -174,23 +177,42 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
     open_mod(MOD_FOLDER)
 
 def main():
+    # Import settings
+    with open('settings.pkl', 'rb') as file:
+        previous_mod_folder = ''
+        previous_mod_name = ''
+        try:
+            previous_mod_folder = pickle.load(file)
+            previous_mod_name = previous_mod_folder.split('/')[-1]
+        except:
+            pass
+
     # Main menu
-    print("\033[32m--- AOE2DE Civilisation Creator ---\033[0m")
-    print("\033[33m0: Open Mod\033[0m")
-    print("\033[33m1: Open Mod\033[0m")
-    print("\033[33m2: New Mod\033[0m")
+    print("\033[32m--- AOE2DE Civilization Creator ---\033[0m")
+    if previous_mod_folder:
+        print(f"\033[33m0: Open {previous_mod_name}\033[0m")
+        print("\033[33m1: Open Mod\033[0m")
+        print("\033[33m2: New Mod\033[0m")
+    else:
+        print("\033[33m0: Open Mod\033[0m")
+        print("\033[33m1: New Mod\033[0m")
     selection = input("Selection: ")
 
-    # Open
-    if selection == "0":
-        global MOD_FOLDER
-        # DEBUG
-        MOD_FOLDER = '/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test'
-        #MOD_FOLDER = input("\nMod folder location: ")
-        open_mod(MOD_FOLDER)
-    # New
-    elif selection == "1":
-        new_mod('', '', '', False)
+    global MOD_FOLDER
+    if previous_mod_folder:
+        if selection == '0': # Open last mod
+            open_mod(previous_mod_folder)
+        elif selection == '1': # Open mod
+            MOD_FOLDER = input("\nMod folder location: ")
+            open_mod(MOD_FOLDER)
+        elif selection == '2': # New mod
+            new_mod('', '', '', False)
+    else:
+        if selection == '0': # Open mod
+            MOD_FOLDER = input("\nMod folder location: ")
+            open_mod(MOD_FOLDER)
+        elif selection == '1': # New mod
+            new_mod('', '', '', False)
 
     # Mod menu
     mod_name = MOD_FOLDER.split('/')[-1]
@@ -319,7 +341,7 @@ def main():
                                 elif bonus_selection == '1':
                                     print("\033[32m\n--- Bonus Prompts ---\033[0m")
                                     print("\033[33m0: \033[4mTechnology\033[0m\033[33m free\033[0m")
-                                    prompt_selection = input('Select a bonus prompt:')
+                                    prompt_selection = input('Select a bonus prompt: ')
 
                                     # Prompts
                                     if prompt_selection == '0':
@@ -351,6 +373,7 @@ def main():
                                                                     technology_names.append(tech_to_add)
                                                                     technology_ids.append(i)
                                                         except:
+                                                            print('Passing')
                                                             pass
                                             elif tech_to_add in technology_names:
                                                 print("\033[4;31mERROR: Technology already added.\033[0m")
@@ -575,28 +598,45 @@ def main():
                         DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
                         print(f"Architecture changed.")
 
-                    # Language
+                    # Language / Sound
                     elif selection == '5':
-                        all_languages = ', '.join([civ.name for civ in DATA.civs])
+                        #all_languages = ', '.join([civ.name for civ in DATA.civs])
+#
+                        ## Change language
+                        #while True:
+                        #    new_language = input(f"\nEnter new language for {selected_civ_name}: ").lower()
+#
+                        #    if new_language == '':
+                        #        break
+                        #    elif new_language == '?':
+                        #        print(all_languages)
+                        #    elif new_language.title() in all_languages:
+#
+                        #        # Save changes
+                        #        #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                        #        print(f"Language for {selected_civ_name} changed to {new_language.title()}.")
+                        #        time.sleep(1)
+                        #        break
+                        #    else:
+                        #        print('ERROR: Language not found.')
+                        #pass
 
-                        # Change language
-                        while True:
-                            new_language = input(f"\nEnter new language for {selected_civ_name}: ").lower()
+                        # DEBUG
 
-                            if new_language == '':
-                                break
-                            elif new_language == '?':
-                                print(all_languages)
-                            elif new_language.title() in all_languages:
+                        # Copy language sound items of the civilization we want
+                        #genieutils.sound.SoundItem.
+                        DATA.sounds[303].items[1].civilization = 1
+                        DATA.sounds[303].items[2].civilization = 1
+                        DATA.sounds[303].items[3].civilization = 1
 
-                                # Save changes
-                                #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                print(f"Language for {selected_civ_name} changed to {new_language.title()}.")
-                                time.sleep(1)
-                                break
-                            else:
-                                print('ERROR: Language not found.')
-                        pass
+                        DATA.sounds[303].items[4].civilization = 15
+                        DATA.sounds[303].items[5].civilization = 15
+                        DATA.sounds[303].items[6].civilization = 15
+                        DATA.sounds[303].items[7].civilization = 15
+                        
+                        
+
+                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
 
                     # Tech Tree
                     elif selection == '6':
