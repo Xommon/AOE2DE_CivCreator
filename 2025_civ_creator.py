@@ -19,6 +19,23 @@ import pickle
 import json
 import re
 
+def save_description(description_code_, description_lines_):
+    with open(MOD_STRINGS, 'r+') as file:
+        # Read all lines
+        lines = file.readlines()
+
+        # Find and modify the line with description_code
+        for i, current_line in enumerate(lines):
+            if current_line.startswith(description_code_):
+                # Reconstruct the modified line
+                lines[i] = description_code_ + f' "{r"\n".join(description_lines_)}"\n'
+                break
+
+        # Write the updated lines back to the file
+        file.seek(0)
+        file.writelines(lines)
+        file.truncate()  # Ensure remaining old content is removed
+
 def open_mod(mod_folder):
     print('\nLoading mod...')
     global DATA
@@ -237,6 +254,18 @@ def main():
             selected_civ_index = int(selection)
             selected_civ_name = lines[selected_civ_index][7:-2]
 
+            # Separate the description to be edited later
+            with open(MOD_STRINGS, 'r') as file:
+                lines = file.readlines()
+                line_index = selected_civ_index + len(DATA.civs) - 1
+                line = lines[line_index]
+                description_code = line[:6]
+                description_lines = line[8:].split(r'\n')
+
+                # Remove any unnecessary characters from the strings
+                description_lines = [s.replace('"', '') for s in description_lines]
+                description_lines = [s.replace('\n', '') for s in description_lines]
+
         # Revert Mod
         elif mod_menu_selection == '1':
             print("\033[31mWARNING: Reverting the mod will completely erase all changes made to the modded files. THIS CHANGE IS IRREVERSIBLE.\033[0m")
@@ -287,31 +316,22 @@ def main():
                             file.seek(0)  # Move to the beginning of the file
                             file.writelines(lines)  # Write all lines back
 
-                    # Back to Civilisation Menu
-                    elif selection == '7':
-                        break
-
                     # Title
                     if selection == '1':
                         # Get user input
-                        new_title = input(f"\nEnter new civilization title for {selected_civ_name} (ex. Infantry and Monk): ")
+                        new_title = input(f"\nEnter new civilization title for {selected_civ_name} (ex. Infantry and Monk): ").lower()
 
-                        with open(MOD_STRINGS, 'r+') as file:
-                            # Read and separate the lines
-                            lines = file.readlines()
-                            line_index = selected_civ_index + len(DATA.civs) - 1
-                            line = lines[line_index]
-                            line_code = line[:6]
-                            split_lines = line.split(r'\n')
-                            
-                            # Replace the title
-                            split_lines[0] = f'{line_code} \"{new_title.title()} civilization'
-                            lines[line_index] = rf'\n'.join(split_lines)
+                        # Replace the title
+                        if 'civilization' in new_title or 'civilisation' in new_title:
+                            description_lines[0] = new_title
+                        else:
+                            description_lines[0] = description_lines[0] = new_title + ' civilization'
+                        description_lines[0] = description_lines[0].title()
 
-                            # Overwrite the file with modified content
-                            file.seek(0)
-                            file.writelines(lines)
-                            file.truncate()  # Ensure remaining old content is removed
+                        # Update the description
+                        save_description(description_code, description_lines)
+                        print(f'Title updated for {selected_civ_name} to {description_lines[0]}')
+                        time.sleep(1)
 
                     # Bonuses
                     elif selection == '2':
@@ -509,6 +529,45 @@ def main():
                                                     if tech.name == effect_name:
                                                         DATA.techs.remove(tech)
                                                 DATA.techs.append(new_tech)
+
+                                                # Edit the description
+                                                with open(MOD_STRINGS, 'r+') as file:
+                                                    # Read and separate the lines
+                                                    lines = file.readlines()
+                                                    line_index = selected_civ_index + len(DATA.civs) - 1
+                                                    line = lines[line_index]
+                                                    line_code = line[:6]
+                                                    split_lines = line.split(r'\n')
+
+                                                    # Extract the relevant portion of the description
+                                                    description = line
+                                                    parts = description.split("\n\n", 2)  # Split into three parts: before, target, and after
+
+                                                    if len(parts) > 0:
+                                                        before, target, after = parts  # Extract the parts
+                                                        target_lines = target.split("\n")  # Split the target portion into an array of strings
+
+                                                        # Check if bonus already exists
+                                                        if (f"• {bonus_to_add_ORIGINAL}") in target_lines:
+                                                            print("\033[31mERROR: Bonus already exists.\033[0m")
+                                                            break
+
+                                                        # Add the new bonus to the array
+                                                        target_lines.append(f"• {bonus_to_add_ORIGINAL}")
+
+                                                        # Rejoin the modified target portion
+                                                        modified_target = "\n".join(target_lines)
+
+                                                        # Reconstruct the full description
+                                                        updated_description = f"{before}\n\n{modified_target}\n\n{after}"
+
+                                                        # Write the updated description back to the file or data structure
+                                                        line = updated_description
+
+                                                    # Overwrite the file with modified content
+                                                    file.seek(0)
+                                                    file.writelines(lines)
+                                                    file.truncate()  # Ensure remaining old content is removed
 
                                                 # Save changes
                                                 print(f"Added new bonus.")
