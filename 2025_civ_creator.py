@@ -321,12 +321,16 @@ def main():
                         # Get user input
                         new_title = input(f"\nEnter new civilization title for {selected_civ_name} (ex. Infantry and Monk): ").lower()
 
+                        # Quit if blank
+                        if new_title == '':
+                            continue
+
                         # Replace the title
-                        if 'civilization' in new_title or 'civilisation' in new_title:
-                            description_lines[0] = new_title
-                        else:
-                            description_lines[0] = description_lines[0] = new_title + ' civilization'
-                        description_lines[0] = description_lines[0].title()
+                        if new_title.endswith('civilization') or new_title.endswith('civilisation'):
+                            new_title = new_title[:-12].strip()
+
+                        # Apply the Civilization ending
+                        description_lines[0] = description_lines[0] = new_title.title() + ' civilization'
 
                         # Update the description
                         save_description(description_code, description_lines)
@@ -410,168 +414,54 @@ def main():
                                             # Remove time
                                             effect_commands.append(genieutils.effect.EffectCommand(103, id, 0, 0, 0))
 
-                                        # Exit if nothing was found
-                                        if len(effect_commands) == 0:
-                                            print("\033[31mERROR: No techs with the names given found.\033[0m")
+                                    # Exit if nothing was found
+                                    if len(effect_commands) == 0:
+                                        print("\033[31mERROR: No units, buildings, or techs with the names given found.\033[0m")
+                                        break
+
+                                    # Create new effect if it doesn't already exist
+                                    effect_found = False
+                                    effect_name = selected_civ_name.upper() + ": " + bonus_to_add_ORIGINAL
+                                    for i, effect in enumerate(DATA.effects):
+                                        if effect.name == effect_name:
+                                            effect.effect_commands = effect_commands
+                                            effect_found = True
+                                            effect_index = i
                                             break
+                                        
+                                    if not effect_found:
+                                        new_effect = genieutils.effect.Effect(effect_name, effect_commands)
+                                        DATA.effects.append(new_effect)
+                                        effect_index = len(DATA.effects) - 1
 
-                                        # Create new effect if it doesn't already exist
-                                        effect_found = False
-                                        effect_name = selected_civ_name.upper() + ": " + bonus_to_add_ORIGINAL
-                                        for i, effect in enumerate(DATA.effects):
-                                            if effect.name == effect_name:
-                                                effect.effect_commands = effect_commands
-                                                effect_found = True
-                                                effect_index = i
-                                                break
-                                            
-                                        if not effect_found:
-                                            new_effect = genieutils.effect.Effect(effect_name, effect_commands)
-                                            DATA.effects.append(new_effect)
-                                            effect_index = len(DATA.effects) - 1
+                                    # Create the tech that replaces the old unit
+                                    new_tech = DATA.techs[1101]
+                                    new_tech.effect_id = effect_index
+                                    new_tech.name = effect_name
+                                    new_tech.civ = selected_civ_index + 1
+                                    for tech in DATA.techs:
+                                        if tech.name == effect_name:
+                                            DATA.techs.remove(tech)
+                                    DATA.techs.append(new_tech)
 
-                                        # Create the tech that replaces the old unit
-                                        new_tech = DATA.techs[1101]
-                                        new_tech.effect_id = effect_index
-                                        new_tech.name = effect_name
-                                        new_tech.civ = selected_civ_index + 1
-                                        for tech in DATA.techs:
-                                            if tech.name == effect_name:
-                                                DATA.techs.remove(tech)
-                                        DATA.techs.append(new_tech)
+                                    # Append bonus to description
+                                    bonuses_found = False
+                                    for i, line in enumerate(description_lines):
+                                        # Add new bonus to the end of the bonuses list
+                                        if bonus_to_add_ORIGINAL in line:
+                                            break
+                                        elif '•' in line:
+                                            bonuses_found = True
+                                        elif bonuses_found and len(line) == 0:
+                                            description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
 
-                                        # Save changes
-                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                        print(f"Added new bonus.")
-                                        time.sleep(0.5)
+                                    # Update the description
+                                    save_description(description_code, description_lines)
 
-                                # Add Bonus
-                                elif bonus_selection == '1':
-                                    print("\033[32m\n--- Bonus Prompts ---\033[0m")
-                                    print("\033[33m0: \033[4mTechnology\033[0m\033[33m free\033[0m")
-                                    prompt_selection = input('Select a bonus prompt: ')
-
-                                    # Prompts
-                                    if prompt_selection == '0':
-                                        technology_names = []
-                                        technology_ids = []
-                                        while True:
-                                            tech_to_add = input('\nEnter a technology name (leave blank to finish): ').lower()
-                                            if tech_to_add == '':
-                                                break
-                                            elif tech_to_add == '?':
-                                                pass
-                                            elif tech_to_add not in technology_names:
-                                                with open(ORIGINAL_STRINGS, 'r') as file:
-                                                    lines = file.readlines()
-                                                    for i, tech in enumerate(DATA.techs):
-                                                        try:
-                                                            # Get the name of the technology
-                                                            tech_name_id = int(tech.language_dll_name)
-                                                            tech_name = None
-
-                                                            # Extract tech name from ORIGINAL_STRINGS
-                                                            for line in lines:
-                                                                if line.startswith(f"{tech_name_id} "):
-                                                                    tech_name = line.split('"')[1].lower()
-                                                                    break
-                                                            
-                                                            if tech_name:
-                                                                if tech_name == tech_to_add:
-                                                                    technology_names.append(tech_to_add)
-                                                                    technology_ids.append(i)
-                                                        except:
-                                                            print('Passing')
-                                                            pass
-                                            elif tech_to_add in technology_names:
-                                                print("\033[4;31mERROR: Technology already added.\033[0m")
-
-                                        # Add technology bonus
-                                        if len(technology_names) == 0:
-                                            print("\033[4;31mERROR: Bonus not added. Must specify at least 1 technology.\033[0m")
-                                        else:
-                                            for i, tech_id in enumerate(technology_ids):
-                                                # Create a new effect
-                                                effect_commands = []
-                                                for tech in technology_ids:
-                                                    # Remove cost
-                                                    effect_commands.append(genieutils.effect.EffectCommand(101, {tech}, 0, 0, 0))
-                                                    effect_commands.append(genieutils.effect.EffectCommand(101, {tech}, 1, 0, 0))
-                                                    effect_commands.append(genieutils.effect.EffectCommand(101, {tech}, 2, 0, 0))
-                                                    effect_commands.append(genieutils.effect.EffectCommand(101, {tech}, 3, 0, 0))
-
-                                                    # Remove time
-                                                    effect_commands.append(genieutils.effect.EffectCommand(103, {tech}, 0, 0, 0))
-
-                                                # Create new effect if it doesn't exist
-                                                effect_found = False
-                                                effect_name = selected_civ_name.title() + " Bonus: Free" + tech_to_add.title()
-
-                                                for i, effect in enumerate(DATA.effects):
-                                                    if effect.name == effect_name:
-                                                        effect.effect_commands = effect_commands
-                                                        effect_found = True
-                                                        effect_index = i
-                                                        break
-                                                    
-                                                if not effect_found:
-                                                    new_effect = genieutils.effect.Effect(effect_name, effect_commands)
-                                                    DATA.effects.append(new_effect)
-                                                    effect_index = len(DATA.effects) - 1
-
-                                                # Create the tech that replaces the old unit
-                                                new_tech = DATA.techs[1101]
-                                                new_tech.effect_id = effect_index
-                                                new_tech.name = effect_name
-                                                new_tech.civ = selected_civ_index + 1
-
-                                                for tech in DATA.techs:
-                                                    if tech.name == effect_name:
-                                                        DATA.techs.remove(tech)
-                                                DATA.techs.append(new_tech)
-
-                                                # Edit the description
-                                                with open(MOD_STRINGS, 'r+') as file:
-                                                    # Read and separate the lines
-                                                    lines = file.readlines()
-                                                    line_index = selected_civ_index + len(DATA.civs) - 1
-                                                    line = lines[line_index]
-                                                    line_code = line[:6]
-                                                    split_lines = line.split(r'\n')
-
-                                                    # Extract the relevant portion of the description
-                                                    description = line
-                                                    parts = description.split("\n\n", 2)  # Split into three parts: before, target, and after
-
-                                                    if len(parts) > 0:
-                                                        before, target, after = parts  # Extract the parts
-                                                        target_lines = target.split("\n")  # Split the target portion into an array of strings
-
-                                                        # Check if bonus already exists
-                                                        if (f"• {bonus_to_add_ORIGINAL}") in target_lines:
-                                                            print("\033[31mERROR: Bonus already exists.\033[0m")
-                                                            break
-
-                                                        # Add the new bonus to the array
-                                                        target_lines.append(f"• {bonus_to_add_ORIGINAL}")
-
-                                                        # Rejoin the modified target portion
-                                                        modified_target = "\n".join(target_lines)
-
-                                                        # Reconstruct the full description
-                                                        updated_description = f"{before}\n\n{modified_target}\n\n{after}"
-
-                                                        # Write the updated description back to the file or data structure
-                                                        line = updated_description
-
-                                                    # Overwrite the file with modified content
-                                                    file.seek(0)
-                                                    file.writelines(lines)
-                                                    file.truncate()  # Ensure remaining old content is removed
-
-                                                # Save changes
-                                                print(f"Added new bonus.")
-                                                DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                    # Save changes
+                                    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                    print(f'Bonus added for {selected_civ_name}: {description_lines[i]}')
+                                    time.sleep(0.5)
 
                     # Unique Unit
                     elif selection == '3':
