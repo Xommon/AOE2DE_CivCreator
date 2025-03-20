@@ -345,6 +345,7 @@ def main():
                             print("\033[33m0: View Bonuses\033[0m")
                             print("\033[33m1: Add Bonus\033[0m")
                             print("\033[33m2: Remove Bonus\033[0m")
+                            print("\033[33m3: Change Team Bonus\033[0m")
                             bonus_selection = input("Selection: ")
 
                             with open(MOD_STRINGS, 'r+') as file:
@@ -439,29 +440,51 @@ def main():
                                     new_tech.effect_id = effect_index
                                     new_tech.name = effect_name
                                     new_tech.civ = selected_civ_index + 1
-                                    for tech in DATA.techs:
+                                    for tech in DATA.techs[:]:  # Iterate over a copy of the list
                                         if tech.name == effect_name:
                                             DATA.techs.remove(tech)
                                     DATA.techs.append(new_tech)
 
                                     # Append bonus to description
-                                    bonuses_found = False
+                                    bonus_found = False
                                     for i, line in enumerate(description_lines):
                                         # Add new bonus to the end of the bonuses list
-                                        if bonus_to_add_ORIGINAL in line:
+                                        if bonus_to_add_ORIGINAL.lower() in description_lines[i].lower():
                                             break
-                                        elif '•' in line:
-                                            bonuses_found = True
-                                        elif bonuses_found and len(line) == 0:
+                                        if '•' in description_lines[i]:
+                                            bonus_found = True
+                                        elif description_lines[i] == '' and bonus_found:
+                                            #print(f'• {bonus_to_add_ORIGINAL}')
                                             description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
-
+                                            break
+#
                                     # Update the description
                                     save_description(description_code, description_lines)
 
                                     # Save changes
                                     DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                    print(f'Bonus added for {selected_civ_name}: {description_lines[i]}')
+                                    print(f'Bonus added for {selected_civ_name}: {bonus_to_add_ORIGINAL}')
                                     time.sleep(0.5)
+                                
+                                # Remove bonus
+                                elif bonus_selection == '2':
+                                    # Show bonuses
+                                    bonus_count = 0
+                                    searching_for_dots = True
+                                    print('\n')
+                                    for line in split_lines:
+                                        if 'Unique' in line:
+                                            searching_for_dots = False
+                                        elif '•' in line and searching_for_dots:
+                                            print(f"\033[33m{str(bonus_count)}: {line[2:]} \033[0m")
+                                            bonus_count += 1
+
+                                    # Get user input
+                                    remove_bonus_selection = input("Selection: ")
+
+                                    # Find and remove the bonus from the .dat file
+                                    for tech in DATA.techs:
+                                        if tech
 
                     # Unique Unit
                     elif selection == '3':
