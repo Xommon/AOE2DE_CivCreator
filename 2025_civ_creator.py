@@ -36,6 +36,48 @@ def save_description(description_code_, description_lines_):
         file.writelines(lines)
         file.truncate()  # Ensure remaining old content is removed
 
+# Bonuses
+def bonus(bonus_string):
+    # Set up the list
+    bonus_effect_commands = []
+
+    # [Technology] free
+    if 'free' in bonus_string:
+        # Strip useless words using regex
+        useless_words = ["free", "is", "are", "upgrade", "upgrades"]
+        cleaned_bonus = re.sub(r'\b(?:' + '|'.join(useless_words) + r')\b', '', bonus_string).strip()
+
+        # Extract the interactable parts
+        bonus_parts = re.split(r',\s*|\s+and\s+', cleaned_bonus)
+
+        # Remove any empty strings from the list
+        bonus_parts = [part.strip() for part in bonus_parts if part.strip()]
+
+        # Extract the techs from the description
+        tech_ids = []
+        for i, tech_id in enumerate(DATA.techs):
+            for part in bonus_parts:
+                if part == DATA.techs[i].name.lower():
+                    tech_ids.append(i)
+
+        # Exit if nothing was found
+        if len(tech_ids) == 0:
+            print("\033[31mERROR: No techs with the names given found.\033[0m")
+            return bonus_effect_commands
+
+        # Create effect commands
+        for id in tech_ids:
+            # Remove cost
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, id, 0, 0, 0))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, id, 1, 0, 0))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, id, 2, 0, 0))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, id, 3, 0, 0))
+
+            # Remove time
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(103, id, 0, 0, 0))
+
+    return bonus_effect_commands
+
 def open_mod(mod_folder):
     print('\nLoading mod...')
     global DATA
@@ -215,7 +257,6 @@ def main():
         print("\033[33m0: Open Mod...\033[0m")
         print("\033[33m1: New Mod...\033[0m")
     selection = input("Selection: ")
-
     
     if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
         if selection == '0': # Open last mod
@@ -316,6 +357,17 @@ def main():
                             file.seek(0)  # Move to the beginning of the file
                             file.writelines(lines)  # Write all lines back
 
+                        # Change name of tech tree and team bonus
+                        for i, effect in enumerate(DATA.effects):
+                            if effect.name == f'{old_name.title()} Tech Tree':
+                                effect.name = f'{selected_civ_name.title()} Tech Tree'
+                            if effect.name == f'{old_name.title()} Team Bonus':
+                                effect.name = f'{selected_civ_name.title()} Team Bonus'
+
+                        # Update the name
+                        print(f'Civilization name changed from {old_name} to {selected_civ_name}.')
+                        time.sleep(1)
+
                     # Title
                     if selection == '1':
                         # Get user input
@@ -378,42 +430,9 @@ def main():
                                     # Get user prompt
                                     bonus_to_add_ORIGINAL = input('\nType a bonus to add: ')
                                     bonus_to_add = bonus_to_add_ORIGINAL.lower()
-                                    effect_commands = []
 
-                                    # [Technology] free
-                                    if 'free' in bonus_to_add:
-                                        # Strip useless words using regex
-                                        useless_words = ["free", "is", "are", "upgrade", "upgrades"]
-                                        cleaned_bonus = re.sub(r'\b(?:' + '|'.join(useless_words) + r')\b', '', bonus_to_add).strip()
-
-                                        # Extract the interactable parts
-                                        bonus_parts = re.split(r',\s*|\s+and\s+', cleaned_bonus)
-
-                                        # Remove any empty strings from the list
-                                        bonus_parts = [part.strip() for part in bonus_parts if part.strip()]
-
-                                        # Extract the techs from the description
-                                        tech_ids = []
-                                        for i, tech_id in enumerate(DATA.techs):
-                                            for part in bonus_parts:
-                                                if part == DATA.techs[i].name.lower():
-                                                    tech_ids.append(i)
-
-                                        # Exit if nothing was found
-                                        if len(tech_ids) == 0:
-                                            print("\033[31mERROR: No techs with the names given found.\033[0m")
-                                            break
-
-                                        # Create effect commands
-                                        for id in tech_ids:
-                                            # Remove cost
-                                            effect_commands.append(genieutils.effect.EffectCommand(101, id, 0, 0, 0))
-                                            effect_commands.append(genieutils.effect.EffectCommand(101, id, 1, 0, 0))
-                                            effect_commands.append(genieutils.effect.EffectCommand(101, id, 2, 0, 0))
-                                            effect_commands.append(genieutils.effect.EffectCommand(101, id, 3, 0, 0))
-
-                                            # Remove time
-                                            effect_commands.append(genieutils.effect.EffectCommand(103, id, 0, 0, 0))
+                                    # Generate the bonus
+                                    effect_commands = bonus(bonus_to_add)
 
                                     # Exit if nothing was found
                                     if len(effect_commands) == 0:
@@ -435,7 +454,7 @@ def main():
                                         DATA.effects.append(new_effect)
                                         effect_index = len(DATA.effects) - 1
 
-                                    # Create the tech that replaces the old unit
+                                    # Create new tech if it doesn't exist
                                     new_tech = DATA.techs[1101]
                                     new_tech.effect_id = effect_index
                                     new_tech.name = effect_name
@@ -471,20 +490,90 @@ def main():
                                     # Show bonuses
                                     bonus_count = 0
                                     searching_for_dots = True
-                                    print('\n')
-                                    for line in split_lines:
-                                        if 'Unique' in line:
-                                            searching_for_dots = False
-                                        elif '•' in line and searching_for_dots:
-                                            print(f"\033[33m{str(bonus_count)}: {line[2:]} \033[0m")
-                                            bonus_count += 1
+                                    options = []
+                                    #print('\n')
 
                                     # Get user input
-                                    remove_bonus_selection = input("Selection: ")
+                                    remove_bonus_selection = '/'
+                                    while remove_bonus_selection != '':
+                                        # List bonuses
+                                        if remove_bonus_selection == '?':
+                                            for line in split_lines:
+                                                if 'Unique' in line:
+                                                    searching_for_dots = False
+                                                elif '•' in line and searching_for_dots:
+                                                    options.append(line[2:])
+                                                    print(f"\033[33m{str(bonus_count)}: {line[2:]} \033[0m")
+                                                    bonus_count += 1
+                                                continue
+
+                                        try:
+                                            remove_bonus_selection = int(input("\nSelect a bonus to remove: "))
+                                            bonus_to_remove = options[remove_bonus_selection]
+                                            break
+                                        except:
+                                            if remove_bonus_selection != '':
+                                                print("\033[31mERROR: Invalid bonus.\033[0m")
+                                            else:
+                                                break
 
                                     # Find and remove the bonus from the .dat file
+                                    if remove_bonus_selection == '':
+                                        break
                                     for tech in DATA.techs:
-                                        if tech
+                                        if tech.name == f'{selected_civ_name.upper()}: {bonus_to_remove}':
+                                            print ('Tech found')
+                                            DATA.techs.remove(tech.name)
+                                    for effect in DATA.effects:
+                                        if effect.name == f'{selected_civ_name.upper()}: {bonus_to_remove}':
+                                            print ('Effect found')
+                                            DATA.effect.remove(effect.name)
+
+                                    # Remove from the description
+                                    for line in description_lines:
+                                        if bonus_to_remove in line:
+                                            description_lines.remove(line)
+                                            save_description(description_code, description_lines)
+                                    
+                                    # Save changes
+                                    #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                    print(f'Bonus removed for {selected_civ_name}: {bonus_to_remove}')
+                                    time.sleep(0.5)
+
+                                # Team bonus
+                                elif bonus_selection == '3':
+                                    # Get user prompt
+                                    bonus_to_add_ORIGINAL = input('\nType a team bonus to change to: ')
+                                    bonus_to_add = bonus_to_add_ORIGINAL.lower()
+
+                                    # Generate the bonus
+                                    effect_commands = bonus(bonus_to_add)
+
+                                    # Exit if nothing was found
+                                    if len(effect_commands) == 0:
+                                        print("\033[31mERROR: No units, buildings, or techs with the names given found.\033[0m")
+                                        break
+
+                                    # Find the previous team effect
+                                    team_bonus_effect = None
+                                    for i, effect in enumerate(DATA.effects):
+                                        if effect.name == f'{selected_civ_name.title()} Team Bonus':
+                                            team_bonus_effect = effect
+
+                                    # Update the team bonus
+                                    team_bonus_effect.effect_commands = effect_commands
+
+                                    # Change team bonus in description
+                                    bonus_found = False
+                                    description_lines[-1] = bonus_to_add_ORIGINAL
+#
+                                    # Update the description
+                                    save_description(description_code, description_lines)
+
+                                    # Save changes
+                                    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                    print(f'Team bonus changed for {selected_civ_name}.')
+                                    time.sleep(0.5)
 
                     # Unique Unit
                     elif selection == '3':
