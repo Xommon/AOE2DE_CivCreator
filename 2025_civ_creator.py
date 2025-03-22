@@ -15,7 +15,6 @@ import genieutils.sound
 import genieutils.tech
 import genieutils.unit
 import genieutils.effect
-import pickle
 import json
 import re
 
@@ -36,10 +35,154 @@ def save_description(description_code_, description_lines_):
         file.writelines(lines)
         file.truncate()  # Ensure remaining old content is removed
 
+def get_unit_name(unit_id):
+    with open(ORIGINAL_STRINGS, 'r') as file:
+        lines = file.readlines()
+
+        # Look for the unit's name
+        for line in lines:
+            if str(DATA.units[unit_id].language_dll_name) in line:
+                new_name = re.sub(r'^\d+\s+', '', line)
+                return new_name
+
 # Bonuses
 def bonus(bonus_string):
     # Set up the list
     bonus_effect_commands = []
+    bonus_string = bonus_string.lower()
+
+    # Bonus unit lines
+    bonus_unit_lines = {
+        # Categories
+        #'all units' : [-1, 0, 6, 12, 13, 18, 43, 19, 22, 2, 36, 51, 44, 54, 55, 35],
+        #'military' : [-1, 0, 35, 6, 36, 47, 12, 44, 23],
+        #'infantry' : [-1, 6],
+        #'villager' : [-1, 4],
+        #'monk' : [-1, 18, 43],
+        #'cavalry' : [-1, 12, 23, 47, 36],
+        #'ship' : [-1, 2, 21, 22, 20, 53],
+        #'boat' : [-1, 2, 21, 22, 20, 53],
+        #'stable' : [-1, 12, 47],
+        #'tower' : [-1, 52],
+        #'building' : [-1, 3],
+
+        # Unit lines
+        'foot archers' : [4, 24, 492, 7, 6, 1155, 185, 8, 530, 73, 559, 763, 765, 866, 868, 1129, 1131, 1800, 1802, 850, -1, 493, -1],
+        'archers' : [4, 24, 492],
+        'archer-line' : [4, 24, 492],
+        'archer line' : [4, 24, 492],
+        'skirmishers' : [7, 6, 1155],
+        'skirmishers-line' : [7, 6, 1155],
+        'skirmishers line' : [7, 6, 1155],
+        'slingers' : [185],
+        'elephant archers' : [873, 875],
+        'elephant archer-line' : [873, 875],
+        'elephant archer line' : [873, 875],
+        'infantry' : [74, 75, 76, 473, 567, 93, 358, 359, 1786, 1787, 1788, 751, 753, 752, 1699, 1663, 1697, 184],
+        'militia' : [74, 75, 76, 473, 567],
+        'militia-line' : [74, 75, 76, 473, 567],
+        'militia line' : [74, 75, 76, 473, 567],
+        'spearmen' : [93, 358, 359, 1786, 1787, 1788],
+        'spearmen-line' : [93, 358, 359, 1786, 1787, 1788],
+        'spearmen line' : [93, 358, 359, 1786, 1787, 1788],
+        'eagles' : [751, 753, 752],
+        'eagle-line' : [751, 753, 752],
+        'eagle line' : [751, 753, 752],
+        'eagle units' : [751, 753, 752],
+        'flemish militia' : [1699, 1663, 1697],
+        'war elephants' : [239, 558],
+        'war elephant-line' : [239, 558],
+        'war elephant line' : [239, 558],
+        'elephants' : [873, 875, 239, 558, 1120, 1122, 1132, 1134, 1744, 1746],
+        'elephant units' : [873, 875, 239, 558, 1120, 1122, 1132, 1134, 1744, 1746],
+        'ballista elephants' : [1120, 1122],
+        'battle elephants' : [1132, 1134],
+        'battle elephant-line' : [1132, 1134],
+        'battle elephant line' : [1132, 1134],
+        'armored elephants' : [1744, 1746],
+        'armored elephant-line' : [1744, 1746],
+        'armored elephant line' : [1744, 1746],
+        'armoured elephants' : [1744, 1746],
+        'armoured elephant-line' : [1744, 1746],
+        'armoured elephant line' : [1744, 1746],
+        'gunpowder units' : [5, 36, 420, 46, 691, 771, 773, 557, 1001, 1003, 831, 832, 1709, 1704, 1706],
+        'hand cannoneers' : [5],
+        'demolition ships' : [1104, 527, 528],
+        'demolition ship-line' : [1104, 527, 528],
+        'demolition ship line' : [1104, 527, 528],
+        'demolition-line' : [1104, 527, 528],
+        'demolition line' : [1104, 527, 528],
+        'fire ships' : [1103, 529, 532],
+        'fire ship line' : [1103, 529, 532],
+        'fire ship-line' : [1103, 529, 532],
+        'fire line' : [1103, 529, 532],
+        'fire-line' : [1103, 529, 532],
+        'demo-line' : [1104, 527, 528],
+        'demo line' : [1104, 527, 528],
+        'galley-line' : [539, 21, 442],
+        'galley line' : [539, 21, 442],
+        'gallies' : [539, 21, 442],
+        'dromons' : [1795],
+        'cannon galleons' : [420, 691],
+        'cannon galleon line' : [420, 691],
+        'cannon galleon-line' : [420, 691],
+        'warrior priest' : [1811, 1831],
+        'monk' : [1811, 1826, 1827],
+        'non-unique barracks units' : [74, 75, 76, 473, 567, 93, 358, 359, 1786, 1787, 1788, 751, 753, 752],
+        'scouts' : [448, 546, 441, 1707],
+        'scout-line' : [448, 546, 441, 1707],
+        'scout line' : [448, 546, 441, 1707],
+        'rathas' : [1738, 1740, 1759, 1761],
+        'trade units' : [],
+        'canoes' : [],
+        'canoe-line' : [],
+        'canoe line' : [],
+        'camels' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
+        'camel units' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
+        'villagers' : [83, 293, 590, 592, 123, 218, 122, 216, 56, 57, 120, 354, 118, 212, 156, 222, 214, 259],
+        'shepherds' : [590, 592],
+        'lumberjacks' : [123, 218],
+        'hunters' : [122, 216],
+        'fishermen' : [56, 57],
+        'foragers' : [120, 354],
+        'builders' : [118, 212],
+        'repairers' : [156, 222],
+        'farmers' : [214, 259],
+        'trebuchets' : [331, 42],
+
+        # Buildings
+        'buildings' : [30, 31, 32, 104, 71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617, 82, 103, 105, 18, 19, 209, 210, 84, 116, 137, 10, 14, 87, 49, 150, 12, 20, 132, 498, 86, 101, 153, 45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189, 598, 79, 234, 235, 236, 72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192, 1251, 1665, 70, 191, 192, 463, 464, 465, 584, 585, 586, 587, 1808, 562, 563, 564, 565, 1646, 1711, 1720, 1734, 68, 129, 130, 131, 50],
+        'town centers' : [71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617],
+        'town centres' : [71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617],
+        'castles' : [82],
+        'blacksmiths' : [103, 105, 18, 19],
+        'universities' : [209, 210],
+        'archery ranges' : [10, 14, 87],
+        'siege workshops' : [49, 150],
+        'barracks' : [12, 20, 132, 498],
+        'stables' : [86, 101, 153],
+        'docks' : [45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189],
+        'outposts' : [598],
+        'watch towers' : [79],
+        'guard towers' : [234],
+        'keeps' : [235],
+        'monasteries' : [30, 31, 32, 104],
+        'bombard towers' : [236],
+        'towers' : [79, 234, 235, 236],
+        'palisade walls' : [72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804], # Including gates
+        'walls' : [117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491,659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192], # Including gates
+        'stone walls' : [117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491,659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192], # Including gates
+        'kreposts' : [1251],
+        'donjons' : [1665],
+        'houses' : [70, 191, 192, 463, 464, 465],
+        'mining camps' : [584, 585, 586, 587],
+        'mule carts' : [1808],
+        'lumber camps' : [562, 563, 564, 565],
+        'markets' : [84, 116, 137, 1646],
+        'folwarks' : [1711, 1720, 1734],
+        'mills' : [68, 129, 130, 131],
+        'farms' : [50],
+        }
 
     # [Technology] free
     if 'free' in bonus_string:
@@ -76,6 +219,122 @@ def bonus(bonus_string):
             # Remove time
             bonus_effect_commands.append(genieutils.effect.EffectCommand(103, id, 0, 0, 0))
 
+    # [Unit/Building/Tech] costs [%] ++ [Resource] ++ starting in the [Age]
+    elif 'cost' or 'costs' in bonus_string:
+        ### Foot archers cost 25% less food starting in the Feudal Age
+        ### foot archers 25% less food feudal
+
+        # Strip useless words using regex
+        useless_words = ["cost", "costs", "is", 'are', 'starting in the', 'age']
+
+        # Extract unit types from bonus_string
+        lower_bonus = bonus_string.lower()
+
+        found_units = []
+        for unit in sorted(bonus_unit_lines, key=len, reverse=True):  # Sort to prioritize multi-word units
+            if unit in lower_bonus:
+                found_units.append(unit)
+                lower_bonus = lower_bonus.replace(unit, '', 1)  # Remove matched unit from string
+
+        # Remove useless words using regex
+        cleaned_bonus = re.sub(r'\b(?:' + '|'.join(useless_words) + r')\b', '', lower_bonus).strip()
+
+        # Extract interactable parts (splitting by commas and "and")
+        bonus_parts = re.split(r',\s*|\s+and\s+', cleaned_bonus)
+        bonus_parts = [part.strip() for part in bonus_parts if part.strip()]  # Remove empty strings
+
+        # Combine found unit types with remaining parts
+        bonus_parts = found_units + bonus_parts
+
+        # Extract the units/buildings from the description
+        unit_ids = []
+        for part in bonus_parts:
+            if part.lower() in bonus_unit_lines:
+                print(part.lower())
+                unit_ids.append(bonus_unit_lines[part.lower()])
+
+        # Get rid of duplicates
+        unit_ids = list(set(unit_ids))
+
+        # Extract the techs from the description
+        tech_ids = []
+        for i, tech_id in enumerate(DATA.techs):
+            for part in bonus_parts:
+                if part == DATA.techs[i].name.lower():
+                    tech_ids.append(i)
+
+        # Exit if nothing was found
+        if len(unit_ids) + len(tech_ids) == 0:
+            print("\033[31mERROR: No units, buildings, or techs with the names given found.\033[0m")
+            return bonus_effect_commands
+
+        # DEBUG
+        print('units:', unit_ids)
+        print('techs:', tech_ids)
+        time.sleep(1)
+
+        # Get positive or negative value
+        negative = True
+        for part in bonus_parts:
+            if 'more' in part:
+                negative = False
+
+        # Get the number value
+        bonus_number = 0
+        for part in bonus_parts:
+            if any(char.isdigit() for char in part):
+                percentage = False
+                if '%' in part:
+                    percentage = True
+                    bonus_number = int(part[:-1])
+                else:
+                    bonus_number = int(part)
+
+                # Look for negative numbers
+                negative = bonus_number < 0
+
+                # Convert percent into integer
+                if percentage and not negative:
+                    bonus_number = bonus_number / 100 + 1
+                elif percentage and negative:
+                    bonus_number = 1 - bonus_number / 100
+                
+                # DEBUG
+                print('bonus number:', bonus_number)
+
+        # Get resource
+        bonus_resource = -1
+        for part in bonus_parts:
+            if part.lower() == 'food':
+                bonus_resource = 0
+            elif part.lower() == 'wood':
+                bonus_resource = 1
+            elif part.lower() == 'gold':
+                bonus_resource = 3
+            elif part.lower() == 'stone':
+                bonus_resource = 2
+
+        # Get age
+        bonus_age_id = -1
+        for part in bonus_parts:
+            if part.lower() == 'feudal':
+                bonus_age_id = 101
+            elif part.lower() == 'castle':
+                bonus_age_id = 102
+            elif part.lower() == 'imperial':
+                bonus_age_id = 103
+
+        # Create effect commands for units
+        for id in unit_ids:
+            pass
+
+        # Create effect commands for techs
+        for tech_id in tech_ids:
+            if bonus_resource == - 1:
+                bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 0, 0, 0))
+                bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 0, 0, 0))
+
+    # Return the effect commands
     return bonus_effect_commands
 
 def open_mod(mod_folder):
@@ -198,6 +457,26 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
     global DATA
     DATA = DatFile.parse(rf'{local_mods_folder}/{mod_name}/resources/_common/dat/empires2_x2_p1.dat')
 
+    # Copy over custom graphics
+    graphics_source_folder = os.path.join(os.path.dirname(__file__), 'graphics')  # Path to the original 'graphics' folder
+    graphics_destination_folder = os.path.join(MOD_FOLDER, 'resources/_common/drs/graphics')  # Path to the new 'graphics' folder in the mod folder
+
+    # Ensure the destination directory exists
+    os.makedirs(graphics_destination_folder, exist_ok=True)
+
+    # Copy all files from the source 'graphics' folder to the destination
+    if os.path.exists(graphics_source_folder):
+        for item in os.listdir(graphics_source_folder):
+            source_path = os.path.join(graphics_source_folder, item)
+            destination_path = os.path.join(graphics_destination_folder, item)
+
+            if os.path.isfile(source_path):
+                shutil.copy2(source_path, destination_path)  # Copy file
+            elif os.path.isdir(source_path):
+                shutil.copytree(source_path, destination_path, dirs_exist_ok=True)  # Copy directory
+    else:
+        print(f"Warning: Source graphics folder '{graphics_source_folder}' does not exist.")
+    
     # Copy and filter original strings
     global MOD_STRINGS
     MOD_STRINGS = rf'{local_mods_folder}/{mod_name}/resources/en/strings/key-value/key-value-modded-strings-utf8.txt'
@@ -321,16 +600,44 @@ def main():
         try:
             edit_civ_index = int(selection)
             if 0 <= edit_civ_index < len(DATA.civs):
+                # Get current title
+                current_title = description_lines[0]
+
+                # Get current unique unit
+                for i, line in enumerate(description_lines):
+                    if 'unique unit' in line.lower():
+                        current_unique_unit = description_lines[i + 1]
+                
+                # Get current architecture
+                def get_architecture_list(unit_id):
+                    # Get the graphic of the unit
+                    unit_id = int(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic[0])
+
+                    # KEY: (gate: 81, castle: 82, wonder: 276)
+                    architecture_sets = {'African': [8790, 8747], 'Central Asian': [11790, 11747], 'Central European': [5322, 171], 'East Asian': [5323, 172], 'Eastern European': [7790, 7747], 'Mediterranean': [7432, 177], 'Middle Eastern': [5325, 173], 'American': [6790, 6747], 'South Asian': [9790, 12477], 'Southeast Asian': [10790, 10747], 'Southeast European': [-1, -1], 'Western European': [5326, 174]}
+                    for arch, ids in architecture_sets.items():
+                        if unit_id in ids:
+                            return arch
+                    return ''  # or 'Unknown' if you prefer a string
+
+                # Get current language
+                current_language = ''
+
+                # Edit civilisation menu
                 while True:
                     print(f"\033[32m\n--- Edit {selected_civ_name} ---\033[0m")
-                    print("\033[33m0: Name\033[0m")
-                    print("\033[33m1: Title\033[0m")
-                    print("\033[33m2: Bonuses\033[0m")
-                    print("\033[33m3: Unique Unit\033[0m")
-                    print("\033[33m4: Architecture\033[0m")
-                    print("\033[33m5: Language\033[0m")
-                    print("\033[33m6: Tech Tree\033[0m")
+                    print(f"\033[33m0: Name\033[0m -- {selected_civ_name}")
+                    print(f"\033[33m1: Title\033[0m -- {current_title}")
+                    print(f"\033[33m2: Bonuses\033[0m")
+                    print(f"\033[33m3: Unique Unit\033[0m -- {current_unique_unit}")
+                    print(f"\033[33m4: Architecture\033[0m -- {get_architecture_list(81)}")
+                    print(f"\033[33m5: Language\033[0m -- {current_language}")
+                    print(f"\033[33m6: Tech Tree\033[0m")
                     selection = input("Selection: ")
+
+                    # Exit
+                    if selection == '':
+                        break
 
                     # Info
                     if selection == '?':
@@ -580,6 +887,8 @@ def main():
                         # Populate all castle units
                         all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "cretan archer", "crusader knight", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "xolotl warrior", "sun warrior", "island sentinel"]
                         new_castle_unit = '?'
+
+                        # Get user input
                         while new_castle_unit == '?':
                             new_castle_unit = input(f"\nEnter unique Castle unit for {selected_civ_name} (leave blank for original): ").lower()
 
@@ -649,6 +958,17 @@ def main():
                             if tech.name == effect_name:
                                 DATA.techs.remove(tech)
                         DATA.techs.append(new_tech)
+
+                        # Assemble unit classes
+                        classes = {0: 'archer', 6: 'infantry', 12: 'cavalry', 13: 'siege', 18: 'monk', 23: 'mounted hand cannoneer', 36: 'cavalry archer', 44: 'hand cannoneer'}
+                        unit_class = classes[DATA.civs[1].units[castle_unit_indexes[2]].class_]
+
+                        # Update description
+                        new_unit_description = f'{new_castle_unit.title()} ({unit_class})'
+                        for i, line in enumerate(description_lines):
+                            if 'unique unit' in line.lower():
+                                description_lines[i + 1] = new_unit_description
+                                save_description(line_code, description_lines)
 
                         # Save changes
                         DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
@@ -776,43 +1096,40 @@ def main():
                         print(f"Architecture changed.")
                         time.sleep(1)
 
-                    # Language / Sound
+                    # Language
                     elif selection == '5':
-                        #all_languages = ', '.join([civ.name for civ in DATA.civs])
-#
-                        ## Change language
-                        #while True:
-                        #    new_language = input(f"\nEnter new language for {selected_civ_name}: ").lower()
-#
-                        #    if new_language == '':
-                        #        break
-                        #    elif new_language == '?':
-                        #        print(all_languages)
-                        #    elif new_language.title() in all_languages:
-#
-                        #        # Save changes
-                        #        #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                        #        print(f"Language for {selected_civ_name} changed to {new_language.title()}.")
-                        #        time.sleep(1)
-                        #        break
-                        #    else:
-                        #        print('ERROR: Language not found.')
-                        #pass
+                        all_languages = ', '.join([civ.name for civ in DATA.civs])
+
+                        # Change language
+                        while True:
+                            new_language = input(f"\nEnter new language for {selected_civ_name}: ").lower()
+
+                            if new_language == '':
+                                break
+                            elif new_language == '?':
+                                print(all_languages)
+                            elif new_language.title() in all_languages:
+
+                                # Save changes
+                                #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                print(f"Language for {selected_civ_name} changed to {new_language.title()}.")
+                                #time.sleep(1)
+                                break
+                            else:
+                                print("\033[31mERROR: Language not found.\033[0m")
+                        pass
 
                         # DEBUG
 
                         # Copy language sound items of the civilization we want
                         #genieutils.sound.SoundItem.
-                        DATA.sounds[303].items[1].civilization = 1
-                        DATA.sounds[303].items[2].civilization = 1
-                        DATA.sounds[303].items[3].civilization = 1
-
-                        DATA.sounds[303].items[4].civilization = 15
-                        DATA.sounds[303].items[5].civilization = 15
-                        DATA.sounds[303].items[6].civilization = 15
-                        DATA.sounds[303].items[7].civilization = 15
-                        
-                        
+                        #DATA.sounds[303].items[1].civilization = 1
+                        #DATA.sounds[303].items[2].civilization = 1
+                        #DATA.sounds[303].items[3].civilization = 1
+                        #DATA.sounds[303].items[4].civilization = 15
+                        #DATA.sounds[303].items[5].civilization = 15
+                        #DATA.sounds[303].items[6].civilization = 15
+                        #DATA.sounds[303].items[7].civilization = 15
 
                         DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
 
