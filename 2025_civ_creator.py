@@ -644,7 +644,7 @@ def main():
     # Mod menu
     mod_name = MOD_FOLDER.split('/')[-1]
     while True:
-        # Display all of the civilisations
+        # Display selected mod menu
         time.sleep(1)
         print(f"\033[32m\n--- {mod_name} Menu ---\033[0m")
         print("\033[33m0: Edit Civilization\033[0m")
@@ -652,16 +652,40 @@ def main():
         mod_menu_selection = input("Selection: ")
 
         # Edit Civilisation
-        print('\n')
         if mod_menu_selection == '0':
+            # Display all civilisations
             selected_civ_index = -1
-            with open (MOD_STRINGS, 'r') as file:
+            all_civs = []
+            with open(MOD_STRINGS, 'r') as file:
                 lines = file.readlines()
                 for i in range(len(DATA.civs) - 1):
-                    print(rf'{i}: {lines[i][7:-2]}')
-            selection = input("Selection: ")
-            selected_civ_index = int(selection)
-            selected_civ_name = lines[selected_civ_index][7:-2]
+                    all_civs.append(rf'{i}: {lines[i][7:-2]}')
+
+                while True:
+                    selection = input("\nEnter civilization ID or name: ").lower()
+
+                    if selection == '?':
+                        for allciv in all_civs:
+                            print(allciv)
+                        continue
+                    else:
+                        try:
+                            # Use the civilization ID
+                            selected_civ_index = int(selection)
+                            selected_civ_name = lines[selected_civ_index][7:-2]
+                            break
+                        except:
+                            # Use the civilization name
+                            for i, civ_line in enumerate(all_civs):
+                                if civ_line[3:].lower() == selection:
+                                    selected_civ_index = i
+                                    selected_civ_name = lines[selected_civ_index][7:-2]
+                                    break  # Exit the for loop
+                            else:
+                                # If no match is found, continue the while loop
+                                print("\033[31mERROR: Invalid civilization name or ID.\033[0m")
+                                continue
+                            break  # Exit the while loop if a match is found
 
             # Separate the description to be edited later
             with open(MOD_STRINGS, 'r') as file:
@@ -743,25 +767,29 @@ def main():
                         new_name = input(f"\nEnter new name for {selected_civ_name}: ")
                         old_name = selected_civ_name
 
-                        # Change name
-                        DATA.civs[edit_civ_index + 1].name = new_name
-                        with open(MOD_STRINGS, 'r+') as file:
-                            lines = file.readlines()  # Read all lines
-                            lines[selected_civ_index] = lines[selected_civ_index][:5] + f' "{new_name}"\n'  # Modify the specific line
-                            selected_civ_name = new_name  # Update the selected civ name
+                        if new_name != '' and new_name != selected_civ_name:
+                            # Change name
+                            DATA.civs[edit_civ_index + 1].name = new_name
+                            with open(MOD_STRINGS, 'r+') as file:
+                                lines = file.readlines()  # Read all lines
+                                lines[selected_civ_index] = lines[selected_civ_index][:5] + f' "{new_name}"\n'  # Modify the specific line
+                                selected_civ_name = new_name  # Update the selected civ name
 
-                            file.seek(0)  # Move to the beginning of the file
-                            file.writelines(lines)  # Write all lines back
+                                file.seek(0)  # Move to the beginning of the file
+                                file.writelines(lines)  # Write all lines back
 
-                        # Change name of tech tree and team bonus
-                        for i, effect in enumerate(DATA.effects):
-                            if effect.name == f'{old_name.title()} Tech Tree':
-                                effect.name = f'{selected_civ_name.title()} Tech Tree'
-                            if effect.name == f'{old_name.title()} Team Bonus':
-                                effect.name = f'{selected_civ_name.title()} Team Bonus'
+                            # Change name of tech tree and team bonus
+                            for i, effect in enumerate(DATA.effects):
+                                if effect.name == f'{old_name.title()} Tech Tree':
+                                    effect.name = f'{selected_civ_name.title()} Tech Tree'
+                                if effect.name == f'{old_name.title()} Team Bonus':
+                                    effect.name = f'{selected_civ_name.title()} Team Bonus'
 
-                        # Update the name
-                        print(f'Civilization name changed from {old_name} to {selected_civ_name}.')
+                            # Update the name
+                            print(f'Civilization name changed from {old_name} to {selected_civ_name}.')
+                        else:
+                            # Do not update the name
+                            print(f'Civilization name not changed for {selected_civ_name}.')
                         time.sleep(1)
 
                     # Title
