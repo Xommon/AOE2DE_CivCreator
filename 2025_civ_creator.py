@@ -462,6 +462,67 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
     global DATA
     DATA = DatFile.parse(rf'{local_mods_folder}/{mod_name}/resources/_common/dat/empires2_x2_p1.dat')
 
+    # Copy over custom sounds
+    sounds_source_folder = os.path.join(os.path.dirname(__file__), 'sounds')  # Path to the original 'sounds' folder
+    sounds_destination_folder = os.path.join(MOD_FOLDER, 'resources/_common/drs/sounds')  # Path to the new 'sounds' folder in the mod folder
+
+    # Ensure the destination directory exists
+    os.makedirs(sounds_destination_folder, exist_ok=True)
+
+    # Copy all files from the source 'sounds' folder to the destination
+    if os.path.exists(sounds_source_folder):
+        for item in os.listdir(sounds_source_folder):
+            source_path = os.path.join(sounds_source_folder, item)
+            destination_path = os.path.join(sounds_destination_folder, item)
+
+            if os.path.isfile(source_path):
+                shutil.copy2(source_path, destination_path)  # Copy file
+            elif os.path.isdir(source_path):
+                shutil.copytree(source_path, destination_path, dirs_exist_ok=True)  # Copy directory
+    else:
+        print(f"Warning: Source sounds folder '{sounds_source_folder}' does not exist.")
+
+    # Reformat the default sounds
+    sound_ids = {303: 'Villager_Male_Select_4', 301: 'Villager_Male_Move_4', 295: 'Villager_Male_Build_1', 299: 'Villager_Male_Chop_1', 455: 'Villager_Male_Farm_1', 448: 'Villager_Male_Fish_1', 297: 'Villager_Male_Forage_1', 298: 'Villager_Male_Hunt_1', 300: 'Villager_Male_Mine_1', 302: 'Villager_Male_Repair_1', 435: 'Villager_Female_Select_4', 434: 'Villager_Female_Move_4', 437: 'Villager_Female_Build_1', 442: 'Villager_Female_Chop_1', 438: 'Villager_Female_Farm_1', 487: 'Villager_Female_Fish_1', 440: 'Villager_Female_Forage_1', 441: 'Villager_Female_Hunt_1', 443: 'Villager_Female_Mine_1', 444: 'Villager_Female_Repair_1', 420: 'Soldier_Select_3', 421: 'Soldier_Move_3', 422: 'Soldier_Attack_3', 423: 'Monk_Select_3', 424: 'Monk_Move_3', 479: 'King_Select_3', 480: 'King_Move_3'}
+    
+    # Remove all previous sound items
+    for sound_id in sound_ids:
+        DATA.sounds[sound_id].items.clear()
+
+    # Set defaults for each civilization
+    for civ in DATA.civs[1:]:
+        for sound_id in sound_ids:
+            # Get the amount of sound items to add
+            sound_count = int(sound_ids[sound_id][-1])
+
+            # Add the sound items to the sound
+            for i in range(sound_count):
+                # Correct the name
+                correct_name = civ.name
+                if correct_name == 'British':
+                    correct_name = 'Britons'
+                elif correct_name == 'French':
+                    correct_name = 'Franks'
+
+                # Skip certain civilizations
+                if correct_name == 'Athenians' or correct_name == 'Spartans' or correct_name == 'Achaemenids':
+                    continue
+
+                # Create new name
+                if sound_count == 1:
+                    new_sound_name = f'{correct_name}_{sound_ids[sound_id][:-2]}'
+                else:
+                    new_sound_name = f'{correct_name}_{sound_ids[sound_id][:-2]}_{i + 1}'
+
+                # Determine probability
+                new_sound_probability = int(100 / sound_count)
+
+                # Create new sound item
+                new_sound = genieutils.sound.SoundItem(new_sound_name, 0, new_sound_probability, DATA.civs.index(civ), -1)
+
+                # Add sound item to the sound
+                DATA.sounds[sound_id].items.append(new_sound)
+
     # Copy over custom graphics
     graphics_source_folder = os.path.join(os.path.dirname(__file__), 'graphics')  # Path to the original 'graphics' folder
     graphics_destination_folder = os.path.join(MOD_FOLDER, 'resources/_common/drs/graphics')  # Path to the new 'graphics' folder in the mod folder
@@ -554,14 +615,16 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
         82:[54,49], # Castles
         30:[15,46], 31:[15,46], 32:[15,46], 104:[15,46], # Monasteries
         463:[20,31], 191:[21,30], 192:[21,30], 464:[21,30], 465:[21,30], # Houses
-        129:[22,45], 68:[23,44], 130:[23,44], 131:[23,44], # Mills
+        129:[22,45], 130:[23,44], 131:[23,44], # Mills
         84:[14,40], 116:[19,39], 137:[19,41], # Markets
     }
     for i, unit in enumerate(DATA.civs[7].units):
         if i in southeast_european_graphics:
-            graphics = southeast_european_graphics[i]
-            unit.standing_graphic = set([graphics[0] + starting_graphic_index, -1])
-            unit.dying_graphic = graphics[1] + starting_graphic_index
+            #graphics = southeast_european_graphics[i]
+            #unit.standing_graphic = set([graphics[0] + starting_graphic_index, -1])
+            #unit.dying_graphic = graphics[1] + starting_graphic_index
+            # DEBUG
+            pass
 
     # Copy and filter original strings
     global MOD_STRINGS
@@ -713,34 +776,35 @@ def main():
         try:
             edit_civ_index = int(selection)
             if 0 <= edit_civ_index < len(DATA.civs):
-                # Get current title
-                current_title = description_lines[0]
-
-                # Get current unique unit
-                for i, line in enumerate(description_lines):
-                    if 'unique unit' in line.lower():
-                        current_unique_unit = description_lines[i + 1].split(',')[0]
-                
-                # Get current architecture
-                def get_architecture_list(unit_id):
-                    # Get the graphic of the unit
-                    unit_id = int(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic[0])
-
-                    # KEY: (university: 209, castle: 82, wonder: 276)
-                    architecture_sets = {'African': [9084, 8747], 'Central Asian': [12084, 11747], 'Central European': [566, 171], 'East Asian': [567, 172], 'Eastern European': [8084, 7747], 'Mediterranean': [593, 177], 'Middle Eastern': [568, 173], 'American': [7084, 6747], 'South Asian': [10084, 12477], 'Southeast Asian': [11084, 10747], 'Southeast European': [15806, 15848], 'Western European': [569, 174]}
-                    for arch, ids in architecture_sets.items():
-                        if unit_id in ids:
-                            return arch
-                    return ''  # or 'Unknown' if you prefer a string
-
-                # Get current language
-                current_language = ''
-
                 # Edit civilisation menu
                 while True:
+                    # Get current unique unit
+                    for i, line in enumerate(description_lines):
+                        if 'unique unit' in line.lower():
+                            current_unique_unit = description_lines[i + 1].split(',')[0]
+
+                    # Get current architecture
+                    def get_architecture_list(unit_id):
+                        # Get the graphic of the unit
+                        unit_id = int(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic[0])
+
+                        # KEY: (university: 209, castle: 82, wonder: 276)
+                        architecture_sets = {'African': [9084, 8747], 'Central Asian': [12084, 11747], 'Central European': [566, 171], 'East Asian': [567, 172], 'Eastern European': [8084, 7747], 'Mediterranean': [593, 177], 'Middle Eastern': [568, 173], 'American': [7084, 6747], 'South Asian': [10084, 12477], 'Southeast Asian': [11084, 10747], 'Southeast European': [15806, 15848], 'Western European': [569, 174]}
+                        for arch, ids in architecture_sets.items():
+                            if unit_id in ids:
+                                return arch
+                        return ''  # or 'Unknown' if you prefer a string
+
+                    # Get current language
+                    current_language = ''
+                    for sound_item in DATA.sounds[301].items:
+                        if sound_item.civilization == selected_civ_index + 1:
+                            current_language = sound_item.filename.split('_')[0]
+
+                    # Print the civilization menu
                     print(f"\033[32m\n--- Edit {selected_civ_name} ---\033[0m")
                     print(f"\033[33m0: Name\033[0m -- {selected_civ_name}")
-                    print(f"\033[33m1: Title\033[0m -- {current_title}")
+                    print(f"\033[33m1: Title\033[0m -- {description_lines[0]}")
                     print(f"\033[33m2: Bonuses\033[0m")
                     print(f"\033[33m3: Unique Unit\033[0m -- {current_unique_unit}")
                     print(f"\033[33m4: Architecture\033[0m -- {get_architecture_list(209)}")
@@ -751,6 +815,15 @@ def main():
                     # Exit
                     if selection == '':
                         break
+
+                    # Read description
+                    with open(MOD_STRINGS, 'r+') as file:
+                        # Read and separate the lines
+                        lines = file.readlines()
+                        line_index = selected_civ_index + len(DATA.civs) - 1
+                        line = lines[line_index]
+                        line_code = line[:6]
+                        split_lines = line.split(r'\n')
 
                     # Info
                     if selection == '?':
@@ -795,7 +868,7 @@ def main():
                     # Title
                     if selection == '1':
                         # Get user input
-                        new_title = input(f"\nEnter new civilization title for {selected_civ_name} (ex. Infantry and Monk): ").lower()
+                        new_title = input(f"\nEnter new civilization title for {selected_civ_name} (ex. Infantry and Monk): ")
 
                         # Quit if blank
                         if new_title == '':
@@ -806,7 +879,7 @@ def main():
                             new_title = new_title[:-12].strip()
 
                         # Apply the Civilization ending
-                        description_lines[0] = description_lines[0] = new_title.title() + ' civilization'
+                        description_lines[0] = new_title + ' civilization'
 
                         # Update the description
                         save_description(description_code, description_lines)
@@ -1009,9 +1082,11 @@ def main():
                         while new_castle_unit == '?':
                             new_castle_unit = input(f"\nEnter unique Castle unit for {selected_civ_name} (leave blank for original): ").lower()
 
-                            if new_castle_unit not in all_castle_units:
+                            if new_castle_unit == '':
+                                break
+                            elif new_castle_unit not in all_castle_units:
                                 new_castle_unit = '?'
-                                print("\033[31mERROR: Unit not found.")
+                                print("\033[31mERROR: Unit not found.\033[0m")
                             elif new_castle_unit == '?':
                                 print(all_castle_units)
                                 continue
@@ -1077,8 +1152,12 @@ def main():
                         DATA.techs.append(new_tech)
 
                         # Assemble unit classes
-                        classes = {0: 'archer', 6: 'infantry', 12: 'cavalry', 13: 'siege', 18: 'monk', 23: 'mounted hand cannoneer', 36: 'cavalry archer', 44: 'hand cannoneer'}
-                        unit_class = classes[DATA.civs[1].units[castle_unit_indexes[2]].class_]
+                        classes = {0: 'archer', 6: 'infantry', 12: 'cavalry', 13: 'siege', 18: 'monk', 23: 'mounted hand cannoneer', 36: 'cavalry archer', 38: 'archer', 44: 'hand cannoneer', 55: 'siege weapon'}
+                        try:
+                            unit_class = classes[DATA.civs[1].units[castle_unit_indexes[2]].class_]
+                        except:
+                            unit_class = 'unknown'
+                            print(DATA.civs[1].units[castle_unit_indexes[2]].class_)
 
                         # Update description
                         new_unit_description = f'{new_castle_unit.title()} ({unit_class})'
@@ -1090,6 +1169,7 @@ def main():
                         # Save changes
                         DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
                         print(f"{selected_civ_name.title()} unique unit set to {new_castle_unit.title()}.")
+                        time.sleep(1)
 
                     # Architecture
                     elif selection == '4':
@@ -1142,7 +1222,6 @@ def main():
                                 elif architecture_changes[i] == -1:
                                     architecture_selection = '?'
                                     print(f'\033[31mERROR: {architecture_types[i]} architecture type not valid.\n\033[0m')
-                        print(architecture_changes)
 
                         for i in range(3):
                             # Skip if unspecified
@@ -1215,38 +1294,48 @@ def main():
 
                     # Language
                     elif selection == '5':
-                        all_languages = ', '.join([civ.name for civ in DATA.civs])
+                        # Assemble all of the language options
+                        all_languages = []
+                        for civ in DATA.civs[1:]:
+                            if civ.name == 'British':
+                                all_languages.append('Britons')
+                            elif civ.name == 'French':
+                                all_languages.append('Franks')
+                            else:
+                                all_languages.append(civ.name)
 
                         # Change language
                         while True:
-                            new_language = input(f"\nEnter new language for {selected_civ_name}: ").lower()
+                            new_language = input(f"\nEnter new language for {selected_civ_name}: ").title()
 
                             if new_language == '':
                                 break
                             elif new_language == '?':
-                                print(all_languages)
+                                print(', '.join(all_languages))
                             elif new_language.title() in all_languages:
+                                # Change sounds
+                                sound_ids = {303: 'Villager_Male_Select_4', 301: 'Villager_Male_Move_4', 295: 'Villager_Male_Build_1', 299: 'Villager_Male_Chop_1', 455: 'Villager_Male_Farm_1', 448: 'Villager_Male_Fish_1', 297: 'Villager_Male_Forage_1', 298: 'Villager_Male_Hunt_1', 300: 'Villager_Male_Mine_1', 302: 'Villager_Male_Repair_1', 435: 'Villager_Female_Select_4', 434: 'Villager_Female_Move_4', 437: 'Villager_Female_Build_1', 442: 'Villager_Female_Chop_1', 438: 'Villager_Female_Farm_1', 487: 'Villager_Female_Fish_1', 440: 'Villager_Female_Forage_1', 441: 'Villager_Female_Hunt_1', 443: 'Villager_Female_Mine_1', 444: 'Villager_Female_Repair_1', 420: 'Soldier_Select_3', 421: 'Soldier_Move_3', 422: 'Soldier_Attack_3', 423: 'Monk_Select_3', 424: 'Monk_Move_3', 479: 'King_Select_3', 480: 'King_Move_3'}
+
+                                # Change the sounds in the .dat file
+                                for civ in DATA.civs[1:]:
+                                    for sound_id in sound_ids:
+                                        # Get the amount of sound items to add
+                                        sound_count = int(sound_ids[sound_id][-1])
+
+                                        # Change the sound items in the sound
+                                        for i, item in enumerate(DATA.sounds[sound_id].items):
+                                            if item.civilization == selected_civ_index + 1:
+                                                new_name = item.filename.split('_')
+                                                new_name[0] = new_language
+                                                item.filename = '_'.join(new_name)
 
                                 # Save changes
-                                #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                print(f"Language for {selected_civ_name} changed to {new_language.title()}.")
-                                #time.sleep(1)
+                                DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                print(f"Language for {selected_civ_name} changed to {new_language}.")
                                 break
                             else:
                                 print("\033[31mERROR: Language not found.\033[0m")
                         pass
-
-                        # DEBUG
-
-                        # Copy language sound items of the civilization we want
-                        #genieutils.sound.SoundItem.
-                        #DATA.sounds[303].items[1].civilization = 1
-                        #DATA.sounds[303].items[2].civilization = 1
-                        #DATA.sounds[303].items[3].civilization = 1
-                        #DATA.sounds[303].items[4].civilization = 15
-                        #DATA.sounds[303].items[5].civilization = 15
-                        #DATA.sounds[303].items[6].civilization = 15
-                        #DATA.sounds[303].items[7].civilization = 15
 
                         DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
 
@@ -1316,6 +1405,12 @@ def main():
                                     unit = 'X'
                                     while unit != '':
                                         unit = input(f'\nEnter the unit, building, or technology name to {enable_disable}: ').lower()
+
+                                        # Save changes
+                                        if unit == '':
+                                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                            break
+
                                         if unit in tech_tree:
                                             # Update .json file
                                             for i in range(tech_tree_index, len(lines)):
@@ -1357,7 +1452,6 @@ def main():
                                                 unit_changed = True
 
                                             if unit_changed:
-                                                DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
                                                 print(f'{unit.title()} {enable_disable}d.')
                                             else:
                                                 print(f'{unit.title()} was already {enable_disable}d.')
