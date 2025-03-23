@@ -421,6 +421,8 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
         mod_name = input("Enter new mod name: ")
     else:
         mod_name = mod_name
+    if mod_name == '':
+        mod_name = 'Test'
 
     # Create new folder and change directory to it
     os.makedirs(mod_name, exist_ok=True)
