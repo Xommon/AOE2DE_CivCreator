@@ -96,6 +96,54 @@ def get_unit_id(internal_name):
     for i, unit in enumerate(DATA.civs[1].units):
         if unit.internal_name == internal_name:
             return i
+        
+def get_tech_id(name):
+    # Search with internal_name
+    for i, tech in enumerate(DATA.techs):
+        if tech.name == name:
+            return i
+        
+    # As a backup, search for name elsewhere
+    string_id = -1
+    with open(ORIGINAL_STRINGS, 'r') as file:
+        get_tech_id_lines = file.readlines()
+        for line in get_tech_id_lines:
+            if name in line:
+                string_id = re.sub(r'^\d+\s+', '', line)
+
+    for i, tech in enumerate(DATA.techs):
+        if tech.language_dll_name == string_id:
+            return i
+        
+def change_string(index, new_string):
+    string_line = ''
+
+    # Get the original line
+    with open(ORIGINAL_STRINGS, 'r') as original_file:
+        original_lines = original_file.readlines()
+        for i, line in enumerate(original_lines):
+            if line.startswith(f'{index} '):
+                string_line = line
+
+    # Find modded line if it exists
+    with open(MOD_STRINGS, 'r+') as mod_file:
+        string_found = False
+        mod_lines = mod_file.readlines()
+        for i, line in enumerate(mod_lines):
+            if line.startswith(f'{index} '):
+                line = f'{index} "{new_string}"\n'
+                string_found = True
+
+        # Create the new line if it doesn't exist
+        if not string_found:
+            if not mod_lines or not mod_lines[-1].endswith('\n'):
+                mod_lines[-1] += '\n'
+            mod_lines.append(f'{index} "{new_string}"\n')
+
+        # Write the updated lines back to the file
+        mod_file.seek(0)
+        mod_file.writelines(mod_lines)
+        mod_file.truncate()  # Ensure remaining old content is removed
 
 # Bonuses
 def bonus(bonus_string):
@@ -932,6 +980,20 @@ def main():
                         if 'unique unit' in line.lower():
                             current_unique_unit = description_lines[i + 1].split(',')[0]
 
+                    # Get current unique techs
+                    current_unique_techs = ''
+                    for word in description_lines[-5].strip('•').split(' '):
+                        if '(' in word:
+                            break
+                        current_unique_techs += word
+
+                    current_unique_techs += ' / '
+
+                    for word in description_lines[-4].strip('•').split(' '):
+                        if '(' in word:
+                            break
+                        current_unique_techs += word
+
                     # Get current architecture
                     def get_architecture_list(unit_id):
                         # Get the graphic of the unit
@@ -956,9 +1018,10 @@ def main():
                     print(f"\033[33m1: Title\033[0m -- {description_lines[0]}")
                     print(f"\033[33m2: Bonuses\033[0m")
                     print(f"\033[33m3: Unique Unit\033[0m -- {current_unique_unit}")
-                    print(f"\033[33m4: Architecture\033[0m -- {get_architecture_list(209)}")
-                    print(f"\033[33m5: Language\033[0m -- {current_language}")
-                    print(f"\033[33m6: Tech Tree\033[0m")
+                    print(f"\033[33m4: Unique Techs\033[0m -- {current_unique_techs}")
+                    print(f"\033[33m5: Architecture\033[0m -- {get_architecture_list(209)}")
+                    print(f"\033[33m6: Language\033[0m -- {current_language}")
+                    print(f"\033[33m7: Tech Tree\033[0m")
                     selection = input("Selection: ")
 
                     # Exit
@@ -1391,8 +1454,43 @@ def main():
                         print(f"{selected_civ_name.title()} unique unit set to {new_castle_unit.title()}.")
                         time.sleep(1)
 
-                    # Architecture
+                    # Unique Techs
                     elif selection == '4':
+                        # Get current techs information
+                        unique_techs_names = current_unique_techs.split(' / ')
+                        unique_techs_ids = [-1, -1]
+                        for i, tech in enumerate(DATA.techs):
+                            if tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 102 and tech.research_location == 82:
+                                unique_techs_ids[0] = i
+                            elif tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 103 and tech.research_location == 82:
+                                unique_techs_ids[1] = i
+
+                        # Prompt the user
+                        new_castle_tech_name = prompt(f"\nChange Castle Age tech name: ", default=unique_techs_names[0])
+                        if new_castle_tech_name == '':
+                            new_castle_tech_name = unique_techs_names[0]
+                        new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ", default=unique_techs_names[1])
+                        if new_imperial_tech_name == '':
+                            new_imperial_tech_name = unique_techs_names[1]
+                            
+                        # Change the names
+                        change_string(DATA.techs[unique_techs_ids[0]].language_dll_name, new_castle_tech_name)
+                        change_string(DATA.techs[unique_techs_ids[1]].language_dll_name, new_imperial_tech_name)
+                        DATA.techs[unique_techs_ids[0]].name = new_castle_tech_name
+                        DATA.techs[unique_techs_ids[1]].name = new_imperial_tech_name
+
+                        # Update the description
+                        description_lines[-5] = f'• {new_castle_tech_name}'
+                        description_lines[-4] = f'• {new_imperial_tech_name}'
+                        save_description(description_code, description_lines)
+
+                        # Save file
+                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                        print(f'Unique techs changed for {selected_civ_name}.')
+                        time.sleep(1)
+
+                    # Architecture
+                    elif selection == '5':
                         # Gather base architectures
                         base_architectures = []
                         for i in range(1, len(DATA.civs)):
@@ -1513,7 +1611,7 @@ def main():
                         time.sleep(1)
 
                     # Language
-                    elif selection == '5':
+                    elif selection == '6':
                         # Assemble all of the language options
                         all_languages = []
                         for civ in DATA.civs[1:]:
@@ -1560,7 +1658,7 @@ def main():
                         DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
 
                     # Tech Tree
-                    elif selection == '6':
+                    elif selection == '7':
                         # Import the tech tree
                         tech_tree = {}
                         with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
