@@ -1,45 +1,87 @@
 [Unit] cost [%] ++ [Resource] ++ starting in the [Age]
+KEYWORDS: cost, costs
+NEEDS: units, buildings, techs, number, resource, age
 
 [Unit] (Exception) [#/%][Stat] ++ in [Age] and [Age]
 [#][Unit][Stat]
+KEYWORDS: attack, movement speed, move ... faster, armor, pierce armor, range, hp, LOS
+NEEDS: units, buildings, number, stat, age
 
 [Unit] (Exception) [#/%][Att/Def] vs. [Unit]
+KEYWORDS: vs., against
+NEEDS: units, buildings, number, attack, armor, pierce armor, units2
 
 [Villager/Building] work [%] faster
+KEYWORDS: work
+NEEDS: units, buildings, number
 
-[Villager] carry [#/%]
+[Villager] carry [#/%] more
+KEYWORDS: villagers carry
+NEEDS: units, number
 
 [Unit] do blast damage
+KEYWORDS: do blast damage
+NEEDS: units
 
 [Exploding Unit] [%] blast radius
+KEYWORDS: blast radius
+NEEDS: units, number
 
 [Building] technologies are [%] more effective
+KEYWORDS: technologies, more effective
+NEEDS: buildings, number
 
 First [Fortified Church/Monastery] receives a free Relic
+KEYWORDS: receives a free Relic
+NEEDS: buildings
 
-[Unit] (Exception) available one age earlier
+[Unit] (Exception) available [#] age earlier
+KEYWORDS: available, age earlier
+NEEDS: units, number
 
-[Unit] fire an additional projectile
+[Unit] fire an additional projectile ++ starting in the [Age]
+KEYWORDS: fire an additional projectile, starting in the
+NEEDS: units, age
 
 [#] [Unit] [Stat] for each [Building] technology
+KEYWORDS: for each, technology
+NEEDS: units, number, stat, building
 
 Start with [#] [Resource]
+KEYWORDS: start with
+NEEDS: number, resource
 
 Relics generate [%] gold
+KEYWORDS: relics generate
+NEEDS: number
 
 [Unit] receive [%] less bonus damage
+KEYWORDS: less bonus damage
+NEEDS: units, buildings, number
 
 [Unit] are more resistant to conversion
+KEYWORDS: are more resistant to conversion
+NEEDS: units
 
 Town Centers spawn [#] villagers when the next Age is reached
+KEYWORDS: villagers when the next age is reached
+NEEDS: number
 
 Town Centers spawn [#] villagers when reaching the [Age]
+KEYWORDS: villagers when reaching the
+NEEDS: number, age
 
 [Unit] regenerate [#]HP per minute
+KEYWORDS: regenerate, HP per minute
+NEEDS: units, number
 
 [Unit] take [%] less population space
+KEYWORDS: less population
+NEEDS: units, number
 
 Trade units yield [%] [Resource] in addition to gold
+KEYWORDS: trade units yield
+NEEDS: number, resource
 
 0 HP
 1 LOS

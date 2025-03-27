@@ -151,7 +151,7 @@ def bonus(bonus_string):
     bonus_effect_commands = []
     bonus_string = bonus_string.lower()
 
-    # Bonus unit lines
+    # Bonus unit lines bank
     bonus_unit_lines = {
         # Categories
         #'all units' : [-1, 0, 6, 12, 13, 18, 43, 19, 22, 2, 36, 51, 44, 54, 55, 35],
@@ -249,8 +249,9 @@ def bonus(bonus_string):
         'repairers' : [156, 222],
         'farmers' : [214, 259],
         'trebuchets' : [331, 42],
-
-        # Buildings
+        }
+    bonus_buildng_lines = {
+    # Buildings
         'buildings' : [30, 31, 32, 104, 71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617, 82, 103, 105, 18, 19, 209, 210, 84, 116, 137, 10, 14, 87, 49, 150, 12, 20, 132, 498, 86, 101, 153, 45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189, 598, 79, 234, 235, 236, 72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192, 1251, 1665, 70, 191, 192, 463, 464, 465, 584, 585, 586, 587, 1808, 562, 563, 564, 565, 1646, 1711, 1720, 1734, 68, 129, 130, 131, 50],
         'town centers' : [71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617],
         'town centres' : [71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617],
@@ -282,157 +283,190 @@ def bonus(bonus_string):
         'folwarks' : [1711, 1720, 1734],
         'mills' : [68, 129, 130, 131],
         'farms' : [50],
-        }
+    }
+
+    # Clean the text of useless words
+    def clean_bonus_string(useless_words):
+        bonus_string = re.sub(r'\b(?:' + '|'.join(useless_words) + r')\b', '', bonus_string).strip()
+    
+    # Set up unit lists
+    primary_units = []
+    secondary_units = []
+    excluded_units = []
+
+    # Extract all units
+    def get_bonus_units():
+        # Get the indexes of the parentheses
+        parentheses_positions = [bonus_string.find('('), bonus_string.find(')')]
+
+        # Search for unit lines
+        for i, unit_line in enumerate(bonus_unit_lines):
+            if unit_line in bonus_string:
+                unit_line_index = bonus_string.find(unit_line)
+                # Add primary unit
+                if unit_line_index < parentheses_positions[0] or parentheses_positions == [-1, -1]:
+                    primary_units.extend(unit_line)
+
+                # Add secondary unit
+                elif unit_line_index > parentheses_positions[1]:
+                    secondary_units.extend(unit_line)
+
+                # Add exception unit
+                else:
+                    excluded_units.append(get_unit_id(unit_line))
+
+    # Extract all buildings
+    bonus_buildings = []
+    def get_bonus_buildings():
+        # Set up buildings
+        for i, building in enumerate(bonus_buildng_lines):
+            if building in bonus_string:
+                bonus_buildings.expand(building)
+
+    # Extract all technologies
+    bonus_techs = []
+    def get_bonus_techs():
+        for i, tech in enumerate(DATA.techs):
+            if tech.name.lower() in bonus_string and tech.name != '':
+                bonus_techs.append(i)
+
+    # Extract the number
+    bonus_number = [0, '+']
+    def get_bonus_number():
+        for i, word in enumerate(bonus_string.split(' ')):
+            try:
+                bonus_number[0] = int(word.strip('%'))
+
+                # Change the percent into a usable number and set type of number
+                if '%' in word:
+                    bonus_number[0] = bonus_number[0] / 100
+                    bonus_number[1] = '*'
+                else:
+                    bonus_number[1] = '+'
+
+                # Look for 'more'/'less'
+                if bonus_string.split(' ')[i + 1] == 'more' and bonus_number[1] == '*':
+                    bonus_number[0] = abs(bonus_number[0]) + 1
+                elif bonus_string.split(' ')[i + 1] == 'less' and bonus_number[1] == '+':
+                    bonus_number[0] = abs(bonus_number[0]) * -1
+            except:
+                continue
+
+    # Extract the resources
+    bonus_resource = []
+    def get_bonus_resource():
+        for word in bonus_string.split(' '):
+            if word == 'food':
+                bonus_resource.append(0)
+            elif word == 'wood':
+                bonus_resource.append(1)
+            elif word == 'stone':
+                bonus_resource.append(2)
+            elif word == 'gold':
+                bonus_resource.append(3)
+        
+        # Add all resources if none were found
+        if len(bonus_resource) == 0:
+            bonus_resource.append(0)
+            bonus_resource.append(1)
+            bonus_resource.append(2)
+            bonus_resource.append(3)
+
+    # Extract the age
+    bonus_age = 0
+    def get_bonus_age():
+        for word in bonus_string.split(' '):
+            if word == 'feudal':
+                bonus_age = 101
+            elif word == 'castle':
+                bonus_age = 102
+            elif word == 'imperial':
+                bonus_age = 103
+
+    # Extract the stats
+    bonus_stats = []
+    def get_bonus_stats():
+        if 'hp' in bonus_string:
+            bonus_stats.append(0)
+        elif 'los' in bonus_string or 'line of sight' in bonus_string:
+            bonus_stats.append(1)
+            bonus_stats.append(23)
+        elif 'movement' in bonus_string or 'move' in bonus_string:
+            bonus_stats.append(5)
+        elif 'armor' in bonus_string or 'armour' in bonus_string:
+            armour_number = 8
+
+            # Get the specific kind of armour change
+            if 'pierce' in bonus_string:
+                armour_number += 0.03
+            elif 'against elephants' in bonus_string:
+                armour_number += 0.05
+            elif 'against infantry' in bonus_string:
+                armour_number += 0.01
+            elif 'against cavalry' in bonus_string:
+                armour_number += 0.08
+            elif 'against buildings' in bonus_string:
+                armour_number += 0.21
+            elif 'against archers' in bonus_string:
+                armour_number += 0.15
+            elif 'against ships' in bonus_string or 'against warships' in bonus_string:
+                armour_number += 0.16
+            elif 'against siege' in bonus_string:
+                armour_number += 0.20
+            elif 'against walls' in bonus_string:
+                armour_number += 0.22
+            elif 'against gunpowder' in bonus_string:
+                armour_number += 0.23
+            elif 'against monks' in bonus_string:
+                armour_number += 0.25
+            elif 'against spearmen' in bonus_string:
+                armour_number += 0.27
+            elif 'against cavalry archers' in bonus_string:
+                armour_number += 0.28
+            elif 'against eagles' in bonus_string or 'against eagle warriors' in bonus_string:
+                armour_number += 0.29
+            elif 'against camel' in bonus_string:
+                armour_number += 0.30
+
+                # Add Mamelukes to the category of camels
+                bonus_stats.append(8.35)
+            elif 'against fishing ships' in bonus_string:
+                armour_number += 0.34
+
+            # Add the complex armour to the list
+            bonus_stats.append(8 + armour_number)
+        elif 'attack' in bonus_string:
+            bonus_stats.append(9)
+        elif 'range' in bonus_string:
+            bonus_stats.append(12)
+            bonus_stats.append(23)
+        elif 'minimum range' in bonus_string or 'min range' in bonus_string:
+            bonus_stats.append(20)
+        elif 'train' in bonus_string:
+            bonus_stats.append(101)
+
+    ## BONUS PROMPTS ##
 
     # [Technology] free
     if 'free' in bonus_string:
-        # Strip useless words using regex
-        useless_words = ["free", "is", "are", "upgrade", "upgrades"]
-        cleaned_bonus = re.sub(r'\b(?:' + '|'.join(useless_words) + r')\b', '', bonus_string).strip()
+        # Get items
+        get_bonus_techs()
 
-        # Extract the interactable parts
-        bonus_parts = re.split(r',\s*|\s+and\s+', cleaned_bonus)
-
-        # Remove any empty strings from the list
-        bonus_parts = [part.strip() for part in bonus_parts if part.strip()]
-
-        # Extract the techs from the description
-        tech_ids = []
-        for i, tech_id in enumerate(DATA.techs):
-            for part in bonus_parts:
-                if part == DATA.techs[i].name.lower():
-                    tech_ids.append(i)
-
-        # Exit if nothing was found
-        if len(tech_ids) == 0:
-            print("\033[31mERROR: No techs with the names given found.\033[0m")
-            return bonus_effect_commands
+        # Break if no items were found
+        if len(bonus_techs) == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            return []
 
         # Create effect commands
-        for id in tech_ids:
+        for tech_id in bonus_techs:
             # Remove cost
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, id, 0, 0, 0))
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, id, 1, 0, 0))
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, id, 2, 0, 0))
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, id, 3, 0, 0))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 0, 0, 0))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 1, 0, 0))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 2, 0, 0))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 3, 0, 0))
 
             # Remove time
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(103, id, 0, 0, 0))
-
-    # [Unit/Building/Tech] costs [%] ++ [Resource] ++ starting in the [Age]
-    elif 'cost' or 'costs' in bonus_string:
-        ### Foot archers cost 25% less food starting in the Feudal Age
-        ### foot archers 25% less food feudal
-
-        # Strip useless words using regex
-        useless_words = ["cost", "costs", "is", 'are', 'starting in the', 'age']
-
-        # Extract unit types from bonus_string
-        lower_bonus = bonus_string.lower()
-
-        found_units = []
-        for unit in sorted(bonus_unit_lines, key=len, reverse=True):  # Sort to prioritize multi-word units
-            if unit in lower_bonus:
-                found_units.append(unit)
-                lower_bonus = lower_bonus.replace(unit, '', 1)  # Remove matched unit from string
-
-        # Remove useless words using regex
-        cleaned_bonus = re.sub(r'\b(?:' + '|'.join(useless_words) + r')\b', '', lower_bonus).strip()
-
-        # Extract interactable parts (splitting by commas and "and")
-        bonus_parts = re.split(r',\s*|\s+and\s+', cleaned_bonus)
-        bonus_parts = [part.strip() for part in bonus_parts if part.strip()]  # Remove empty strings
-
-        # Combine found unit types with remaining parts
-        bonus_parts = found_units + bonus_parts
-
-        # Extract the units/buildings from the description
-        unit_ids = []
-        for part in bonus_parts:
-            if part.lower() in bonus_unit_lines:
-                print(part.lower())
-                unit_ids.append(bonus_unit_lines[part.lower()])
-
-        # Get rid of duplicates
-        unit_ids = list(set(unit_ids))
-
-        # Extract the techs from the description
-        tech_ids = []
-        for i, tech_id in enumerate(DATA.techs):
-            for part in bonus_parts:
-                if part == DATA.techs[i].name.lower():
-                    tech_ids.append(i)
-
-        # Exit if nothing was found
-        if len(unit_ids) + len(tech_ids) == 0:
-            print("\033[31mERROR: No units, buildings, or techs with the names given found.\033[0m")
-            return bonus_effect_commands
-
-        # DEBUG
-        print('units:', unit_ids)
-        print('techs:', tech_ids)
-        time.sleep(1)
-
-        # Get positive or negative value
-        negative = True
-        for part in bonus_parts:
-            if 'more' in part:
-                negative = False
-
-        # Get the number value
-        bonus_number = 0
-        for part in bonus_parts:
-            if any(char.isdigit() for char in part):
-                percentage = False
-                if '%' in part:
-                    percentage = True
-                    bonus_number = int(part[:-1])
-                else:
-                    bonus_number = int(part)
-
-                # Look for negative numbers
-                negative = bonus_number < 0
-
-                # Convert percent into integer
-                if percentage and not negative:
-                    bonus_number = bonus_number / 100 + 1
-                elif percentage and negative:
-                    bonus_number = 1 - bonus_number / 100
-                
-                # DEBUG
-                print('bonus number:', bonus_number)
-
-        # Get resource
-        bonus_resource = -1
-        for part in bonus_parts:
-            if part.lower() == 'food':
-                bonus_resource = 0
-            elif part.lower() == 'wood':
-                bonus_resource = 1
-            elif part.lower() == 'gold':
-                bonus_resource = 3
-            elif part.lower() == 'stone':
-                bonus_resource = 2
-
-        # Get age
-        bonus_age_id = -1
-        for part in bonus_parts:
-            if part.lower() == 'feudal':
-                bonus_age_id = 101
-            elif part.lower() == 'castle':
-                bonus_age_id = 102
-            elif part.lower() == 'imperial':
-                bonus_age_id = 103
-
-        # Create effect commands for units
-        for id in unit_ids:
-            pass
-
-        # Create effect commands for techs
-        for tech_id in tech_ids:
-            if bonus_resource == - 1:
-                bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 0, 0, 0))
-                bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 0, 0, 0))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(103, tech_id, 0, 0, 0))
 
     # Return the effect commands
     return bonus_effect_commands
