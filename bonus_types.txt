@@ -11,11 +11,11 @@ NEEDS: units, buildings, number, stat, age
 KEYWORDS: vs., against
 NEEDS: units, buildings, number, attack, armor, pierce armor, units2
 
-[Villager/Building] work [%] faster
+// [Villager/Building] work [%] faster
 KEYWORDS: work
 NEEDS: units, buildings, number
 
-[Villager] carry [#/%] more
+// [Villager] carry [#/%] more
 KEYWORDS: villagers carry
 NEEDS: units, number
 
@@ -47,7 +47,7 @@ NEEDS: units, age
 KEYWORDS: for each, technology
 NEEDS: units, number, stat, building
 
-Start with [#] [Resource]
+// Start with [#] [Resource]
 KEYWORDS: start with
 NEEDS: number, resource
 

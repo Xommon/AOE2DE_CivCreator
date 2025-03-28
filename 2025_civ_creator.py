@@ -337,7 +337,7 @@ def create_bonus(bonus_string, civ_id):
                     current_unit_names.append('villager (male)')
 
                 for name in current_unit_names:
-                    if name in bonus_string:
+                    if name in bonus_string and name != '':
                         # Add primary unit
                         if unit_index < parentheses_positions[0] or parentheses_positions == [-1, -1]:
                             primary_units.append(i)
@@ -377,7 +377,7 @@ def create_bonus(bonus_string, civ_id):
         # Set up buildings
         for i, building in enumerate(bonus_buildng_lines):
             if building in bonus_string:
-                bonus_buildings.expand(building)
+                bonus_buildings.extend(bonus_buildng_lines[building])
 
     # Extract all technologies
     bonus_techs = []
@@ -533,8 +533,8 @@ def create_bonus(bonus_string, civ_id):
         # Break if no items were found
         if len(bonus_techs) == 0:
             print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\032[31mTry using the format: [Technology] free\032[0m")
-            return []
+            print("\033[31mTry using the format: [Technology] free\033[0m")
+            return [], []
 
         # Create effect commands
         for tech_id in bonus_techs:
@@ -559,8 +559,8 @@ def create_bonus(bonus_string, civ_id):
         # Break if no items were found
         if len(bonus_unit_lines) == 0 or bonus_number[0] == 0:
             print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\032[31mTry using the format: [Unit/Building] cost [%] ++ [Resource] ++ starting in the [Age]\032[0m")
-            return []
+            print("\033[31mTry using the format: [Unit/Building] cost [%] ++ [Resource] ++ starting in the [Age]\033[0m")
+            return [], []
 
         # Get effect ID
         if bonus_number[1] == '+':
@@ -582,10 +582,10 @@ def create_bonus(bonus_string, civ_id):
         get_bonus_number()
 
         # Break if no items were found
-        if len(bonus_unit_lines) == 0 or bonus_number[0] == 0:
+        if bonus_number[0] == 0:
             print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\032[31mTry using the format: [Villager/Building] work [%] faster\032[0m")
-            return []
+            print("\033[31mTry using the format: [Villager/Building] work [%] faster\033[0m")
+            return [], []
 
         # Get effect ID
         if bonus_number[1] == '+':
@@ -597,6 +597,74 @@ def create_bonus(bonus_string, civ_id):
         for unit_id in primary_units:
             # Change work rate
             bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id, -1, 13, bonus_number[0]))
+        for building_id in bonus_buildings:
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, building_id, -1, 13, bonus_number[0]))
+
+    # [Villager] carry [#/%] more
+    if 'carry' in bonus_string or 'carries' in bonus_string:
+        # Get items
+        get_bonus_units()
+        get_bonus_number()
+
+        # Break if no items were found
+        if bonus_number[0] == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\033[31mTry using the format: [Villager] carry [#/%] more\033[0m")
+            return [], []
+
+        # Get effect ID
+        if bonus_number[1] == '+':
+            effect_id = 4
+        elif bonus_number[1] == '*':
+            effect_id = 5
+
+        # Create effect commands
+        for unit_id in primary_units:
+            # Change work rate
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id, -1, 14, bonus_number[0]))
+
+    # Start with [#] [Resource] # INACTIVE
+    if 'start with' in bonus_string or 'starts with' in bonus_string:
+        # Get items
+        get_bonus_tech_resource()
+        get_bonus_number()
+
+        # Break if no items were found
+        if bonus_number[0] == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\033[31mTry using the format: Start with [#] [Resource]\033[0m")
+            return [], []
+
+        # Get effect ID
+        if bonus_number[1] == '+':
+            effect_id = 1
+        elif bonus_number[1] == '*':
+            effect_id = 6
+
+        # Create effect commands
+        for resource_id in bonus_tech_resource:
+            # Change work rate
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, resource_id, 1, -1, bonus_number[0]))
+
+    # Relics generate [%] gold
+    if 'relics generate' in bonus_string or 'relic generates' in bonus_string:
+        # Get items
+        get_bonus_number()
+
+        # Break if no items were found
+        if bonus_number[0] == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\033[31mTry using the format: Relics generate [%] gold\033[0m")
+            return [], []
+
+        # Get effect ID
+        if bonus_number[1] == '+':
+            effect_id = 1
+        elif bonus_number[1] == '*':
+            effect_id = 6
+
+        # Create effect commands
+        bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, 191, 0, -1, bonus_number[0]))
 
     # Add the effect commands
     bonus_effect.effect_commands = bonus_effect_commands
@@ -1345,7 +1413,7 @@ def main():
                                     bonus_tech, bonus_effect = create_bonus(bonus_to_add_ORIGINAL, selected_civ_index)
 
                                     # Exit if nothing was found
-                                    if len(bonus_effect.effect_commands) == 0:
+                                    if bonus_effect == []:
                                         break
 
                                     # Use the old tech if it exists
@@ -1417,7 +1485,7 @@ def main():
                                         remove_bonus_selection = input("\nSelect a bonus index to remove: ")
 
                                         if remove_bonus_selection == '?':
-                                            for i, bonus in options:
+                                            for i in range(len(options)):
                                                 print(f"\033[33m{i}: {line[2:]} \033[0m")
                                         elif int(remove_bonus_selection) <= len(options):
                                             break
