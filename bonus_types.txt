@@ -1,4 +1,4 @@
-[Unit] cost [%] ++ [Resource] ++ starting in the [Age]
+// [Unit] cost [%] ++ [Resource] ++ starting in the [Age]
 KEYWORDS: cost, costs
 NEEDS: units, buildings, techs, number, resource, age
 

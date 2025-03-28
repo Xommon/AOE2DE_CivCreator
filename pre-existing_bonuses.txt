@@ -1,0 +1,44 @@
+BRITONS:
+381/379: Town Centers cost -50% wood starting in the Castle Age
+382/380, 403/415: Foot archers (except skirmishers) +1 range in Castle and Imperial Age (+2 total)
+383/381: Shepherds work 25% faster
+
+FRANKS:
+325/324, 330/329: Castles cost -15% in Castle, -25% in Imperial Age
+290/285: Cavalry +20% hit points starting in Feudal Age
+TREE: Mill technologies free
+524/523 Foragers work 15% faster
+
+GOTHS:
+344/342, 731/765, 732/766, 733/767: Infantry cost -20% in Dark, -25% in Feudal, -30% in Castle, -35% in Imperial Age
+327/326, 328/327, 329/328: Infantry +1 attack vs. buildings per age (starting from Feudal Age)
+402/414: Villagers +5 attack vs. wild boar; hunters carry +15 meat; hunt lasts 20% longer
+343/341: Loom can be researched instantly
+406/418: +10 population in Imperial Age
+
+TEUTONS:
+347/345: Monks healing range 2x
+353/352, Towers garrison 2x units
+TREE: Murder Holes, Herbal Medicine free
+314/314: Farms cost -40%
+336/335: Town Center garrison +10
+334/333, 335/334: Barracks and Stable units +1 armor in Castle and Imperial Age (+2 total)
+
+JAPANESE:
+306/306, 422/434, 423/435, 424/436: Fishing Ships 2x hit points; +2P armor; work rate +5% Dark, +10% Feudal, +15% Castle, +20% Imperial Age
+340/338: Mill, Lumber/Mining Camps cost -50%
+341/339: Infantry attack 33% faster starting in Feudal Age
+190/185: Cavalry Archers +2 attack vs. Archers
+
+CHINESE:
+226/215, 302/302: Start with +3 villagers, -50 wood, -200 food
+350/349, 351/350, 352/351: Technologies cost -5% Feudal, -10% Castle, -15% Imperial Age
+425/437: Town Centers support 15 population and +7 LOS
+396/395: Demolition ships +50% hit points
+
+BYZANTINES:
+283/282, 417/429, 418/430, 419/431: Buildings +10% HP Dark, +20% Feudal, +30% Castle, +40% Imperial Age
+284/283: Camel Riders, Skirmishers, Pikemen, Halberdiers cost -25%
+397/396: Fire Ships and Dromons attack 20% faster
+TREE: Advance to Imperial Age costs -33%
+TREE: Town Watch, Town Patrol free

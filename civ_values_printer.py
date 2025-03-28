@@ -12,13 +12,12 @@ import time
 import pyperclip
 
 # Open file
-path = input('Give path to .dat file: ')
+#path = input('Give path to .dat file: ')
+path = r'/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test/resources/_common/dat/empires2_x2_p1.dat'
 DATA = DatFile.parse(path)
 print('File opened')
 time.sleep(1)
 
 # Print the data
-for i in range(22):
-    pyperclip.copy(DATA.civs[1].units[2382 + i])
-    print(f'Unit {i} copied.')
-    input('Press Enter to continue.')
+print(DATA.techs[1100])
+print(DATA.effects[0])

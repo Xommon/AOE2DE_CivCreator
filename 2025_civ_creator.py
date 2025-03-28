@@ -2,7 +2,7 @@
 # 02. March 2025
 # 2025 Civilisation Creator
 # DEBUG: wine /home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/Tools_Builds/AdvancedGenieEditor3.exe
-# DEBUG: \home\xommon\snap\steam\common\.local\share\Steam\steamapps\compatdata\813780\pfx\drive_c\users\steamuser\Games\Age of Empires 2 DE\76561198021486964\mods\local\Test\resources\_common\dat\empires2_x2_p1.dat
+# DEBUG: /home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test/resources/_common/dat/empires2_x2_p1.dat
 
 import os
 import shutil
@@ -12,6 +12,7 @@ import io
 import ast
 import genieutils
 from genieutils.datfile import DatFile
+from genieutils.tech import ResearchResourceCost
 import genieutils.graphic
 import genieutils.sound
 import genieutils.tech
@@ -87,10 +88,17 @@ def get_unit_name(unit_id):
         lines = file.readlines()
 
         # Look for the unit's name
-        for line in lines:
-            if str(DATA.units[unit_id].language_dll_name) in line:
-                new_name = re.sub(r'^\d+\s+', '', line)
-                return new_name
+        try:
+            for line in lines:
+                if str(DATA.civs[1].units[unit_id].language_dll_name) in line:
+                    new_name = re.sub(r'^\d+\s+', '', line)
+                    
+                    # Return nothing if the language dll name is 0
+                    if DATA.civs[1].units[unit_id].language_dll_name == 0:
+                        new_name = ''
+                    return new_name.strip('"')
+        except:
+            return 'NOT_FOUND^'
             
 def get_unit_id(internal_name):
     for i, unit in enumerate(DATA.civs[1].units):
@@ -146,7 +154,11 @@ def change_string(index, new_string):
         mod_file.truncate()  # Ensure remaining old content is removed
 
 # Bonuses
-def bonus(bonus_string):
+def create_bonus(bonus_string, civ_id):
+    # Create the tech and effect, set the civilisation and names
+    bonus_tech = genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', repeatable=1)
+    bonus_effect = genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', effect_commands=[])
+
     # Set up the list
     bonus_effect_commands = []
     bonus_string = bonus_string.lower()
@@ -239,7 +251,7 @@ def bonus(bonus_string):
         'canoe line' : [],
         'camels' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
         'camel units' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
-        'villagers' : [83, 293, 590, 592, 123, 218, 122, 216, 56, 57, 120, 354, 118, 212, 156, 222, 214, 259],
+        'villagers' : [83, 293, 590, 592, 123, 218, 122, 216, 56, 57, 120, 124, 354, 118, 212, 156, 220, 222, 214, 259, 579, 581],
         'shepherds' : [590, 592],
         'lumberjacks' : [123, 218],
         'hunters' : [122, 216],
@@ -285,35 +297,79 @@ def bonus(bonus_string):
         'farms' : [50],
     }
 
-    # Clean the text of useless words
-    def clean_bonus_string(useless_words):
-        bonus_string = re.sub(r'\b(?:' + '|'.join(useless_words) + r')\b', '', bonus_string).strip()
-    
-    # Set up unit lists
+    # Extract units
     primary_units = []
     secondary_units = []
-    excluded_units = []
-
-    # Extract all units
     def get_bonus_units():
+        nonlocal primary_units, secondary_units
+        excluded_units = []
+
         # Get the indexes of the parentheses
         parentheses_positions = [bonus_string.find('('), bonus_string.find(')')]
 
-        # Search for unit lines
-        for i, unit_line in enumerate(bonus_unit_lines):
+        # Check unit lines first
+        for unit_line in bonus_unit_lines:
+            # Get the index of the word
+            unit_line_index = bonus_string.find(unit_line)
+
             if unit_line in bonus_string:
-                unit_line_index = bonus_string.find(unit_line)
                 # Add primary unit
                 if unit_line_index < parentheses_positions[0] or parentheses_positions == [-1, -1]:
-                    primary_units.extend(unit_line)
+                    primary_units.extend(bonus_unit_lines[unit_line])
 
                 # Add secondary unit
                 elif unit_line_index > parentheses_positions[1]:
-                    secondary_units.extend(unit_line)
+                    secondary_units.extend(bonus_unit_lines[unit_line])
 
-                # Add exception unit
-                else:
-                    excluded_units.append(get_unit_id(unit_line))
+        # Check for individual units
+        for i, unit in enumerate(DATA.civs[1].units):
+            try:
+                # Get the index of the word
+                unit_index = bonus_string.find(unit.name.lower())
+
+                # Singularise the unit name
+                current_unit_names = [get_unit_name(i).lower()]
+                if current_unit_names[0].endswith('ies'):
+                    current_unit_names.append(f'{current_unit_names[0][-3]}y')
+                elif current_unit_names[0].endswith('s'):
+                    current_unit_names.append(f'{current_unit_names[0][-1]}')
+                elif current_unit_names[0] == 'villager' or current_unit_names[0] == 'villagers':
+                    current_unit_names.append('villager (male)')
+
+                for name in current_unit_names:
+                    if name in bonus_string:
+                        # Add primary unit
+                        if unit_index < parentheses_positions[0] or parentheses_positions == [-1, -1]:
+                            primary_units.append(i)
+
+                        # Add secondary unit
+                        elif unit_index > parentheses_positions[1]:
+                            secondary_units.append(i)
+            except:
+                pass
+
+        # Add exception units
+        for i, unit in enumerate(DATA.civs[1].units):
+            try:
+                if get_unit_name(i).lower() == 'militia':
+                    print('militia')
+
+                if get_unit_name(i).lower() in bonus_string and get_unit_name(i) != '':
+                    unit_line_index = bonus_string.find(get_unit_name(i).lower())
+                    print(parentheses_positions[0], '<', unit_line_index, '>', parentheses_positions[1])
+
+                    if unit_line_index > parentheses_positions[0] and unit_line_index < parentheses_positions[1]:
+                        excluded_units.append(i)
+            except:
+                pass
+
+        #print('excluded units:', excluded_units)
+
+        # Remove duplicates
+        primary_units = list(set(primary_units))
+
+        # Remove excluded units
+        primary_units[:] = [x for x in primary_units if x not in excluded_units]
 
     # Extract all buildings
     bonus_buildings = []
@@ -331,7 +387,7 @@ def bonus(bonus_string):
                 bonus_techs.append(i)
 
     # Extract the number
-    bonus_number = [0, '+']
+    bonus_number = [0, '+'] # Set default number to 0 and addition
     def get_bonus_number():
         for i, word in enumerate(bonus_string.split(' ')):
             try:
@@ -345,43 +401,65 @@ def bonus(bonus_string):
                     bonus_number[1] = '+'
 
                 # Look for 'more'/'less'
-                if bonus_string.split(' ')[i + 1] == 'more' and bonus_number[1] == '*':
+                if (bonus_string.split(' ')[i + 1] == 'more' or bonus_string.split(' ')[i + 1] == 'faster') and bonus_number[1] == '*':
                     bonus_number[0] = abs(bonus_number[0]) + 1
                 elif bonus_string.split(' ')[i + 1] == 'less' and bonus_number[1] == '+':
                     bonus_number[0] = abs(bonus_number[0]) * -1
+                elif (bonus_string.split(' ')[i + 1] == 'less' or bonus_string.split(' ')[i + 1] == 'slower') and bonus_number[1] == '*':
+                    bonus_number[0] = 1 - bonus_number[0]
+
+                break
             except:
                 continue
 
-    # Extract the resources
-    bonus_resource = []
-    def get_bonus_resource():
+    # Extract the tech resources
+    bonus_tech_resource = []
+    def get_bonus_tech_resource():
         for word in bonus_string.split(' '):
             if word == 'food':
-                bonus_resource.append(0)
+                bonus_tech_resource.append(0)
             elif word == 'wood':
-                bonus_resource.append(1)
+                bonus_tech_resource.append(1)
             elif word == 'stone':
-                bonus_resource.append(2)
+                bonus_tech_resource.append(2)
             elif word == 'gold':
-                bonus_resource.append(3)
+                bonus_tech_resource.append(3)
         
         # Add all resources if none were found
-        if len(bonus_resource) == 0:
-            bonus_resource.append(0)
-            bonus_resource.append(1)
-            bonus_resource.append(2)
-            bonus_resource.append(3)
+        if len(bonus_tech_resource) == 0:
+            bonus_tech_resource.append(0)
+            bonus_tech_resource.append(1)
+            bonus_tech_resource.append(2)
+            bonus_tech_resource.append(3)
+
+    # Extract the unit resource
+    bonus_unit_resource = []
+    def get_bonus_unit_resource():
+        for word in bonus_string.split(' '):
+            if word == 'food':
+                bonus_tech_resource.append(103)
+            elif word == 'wood':
+                bonus_tech_resource.append(104)
+            elif word == 'gold':
+                bonus_tech_resource.append(105)
+            elif word == 'stone':
+                bonus_tech_resource.append(106)
+        
+        # Add all resources if none were found
+        if len(bonus_unit_resource) == 0:
+            bonus_unit_resource.append(100)
 
     # Extract the age
-    bonus_age = 0
     def get_bonus_age():
-        for word in bonus_string.split(' '):
-            if word == 'feudal':
-                bonus_age = 101
-            elif word == 'castle':
-                bonus_age = 102
-            elif word == 'imperial':
-                bonus_age = 103
+        if 'feudal' in bonus_string:
+            bonus_tech.required_techs[0] = 101
+            bonus_tech.required_tech_count = 1
+        elif 'castle' in bonus_string:
+            bonus_tech.required_techs[0] = 102
+            bonus_tech.required_tech_count = 1
+        elif 'imperial' in bonus_string:
+            bonus_tech.required_techs[0] = 103
+            bonus_tech.required_tech_count = 1
 
     # Extract the stats
     bonus_stats = []
@@ -455,6 +533,7 @@ def bonus(bonus_string):
         # Break if no items were found
         if len(bonus_techs) == 0:
             print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\032[31mTry using the format: [Technology] free\032[0m")
             return []
 
         # Create effect commands
@@ -468,8 +547,62 @@ def bonus(bonus_string):
             # Remove time
             bonus_effect_commands.append(genieutils.effect.EffectCommand(103, tech_id, 0, 0, 0))
 
+    # [Unit/Building] cost [%] ++ [Resource] ++ starting in the [Age]
+    elif 'cost' in bonus_string:
+        # Get items
+        get_bonus_units()
+        get_bonus_buildings()
+        get_bonus_number()
+        get_bonus_unit_resource()
+        get_bonus_age()
+
+        # Break if no items were found
+        if len(bonus_unit_lines) == 0 or bonus_number[0] == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\032[31mTry using the format: [Unit/Building] cost [%] ++ [Resource] ++ starting in the [Age]\032[0m")
+            return []
+
+        # Get effect ID
+        if bonus_number[1] == '+':
+            effect_id = 4
+        elif bonus_number[1] == '*':
+            effect_id = 5
+
+        # Create effect commands
+        for unit_id in primary_units:
+            # Change cost
+            for resource in bonus_unit_resource:
+                bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id, -1, resource, bonus_number[0]))
+
+    # [Villager/Building] work [%] faster
+    if 'work' in bonus_string or 'works' in bonus_string:
+        # Get items
+        get_bonus_units()
+        get_bonus_buildings()
+        get_bonus_number()
+
+        # Break if no items were found
+        if len(bonus_unit_lines) == 0 or bonus_number[0] == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\032[31mTry using the format: [Villager/Building] work [%] faster\032[0m")
+            return []
+
+        # Get effect ID
+        if bonus_number[1] == '+':
+            effect_id = 4
+        elif bonus_number[1] == '*':
+            effect_id = 5
+
+        # Create effect commands
+        for unit_id in primary_units:
+            # Change work rate
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id, -1, 13, bonus_number[0]))
+
+    # Add the effect commands
+    bonus_effect.effect_commands = bonus_effect_commands
+
     # Return the effect commands
-    return bonus_effect_commands
+    return bonus_tech, bonus_effect
 
 def open_mod(mod_folder):
     print('\nLoading mod...')
@@ -887,6 +1020,22 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
             pickle.dump(civ.units, file)
             file.write(b'\n')
 
+    # Correct name mistakes for the Britons and the Franks
+    DATA.civs[1].name = 'Britons'
+    DATA.civs[2].name = 'Franks'
+
+    # Rename existing civ bonuses
+    preexisting_bonuses = [381, 382, 403, 383]
+    new_existing_bonus_names = [
+        r'BRITONS: Town Centers cost -50% wood starting in the Castle Age',
+        r'BRITONS: Foot archers (except skirmishers) +1 range in Castle Age',
+        r'BRITONS: Foot archers (except skirmishers) +1 range in Imperial Age',
+        r'BRITONS: Shepherds work 25% faster'
+        ]
+    for i, tech_id in enumerate(preexisting_bonuses):
+        DATA.techs[tech_id].name = new_existing_bonus_names[i]
+        DATA.effects[DATA.techs[tech_id].effect_id].name = new_existing_bonus_names[i]
+
     # Save changes
     DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
 
@@ -1086,6 +1235,13 @@ def main():
                         new_name = input(f"\nEnter new name for {selected_civ_name}: ")
                         old_name = selected_civ_name
 
+                        # Check to see if name already exists
+                        for civ in DATA.civs:
+                            if civ.name.lower() == new_name.lower():
+                                print("\033[31mERROR: Civilization name already assigned to another civilization.\033[0m")
+                                time.sleep(1)
+                                break
+
                         if new_name != '' and new_name != selected_civ_name:
                             # Change name
                             DATA.civs[edit_civ_index + 1].name = new_name
@@ -1097,12 +1253,23 @@ def main():
                                 file.seek(0)  # Move to the beginning of the file
                                 file.writelines(lines)  # Write all lines back
 
-                            # Change name of tech tree and team bonus
+                            # Change name of tech tree, team bonus, and civilization bonus effects
                             for i, effect in enumerate(DATA.effects):
                                 if effect.name == f'{old_name.title()} Tech Tree':
                                     effect.name = f'{selected_civ_name.title()} Tech Tree'
-                                if effect.name == f'{old_name.title()} Team Bonus':
+                                elif effect.name == f'{old_name.title()} Team Bonus':
                                     effect.name = f'{selected_civ_name.title()} Team Bonus'
+                                elif f'{old_name.upper()}' in effect.name:
+                                    name_list = effect.name.split(':')
+                                    name_list[0] = new_name.upper()
+                                    effect.name = ':'.join(name_list)
+
+                            # Change the name of the bonus techs
+                            for i, tech in enumerate(DATA.techs):
+                                if f'{old_name.upper()}' in tech.name:
+                                    name_list = tech.name.split(':')
+                                    name_list[0] = new_name.upper()
+                                    tech.name = ':'.join(name_list)
 
                             # Update the name
                             print(f'Civilization name changed from {old_name} to {selected_civ_name}.')
@@ -1166,7 +1333,7 @@ def main():
                                         elif 'Team Bonus' in line:
                                             next_line = True
                                         elif next_line:
-                                            print('Team Bonus:', line[:-1])
+                                            print('Team Bonus:', line.strip('"'))
 
                                 # Add bonus
                                 elif bonus_selection == '1':
@@ -1175,37 +1342,41 @@ def main():
                                     bonus_to_add = bonus_to_add_ORIGINAL.lower()
 
                                     # Generate the bonus
-                                    effect_commands = bonus(bonus_to_add)
+                                    bonus_tech, bonus_effect = create_bonus(bonus_to_add_ORIGINAL, selected_civ_index)
 
                                     # Exit if nothing was found
-                                    if len(effect_commands) == 0:
-                                        print("\033[31mERROR: No units, buildings, or techs with the names given found.\033[0m")
+                                    if len(bonus_effect.effect_commands) == 0:
                                         break
 
-                                    # Create new effect if it doesn't already exist
+                                    # Use the old tech if it exists
+                                    tech_found = False
+                                    for tech in DATA.techs:
+                                        if tech.name == bonus_tech.name:
+                                            bonus_tech = tech
+                                            tech.effect_id = DATA.effects.index(bonus_effect)
+                                            tech_found = True
+                                            break
+
+                                    if not tech_found:
+                                        # Add the tech if it didn't exist before
+                                        DATA.techs.append(bonus_tech)
+
+                                    # Add the new effect if it doesn't already exist
                                     effect_found = False
-                                    effect_name = selected_civ_name.upper() + ": " + bonus_to_add_ORIGINAL
                                     for i, effect in enumerate(DATA.effects):
-                                        if effect.name == effect_name:
-                                            effect.effect_commands = effect_commands
+                                        if effect.name == bonus_effect.name:
+                                            # Give the new effect commands to the old effect
+                                            effect.effect_commands = bonus_effect.effect_commands
+                                            bonus_tech.effect_id = i
                                             effect_found = True
-                                            effect_index = i
                                             break
                                         
                                     if not effect_found:
-                                        new_effect = genieutils.effect.Effect(effect_name, effect_commands)
-                                        DATA.effects.append(new_effect)
-                                        effect_index = len(DATA.effects) - 1
+                                        # Add the effect if it didn't exist before
+                                        DATA.effects.append(bonus_effect)
 
-                                    # Create new tech if it doesn't exist
-                                    new_tech = DATA.techs[1101]
-                                    new_tech.effect_id = effect_index
-                                    new_tech.name = effect_name
-                                    new_tech.civ = selected_civ_index + 1
-                                    for tech in DATA.techs[:]:  # Iterate over a copy of the list
-                                        if tech.name == effect_name:
-                                            DATA.techs.remove(tech)
-                                    DATA.techs.append(new_tech)
+                                    # Connect the effect to the tech
+                                    bonus_tech.effect_id = DATA.effects.index(bonus_effect)
 
                                     # Append bonus to description
                                     bonus_found = False
@@ -1216,7 +1387,6 @@ def main():
                                         if '•' in description_lines[i]:
                                             bonus_found = True
                                         elif description_lines[i] == '' and bonus_found:
-                                            #print(f'• {bonus_to_add_ORIGINAL}')
                                             description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
                                             break
 #
@@ -1230,58 +1400,46 @@ def main():
                                 
                                 # Remove bonus
                                 elif bonus_selection == '2':
-                                    # Show bonuses
+                                    # Get current bonuses
                                     bonus_count = 0
                                     searching_for_dots = True
                                     options = []
-                                    #print('\n')
+                                    for line in split_lines:
+                                        if 'Unique' in line:
+                                            searching_for_dots = False
+                                        elif '•' in line and searching_for_dots:
+                                            options.append(line[2:])
+                                            bonus_count += 1
 
                                     # Get user input
-                                    remove_bonus_selection = '/'
-                                    while remove_bonus_selection != '':
+                                    while True:
                                         # List bonuses
+                                        remove_bonus_selection = input("\nSelect a bonus index to remove: ")
+
                                         if remove_bonus_selection == '?':
-                                            for line in split_lines:
-                                                if 'Unique' in line:
-                                                    searching_for_dots = False
-                                                elif '•' in line and searching_for_dots:
-                                                    options.append(line[2:])
-                                                    print(f"\033[33m{str(bonus_count)}: {line[2:]} \033[0m")
-                                                    bonus_count += 1
-                                                continue
-
-                                        try:
-                                            remove_bonus_selection = int(input("\nSelect a bonus to remove: "))
-                                            bonus_to_remove = options[remove_bonus_selection]
+                                            for i, bonus in options:
+                                                print(f"\033[33m{i}: {line[2:]} \033[0m")
+                                        elif int(remove_bonus_selection) <= len(options):
                                             break
-                                        except:
-                                            if remove_bonus_selection != '':
-                                                print("\033[31mERROR: Invalid bonus.\033[0m")
-                                            else:
-                                                break
+                                        else:
+                                            print("\033[31mERROR: Please select the index of the bonus to remove.\033[0m")
 
-                                    # Find and remove the bonus from the .dat file
-                                    if remove_bonus_selection == '':
-                                        break
-                                    for tech in DATA.techs:
-                                        if tech.name == f'{selected_civ_name.upper()}: {bonus_to_remove}':
-                                            print ('Tech found')
-                                            DATA.techs.remove(tech.name)
-                                    for effect in DATA.effects:
-                                        if effect.name == f'{selected_civ_name.upper()}: {bonus_to_remove}':
-                                            print ('Effect found')
-                                            DATA.effect.remove(effect.name)
+                                    # Unpair the effect from the tech to disable it
+                                    if remove_bonus_selection != '':
+                                        for tech in DATA.techs:
+                                            if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
+                                                tech.effect_id = -1
 
-                                    # Remove from the description
-                                    for line in description_lines:
-                                        if bonus_to_remove in line:
-                                            description_lines.remove(line)
-                                            save_description(description_code, description_lines)
-                                    
-                                    # Save changes
-                                    #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                    print(f'Bonus removed for {selected_civ_name}: {bonus_to_remove}')
-                                    time.sleep(0.5)
+                                        # Remove from the description
+                                        for line in description_lines:
+                                            if options[int(remove_bonus_selection)] in line:
+                                                description_lines.remove(line)
+                                                save_description(description_code, description_lines)
+
+                                        # Save changes
+                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                        print(f'Bonus removed for {selected_civ_name}: {options[int(remove_bonus_selection)]}')
+                                        time.sleep(1)
 
                                 # Team bonus
                                 elif bonus_selection == '3':
@@ -1290,11 +1448,10 @@ def main():
                                     bonus_to_add = bonus_to_add_ORIGINAL.lower()
 
                                     # Generate the bonus
-                                    effect_commands = bonus(bonus_to_add)
+                                    bonus_tech, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
 
                                     # Exit if nothing was found
-                                    if len(effect_commands) == 0:
-                                        print("\033[31mERROR: No units, buildings, or techs with the names given found.\033[0m")
+                                    if len(bonus_effect.effect_commands) == 0:
                                         break
 
                                     # Find the previous team effect
@@ -1304,7 +1461,7 @@ def main():
                                             team_bonus_effect = effect
 
                                     # Update the team bonus
-                                    team_bonus_effect.effect_commands = effect_commands
+                                    team_bonus_effect.effect_commands = bonus_effect.effect_commands
 
                                     # Change team bonus in description
                                     bonus_found = False
