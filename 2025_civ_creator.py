@@ -156,7 +156,7 @@ def change_string(index, new_string):
 # Bonuses
 def create_bonus(bonus_string, civ_id):
     # Create the tech and effect, set the civilisation and names
-    bonus_tech = genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', repeatable=1)
+    bonus_technology = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', repeatable=1)]
     bonus_effect = genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', effect_commands=[])
 
     # Set up the list
@@ -166,17 +166,19 @@ def create_bonus(bonus_string, civ_id):
     # Bonus unit lines bank
     bonus_unit_lines = {
         # Categories
-        #'all units' : [-1, 0, 6, 12, 13, 18, 43, 19, 22, 2, 36, 51, 44, 54, 55, 35],
-        #'military' : [-1, 0, 35, 6, 36, 47, 12, 44, 23],
-        #'infantry' : [-1, 6],
-        #'villager' : [-1, 4],
-        #'monk' : [-1, 18, 43],
-        #'cavalry' : [-1, 12, 23, 47, 36],
-        #'ship' : [-1, 2, 21, 22, 20, 53],
-        #'boat' : [-1, 2, 21, 22, 20, 53],
-        #'stable' : [-1, 12, 47],
-        #'tower' : [-1, 52],
-        #'building' : [-1, 3],
+        'all units': [0.5, 6.5, 12.5, 13.5, 18.5, 43.5, 19.5, 22.5, 2.5, 36.5, 51.5, 44.5, 54.5, 55.5, 35.5],
+        'military': [0.5, 35.5, 6.5, 36.5, 47.5, 12.5, 44.5, 23.5],
+        'infantry': [6.5],
+        'villager': [4.5],
+        #'monk': [18.5, 43.5],
+        'all archers': [0.5],
+        'cavalry': [12.5, 23.5, 47.5, 36.5],
+        'cavalry archers': [36.5],
+        'ship': [2.5, 21.5, 22.5, 20.5, 53.5],
+        'boat': [2.5, 21.5, 22.5, 20.5, 53.5],
+        'stable': [12.5, 47.5],
+        'tower': [52.5],
+        'building': [3.5],
 
         # Unit lines
         'foot archers' : [4, 24, 492, 7, 6, 1155, 185, 8, 530, 73, 559, 763, 765, 866, 868, 1129, 1131, 1800, 1802, 850, -1, 493, -1],
@@ -244,6 +246,7 @@ def create_bonus(bonus_string, civ_id):
         'scouts' : [448, 546, 441, 1707],
         'scout-line' : [448, 546, 441, 1707],
         'scout line' : [448, 546, 441, 1707],
+        'steppe lancers' : [1370, 1372],
         'rathas' : [1738, 1740, 1759, 1761],
         'trade units' : [],
         'canoes' : [],
@@ -313,6 +316,12 @@ def create_bonus(bonus_string, civ_id):
             unit_line_index = bonus_string.find(unit_line)
 
             if unit_line in bonus_string:
+                # Check for redundancies and false flags
+                if unit_line == 'archers' and bonus_string.find('cavalry archers') == unit_line_index - 8:
+                    continue
+                elif unit_line == 'cavalry' and bonus_string.find('cavalry archers') == unit_line_index:
+                    continue
+
                 # Add primary unit
                 if unit_line_index < parentheses_positions[0] or parentheses_positions == [-1, -1]:
                     primary_units.extend(bonus_unit_lines[unit_line])
@@ -452,14 +461,14 @@ def create_bonus(bonus_string, civ_id):
     # Extract the age
     def get_bonus_age():
         if 'feudal' in bonus_string:
-            bonus_tech.required_techs[0] = 101
-            bonus_tech.required_tech_count = 1
+            bonus_technology[0].required_techs[0] = 101
+            bonus_technology[0].required_tech_count = 1
         elif 'castle' in bonus_string:
-            bonus_tech.required_techs[0] = 102
-            bonus_tech.required_tech_count = 1
+            bonus_technology[0].required_techs[0] = 102
+            bonus_technology[0].required_tech_count = 1
         elif 'imperial' in bonus_string:
-            bonus_tech.required_techs[0] = 103
-            bonus_tech.required_tech_count = 1
+            bonus_technology[0].required_techs[0] = 103
+            bonus_technology[0].required_tech_count = 1
 
     # Extract the stats
     bonus_stats = []
@@ -570,12 +579,20 @@ def create_bonus(bonus_string, civ_id):
 
         # Create effect commands
         for unit_id in primary_units:
+            # Check for unit category
+            if int(unit_id) != unit_id:
+                unit_category_id = int(unit_id)
+                unit_id_post = -1
+            else:
+                unit_category_id = -1
+                unit_id_post = unit_id
+
             # Change cost
             for resource in bonus_unit_resource:
-                bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id, -1, resource, bonus_number[0]))
+                bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, resource, bonus_number[0]))
 
     # [Villager/Building] work [%] faster
-    if 'work' in bonus_string or 'works' in bonus_string:
+    elif 'work' in bonus_string or 'works' in bonus_string:
         # Get items
         get_bonus_units()
         get_bonus_buildings()
@@ -594,14 +611,20 @@ def create_bonus(bonus_string, civ_id):
             effect_id = 5
 
         # Create effect commands
-        for unit_id in primary_units:
+        for unit_id in (primary_units + bonus_buildings):
+            # Check for unit category
+            if int(unit_id) != unit_id:
+                unit_category_id = int(unit_id)
+                unit_id_post = -1
+            else:
+                unit_category_id = -1
+                unit_id_post = unit_id
+
             # Change work rate
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id, -1, 13, bonus_number[0]))
-        for building_id in bonus_buildings:
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, building_id, -1, 13, bonus_number[0]))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, 13, bonus_number[0]))
 
     # [Villager] carry [#/%] more
-    if 'carry' in bonus_string or 'carries' in bonus_string:
+    elif 'carry' in bonus_string or 'carries' in bonus_string:
         # Get items
         get_bonus_units()
         get_bonus_number()
@@ -624,7 +647,7 @@ def create_bonus(bonus_string, civ_id):
             bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id, -1, 14, bonus_number[0]))
 
     # Start with [#] [Resource] # INACTIVE
-    if 'start with' in bonus_string or 'starts with' in bonus_string:
+    elif 'start with' in bonus_string or 'starts with' in bonus_string:
         # Get items
         get_bonus_tech_resource()
         get_bonus_number()
@@ -647,7 +670,7 @@ def create_bonus(bonus_string, civ_id):
             bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, resource_id, 1, -1, bonus_number[0]))
 
     # Relics generate [%] gold
-    if 'relics generate' in bonus_string or 'relic generates' in bonus_string:
+    elif 'relics generate' in bonus_string or 'relic generates' in bonus_string:
         # Get items
         get_bonus_number()
 
@@ -666,11 +689,80 @@ def create_bonus(bonus_string, civ_id):
         # Create effect commands
         bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, 191, 0, -1, bonus_number[0]))
 
-    # Add the effect commands
+    # [Unit/Building] receive [%] less bonus damage
+    elif 'receive' in bonus_string and 'bonus damage' in bonus_string:
+        # Get items
+        get_bonus_units()
+        get_bonus_buildings()
+        get_bonus_number()
+
+        # Break if no items were found
+        if bonus_number[0] == 0 or len(primary_units) == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\033[31mTry using the format: [Unit] receive [%] less bonus damage\033[0m")
+            return [], []
+
+        # Create effect commands
+        for i, unit_id in enumerate(primary_units + bonus_buildings):
+            # Check for unit category
+            if int(unit_id) != unit_id:
+                unit_category_id = int(unit_id)
+                unit_id_post = -1
+            else:
+                unit_category_id = -1
+                unit_id_post = unit_id
+
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(0, unit_id_post, unit_category_id, 24, 1 - bonus_number[0]))
+
+    # Town Centers spawn [#] villagers when the next Age is reached
+    elif 'spawn' in bonus_string and 'villagers when the next age is reached' in bonus_string:
+        # Get items
+        get_bonus_number()
+
+        # Break if no items were found
+        if bonus_number[0] == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\033[31mTry using the format: Town Centers spawn [#] villagers when the next age is reached\033[0m")
+            return [], []
+        
+        # Create a tech for each age
+        bonus_technology.append(bonus_technology[0])
+        bonus_technology.append(bonus_technology[0])
+        bonus_technology[0].required_techs = 101
+        bonus_technology[0].required_tech_count = 1
+        bonus_technology[1].required_techs = 102
+        bonus_technology[1].required_tech_count = 1
+        bonus_technology[2].required_techs = 103
+        bonus_technology[2].required_tech_count = 1
+
+        # Create effect commands
+        bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 83, 109, 2, 0))
+
+    # Town Centers spawn [#] villagers when reaching the [Age]
+    elif 'spawn' in bonus_string and 'villagers when reaching the' in bonus_string:
+        # Get items
+        get_bonus_number()
+        get_bonus_age()
+
+        # Break if no items were found
+        if bonus_number[0] == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\033[31mTry using the format: Town Centers spawn [#] villagers when reaching the [Age]\033[0m")
+            return [], []
+
+        # Create effect commands
+        bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 83, 109, 2, 0))
+
+    # Error out
+    else:
+        print("\033[31mERROR: Invalid bonus description.\033[0m")
+        return [], []
+
+    # Add the effect commands to the bonus
     bonus_effect.effect_commands = bonus_effect_commands
 
     # Return the effect commands
-    return bonus_tech, bonus_effect
+    return bonus_technology, bonus_effect
 
 def open_mod(mod_folder):
     print('\nLoading mod...')
@@ -1236,14 +1328,14 @@ def main():
                     for word in description_lines[-5].strip('•').split(' '):
                         if '(' in word:
                             break
-                        current_unique_techs += word
+                        current_unique_techs += word + ' '
 
-                    current_unique_techs += ' / '
+                    current_unique_techs += '/'
 
                     for word in description_lines[-4].strip('•').split(' '):
                         if '(' in word:
                             break
-                        current_unique_techs += word
+                        current_unique_techs += word + ' '
 
                     # Get current architecture
                     def get_architecture_list(unit_id):
@@ -1369,15 +1461,7 @@ def main():
 
                     # Bonuses
                     elif selection == '2':
-                        bonus_selection = '?'
-                        while bonus_selection != '':
-                            print("\033[32m\n--- Bonuses Menu ---\033[0m")
-                            print("\033[33m0: View Bonuses\033[0m")
-                            print("\033[33m1: Add Bonus\033[0m")
-                            print("\033[33m2: Remove Bonus\033[0m")
-                            print("\033[33m3: Change Team Bonus\033[0m")
-                            bonus_selection = input("Selection: ")
-
+                        while True:
                             with open(MOD_STRINGS, 'r+') as file:
                                 # Read and separate the lines
                                 lines = file.readlines()
@@ -1386,88 +1470,39 @@ def main():
                                 line_code = line[:6]
                                 split_lines = line.split(r'\n')
 
-                                # View Bonuses
-                                if bonus_selection == '0':
-                                    bonus_count = 0
-                                    searching_for_dots = True
-                                    next_line = False
-                                    print('\n')
-                                    for line in split_lines:
-                                        if 'Unique' in line:
-                                            searching_for_dots = False
-                                        elif '•' in line and searching_for_dots:
-                                            print(str(bonus_count) + ': ' + line[2:])
-                                            bonus_count += 1
-                                        elif 'Team Bonus' in line:
-                                            next_line = True
-                                        elif next_line:
-                                            print('Team Bonus:', line.strip('"'))
+                                # Show the bonuses menu
+                                print("\033[32m\n--- Bonuses Menu ---\033[0m")
+                                bonus_count = 0
+                                searching_for_dots = True
+                                next_line = False
+                                for line in split_lines:
+                                    if 'Unique' in line:
+                                        searching_for_dots = False
+                                    elif '•' in line and searching_for_dots:
+                                        print(f"\033[33m{str(bonus_count)}: {line[2:]}\033[0m")
+                                        bonus_count += 1
+                                    elif 'Team Bonus' in line:
+                                        next_line = True
+                                    elif next_line:
+                                        print(f"\033[33mTeam Bonus: {line[:-2]}\033[0m")
+                                bonus_selection = input("Bonus action: ")
 
-                                # Add bonus
-                                elif bonus_selection == '1':
-                                    # Get user prompt
-                                    bonus_to_add_ORIGINAL = input('\nType a bonus to add: ')
-                                    bonus_to_add = bonus_to_add_ORIGINAL.lower()
-
-                                    # Generate the bonus
-                                    bonus_tech, bonus_effect = create_bonus(bonus_to_add_ORIGINAL, selected_civ_index)
-
-                                    # Exit if nothing was found
-                                    if bonus_effect == []:
-                                        break
-
-                                    # Use the old tech if it exists
-                                    tech_found = False
-                                    for tech in DATA.techs:
-                                        if tech.name == bonus_tech.name:
-                                            bonus_tech = tech
-                                            tech.effect_id = DATA.effects.index(bonus_effect)
-                                            tech_found = True
-                                            break
-
-                                    if not tech_found:
-                                        # Add the tech if it didn't exist before
-                                        DATA.techs.append(bonus_tech)
-
-                                    # Add the new effect if it doesn't already exist
-                                    effect_found = False
-                                    for i, effect in enumerate(DATA.effects):
-                                        if effect.name == bonus_effect.name:
-                                            # Give the new effect commands to the old effect
-                                            effect.effect_commands = bonus_effect.effect_commands
-                                            bonus_tech.effect_id = i
-                                            effect_found = True
-                                            break
-                                        
-                                    if not effect_found:
-                                        # Add the effect if it didn't exist before
-                                        DATA.effects.append(bonus_effect)
-
-                                    # Connect the effect to the tech
-                                    bonus_tech.effect_id = DATA.effects.index(bonus_effect)
-
-                                    # Append bonus to description
-                                    bonus_found = False
-                                    for i, line in enumerate(description_lines):
-                                        # Add new bonus to the end of the bonuses list
-                                        if bonus_to_add_ORIGINAL.lower() in description_lines[i].lower():
-                                            break
-                                        if '•' in description_lines[i]:
-                                            bonus_found = True
-                                        elif description_lines[i] == '' and bonus_found:
-                                            description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
-                                            break
-#
-                                    # Update the description
-                                    save_description(description_code, description_lines)
-
-                                    # Save changes
-                                    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                    print(f'Bonus added for {selected_civ_name}: {bonus_to_add_ORIGINAL}')
-                                    time.sleep(0.5)
+                                # Show instructions
+                                if bonus_selection == '?':
+                                    print('\n\x1b[35mEnter bonus description to add a new bonus.\x1b[0m')
+                                    print('\x1b[35mEnter existing bonus index number to remove that bonus.\x1b[0m')
+                                    print('\x1b[35mEnter existing bonus index, a colon (:), and then the bonus description to change an existing bonus.\x1b[0m')
+                                    print('\x1b[35mEnter "Team bonus: " followed by the bonus description to change the team bonus.\x1b[0m')
+                                    time.sleep(1)
+                                    continue
                                 
+                                # Quit menu
+                                if bonus_selection == '':
+                                    time.sleep(1)
+                                    break
+
                                 # Remove bonus
-                                elif bonus_selection == '2':
+                                elif bonus_selection.isdigit():
                                     # Get current bonuses
                                     bonus_count = 0
                                     searching_for_dots = True
@@ -1479,20 +1514,8 @@ def main():
                                             options.append(line[2:])
                                             bonus_count += 1
 
-                                    # Get user input
-                                    while True:
-                                        # List bonuses
-                                        remove_bonus_selection = input("\nSelect a bonus index to remove: ")
-
-                                        if remove_bonus_selection == '?':
-                                            for i in range(len(options)):
-                                                print(f"\033[33m{i}: {line[2:]} \033[0m")
-                                        elif int(remove_bonus_selection) <= len(options):
-                                            break
-                                        else:
-                                            print("\033[31mERROR: Please select the index of the bonus to remove.\033[0m")
-
                                     # Unpair the effect from the tech to disable it
+                                    remove_bonus_selection = int(bonus_selection)
                                     if remove_bonus_selection != '':
                                         for tech in DATA.techs:
                                             if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
@@ -1510,9 +1533,9 @@ def main():
                                         time.sleep(1)
 
                                 # Team bonus
-                                elif bonus_selection == '3':
+                                elif bonus_selection.lower().startswith('team bonus:'):
                                     # Get user prompt
-                                    bonus_to_add_ORIGINAL = input('\nType a team bonus to change to: ')
+                                    bonus_to_add_ORIGINAL = bonus_selection[11:].strip()
                                     bonus_to_add = bonus_to_add_ORIGINAL.lower()
 
                                     # Generate the bonus
@@ -1541,7 +1564,106 @@ def main():
                                     # Save changes
                                     DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
                                     print(f'Team bonus changed for {selected_civ_name}.')
-                                    time.sleep(0.5)
+                                    time.sleep(1)
+
+                                # Change bonus
+                                elif bonus_selection[0].isdigit() and bonus_selection[1] == ':':
+                                    # Get starting variables
+                                    bonus_change_index = int(bonus_selection[0])
+                                    bonus_change_from = description_lines[2 + bonus_change_index][2:]
+                                    bonus_change_to = bonus_selection[2:].strip()
+
+                                    # Generate the bonus
+                                    bonus_tech, bonus_effect = create_bonus(bonus_change_to, selected_civ_index)
+
+                                    # Exit if nothing was found
+                                    if len(bonus_effect.effect_commands) == 0:
+                                        break
+
+                                    # Find the existing bonus effect
+                                    for i, effect in enumerate(DATA.effects):
+                                        if selected_civ_name.lower() in effect.name.lower() and bonus_change_from in effect.name:
+                                            DATA.effects[i] = bonus_effect
+                                            DATA.effects[i].name = f'{selected_civ_name.upper()}: {bonus_change_to}'
+                                            break
+
+                                    # Find the existing bonus tech
+                                    for j, tech in enumerate(DATA.techs):
+                                        if tech.civ == selected_civ_index + 1 and bonus_change_from in tech.name:
+                                            DATA.techs[j] = bonus_tech[0]
+                                            DATA.techs[j].name = f'{selected_civ_name.upper()}: {bonus_change_to}'
+                                            DATA.techs[j].effect_id = i
+                                            break
+
+                                    # Update the description
+                                    description_lines[2 + bonus_change_index] = f'• {bonus_change_to}'
+                                    save_description(description_code, description_lines)
+
+                                    # Save changes
+                                    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                    print(f'Bonus {bonus_change_index} changed for {selected_civ_name}.')
+                                    time.sleep(1)
+
+                                # Add bonus
+                                else:
+                                    # Get user prompt
+                                    bonus_to_add_ORIGINAL = bonus_selection
+                                    bonus_to_add = bonus_to_add_ORIGINAL.lower()
+
+                                    # Generate the bonus
+                                    bonus_techs, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
+
+                                    # Use the old tech if it exists
+                                    if bonus_effect != []:
+                                        tech_found = False
+                                        for bonus_tech in bonus_techs:
+                                            for tech in DATA.techs:
+                                                if tech.name == bonus_tech.name:
+                                                    bonus_tech = tech
+                                                    tech.effect_id = DATA.effects.index(bonus_effect)
+                                                    tech_found = True
+                                                    break
+
+                                            if not tech_found:
+                                                # Add the tech if it didn't exist before
+                                                DATA.techs.append(bonus_tech)
+
+                                            # Add the new effect if it doesn't already exist
+                                            effect_found = False
+                                            for i, effect in enumerate(DATA.effects):
+                                                if effect.name == bonus_effect.name:
+                                                    # Give the new effect commands to the old effect
+                                                    effect.effect_commands = bonus_effect.effect_commands
+                                                    bonus_tech.effect_id = i
+                                                    effect_found = True
+                                                    break
+                                                
+                                            if not effect_found:
+                                                # Add the effect if it didn't exist before
+                                                DATA.effects.append(bonus_effect)
+
+                                            # Connect the effect to the tech
+                                            bonus_tech.effect_id = DATA.effects.index(bonus_effect)
+
+                                        # Append bonus to description
+                                        bonus_found = False
+                                        for i, line in enumerate(description_lines):
+                                            # Add new bonus to the end of the bonuses list
+                                            if bonus_to_add_ORIGINAL.lower() in description_lines[i].lower():
+                                                break
+                                            if '•' in description_lines[i]:
+                                                bonus_found = True
+                                            elif description_lines[i] == '' and bonus_found:
+                                                description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
+                                                break
+#   
+                                        # Update the description
+                                        save_description(description_code, description_lines)
+
+                                        # Save changes
+                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                        print(f'Bonus added for {selected_civ_name}: {bonus_to_add_ORIGINAL}')
+                                        time.sleep(1)
 
                     # Unique Unit
                     elif selection == '3':
@@ -1724,13 +1846,39 @@ def main():
                             elif tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 103 and tech.research_location == 82:
                                 unique_techs_ids[1] = i
 
-                        # Prompt the user
+                        # Prompt the user for Castle Age tech
                         new_castle_tech_name = prompt(f"\nChange Castle Age tech name: ", default=unique_techs_names[0])
                         if new_castle_tech_name == '':
                             new_castle_tech_name = unique_techs_names[0]
+                        while True:
+                            prompt_default_text = description_lines[-5].split('(')[1].strip(')')
+                            new_castle_tech_description = prompt(f"Change Castle Age tech description: ", default=prompt_default_text)
+
+                            new_castle_tech, new_castle_effect = create_bonus(new_castle_tech_description, selected_civ_index)
+                            if len(new_castle_effect.effect_commands) == 0:
+                                print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
+                                continue
+                            else:
+                                DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id].name = new_castle_tech_description
+                                DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id].effect_commands = new_castle_effect.effect_commands
+                                break
+
+
                         new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ", default=unique_techs_names[1])
                         if new_imperial_tech_name == '':
                             new_imperial_tech_name = unique_techs_names[1]
+                        while True:
+                            prompt_default_text = description_lines[-4].split('(')[1].strip(')')
+                            new_imperial_tech_description = prompt(f"Change Imperial Age tech description: ", default=prompt_default_text)
+
+                            new_imperial_tech, new_imperial_effect = create_bonus(new_imperial_tech_description, selected_civ_index)
+                            if len(new_imperial_effect.effect_commands) == 0:
+                                print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
+                                continue
+                            else:
+                                DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id].name = new_imperial_tech_description
+                                DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id].effect_commands = new_imperial_effect.effect_commands
+                                break
                             
                         # Change the names
                         change_string(DATA.techs[unique_techs_ids[0]].language_dll_name, new_castle_tech_name)
@@ -1739,8 +1887,8 @@ def main():
                         DATA.techs[unique_techs_ids[1]].name = new_imperial_tech_name
 
                         # Update the description
-                        description_lines[-5] = f'• {new_castle_tech_name}'
-                        description_lines[-4] = f'• {new_imperial_tech_name}'
+                        description_lines[-5] = f'• {new_castle_tech_name} ({new_castle_tech_description})'
+                        description_lines[-4] = f'• {new_imperial_tech_name} ({new_imperial_tech_description})'
                         save_description(description_code, description_lines)
 
                         # Save file
@@ -1913,8 +2061,6 @@ def main():
                             else:
                                 print("\033[31mERROR: Language not found.\033[0m")
                         pass
-
-                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
 
                     # Tech Tree
                     elif selection == '7':

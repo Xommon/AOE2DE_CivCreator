@@ -51,11 +51,11 @@ NEEDS: units, number, stat, building
 KEYWORDS: start with
 NEEDS: number, resource
 
-Relics generate [%] gold
+// Relics generate [%] gold
 KEYWORDS: relics generate
 NEEDS: number
 
-[Unit] receive [%] less bonus damage
+// [Unit] receive [%] less bonus damage
 KEYWORDS: less bonus damage
 NEEDS: units, buildings, number
 
@@ -63,11 +63,11 @@ NEEDS: units, buildings, number
 KEYWORDS: are more resistant to conversion
 NEEDS: units
 
-Town Centers spawn [#] villagers when the next Age is reached
+// Town Centers spawn [#] villagers when the next Age is reached
 KEYWORDS: villagers when the next age is reached
 NEEDS: number
 
-Town Centers spawn [#] villagers when reaching the [Age]
+// Town Centers spawn [#] villagers when reaching the [Age]
 KEYWORDS: villagers when reaching the
 NEEDS: number, age
 
