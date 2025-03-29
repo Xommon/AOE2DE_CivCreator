@@ -1503,34 +1503,38 @@ def main():
 
                                 # Remove bonus
                                 elif bonus_selection.isdigit():
-                                    # Get current bonuses
-                                    bonus_count = 0
-                                    searching_for_dots = True
-                                    options = []
-                                    for line in split_lines:
-                                        if 'Unique' in line:
-                                            searching_for_dots = False
-                                        elif '•' in line and searching_for_dots:
-                                            options.append(line[2:])
-                                            bonus_count += 1
+                                    # Check to make sure
+                                    remove_check = input(f'\nAre you sure you want to remove bonus {int(bonus_selection)}: {description_lines[2 + int(bonus_selection)][2:]}? (y/n):')
 
-                                    # Unpair the effect from the tech to disable it
-                                    remove_bonus_selection = int(bonus_selection)
-                                    if remove_bonus_selection != '':
-                                        for tech in DATA.techs:
-                                            if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
-                                                tech.effect_id = -1
+                                    if remove_check.lower() == 'y' or remove_check.lower() == 'yes':
+                                        # Get current bonuses
+                                        bonus_count = 0
+                                        searching_for_dots = True
+                                        options = []
+                                        for line in split_lines:
+                                            if 'Unique' in line:
+                                                searching_for_dots = False
+                                            elif '•' in line and searching_for_dots:
+                                                options.append(line[2:])
+                                                bonus_count += 1
 
-                                        # Remove from the description
-                                        for line in description_lines:
-                                            if options[int(remove_bonus_selection)] in line:
-                                                description_lines.remove(line)
-                                                save_description(description_code, description_lines)
+                                        # Unpair the effect from the tech to disable it
+                                        remove_bonus_selection = int(bonus_selection)
+                                        if remove_bonus_selection != '':
+                                            for tech in DATA.techs:
+                                                if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
+                                                    tech.effect_id = -1
 
-                                        # Save changes
-                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                        print(f'Bonus removed for {selected_civ_name}: {options[int(remove_bonus_selection)]}')
-                                        time.sleep(1)
+                                            # Remove from the description
+                                            for line in description_lines:
+                                                if options[int(remove_bonus_selection)] in line:
+                                                    description_lines.remove(line)
+                                                    save_description(description_code, description_lines)
+
+                                            # Save changes
+                                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                            print(f'Bonus removed for {selected_civ_name}: {options[int(remove_bonus_selection)]}')
+                                            time.sleep(1)
 
                                 # Team bonus
                                 elif bonus_selection.lower().startswith('team bonus:'):
