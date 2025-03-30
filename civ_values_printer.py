@@ -20,4 +20,5 @@ print('File opened')
 time.sleep(1)
 
 # Print the data
-print(DATA.effects[866].effect_commands[1])
+for ec in DATA.effects[399].effect_commands:
+    print(ec)

@@ -174,8 +174,8 @@ def create_bonus(bonus_string, civ_id):
         'all archers': [0.5],
         'cavalry': [12.5, 23.5, 47.5, 36.5],
         'cavalry archers': [36.5],
-        'ship': [2.5, 21.5, 22.5, 20.5, 53.5],
-        'boat': [2.5, 21.5, 22.5, 20.5, 53.5],
+        'ships': [2.5, 21.5, 22.5, 20.5, 53.5],
+        'boats': [2.5, 21.5, 22.5, 20.5, 53.5],
         'stable': [12.5, 47.5],
         'tower': [52.5],
         'building': [3.5],
@@ -192,7 +192,6 @@ def create_bonus(bonus_string, civ_id):
         'elephant archers' : [873, 875],
         'elephant archer-line' : [873, 875],
         'elephant archer line' : [873, 875],
-        'infantry' : [74, 75, 76, 473, 567, 93, 358, 359, 1786, 1787, 1788, 751, 753, 752, 1699, 1663, 1697, 184],
         'militia' : [74, 75, 76, 473, 567],
         'militia-line' : [74, 75, 76, 473, 567],
         'militia line' : [74, 75, 76, 473, 567],
@@ -248,7 +247,7 @@ def create_bonus(bonus_string, civ_id):
         'scout line' : [448, 546, 441, 1707],
         'steppe lancers' : [1370, 1372],
         'rathas' : [1738, 1740, 1759, 1761],
-        'trade units' : [],
+        'trade units' : [17, 128, 204],
         'canoes' : [],
         'canoe-line' : [],
         'canoe line' : [],
@@ -459,16 +458,20 @@ def create_bonus(bonus_string, civ_id):
             bonus_unit_resource.append(100)
 
     # Extract the age
+    total_ages = 0
     def get_bonus_age():
         if 'feudal' in bonus_string:
             bonus_technology[0].required_techs[0] = 101
             bonus_technology[0].required_tech_count = 1
-        elif 'castle' in bonus_string:
+            total_ages += 1
+        if 'castle' in bonus_string:
             bonus_technology[0].required_techs[0] = 102
             bonus_technology[0].required_tech_count = 1
-        elif 'imperial' in bonus_string:
+            total_ages += 1
+        if 'imperial' in bonus_string:
             bonus_technology[0].required_techs[0] = 103
             bonus_technology[0].required_tech_count = 1
+            total_ages += 1
 
     # Extract the stats
     bonus_stats = []
@@ -485,43 +488,40 @@ def create_bonus(bonus_string, civ_id):
 
             # Get the specific kind of armour change
             if 'pierce' in bonus_string:
-                armour_number += 0.03
+                armour_number += 0.0768
             elif 'against elephants' in bonus_string:
-                armour_number += 0.05
+                armour_number += 0.1280
             elif 'against infantry' in bonus_string:
-                armour_number += 0.01
+                armour_number += 0.0256
             elif 'against cavalry' in bonus_string:
-                armour_number += 0.08
-            elif 'against buildings' in bonus_string:
-                armour_number += 0.21
+                armour_number += 0.2048
             elif 'against archers' in bonus_string:
-                armour_number += 0.15
+                armour_number += 0.3840
             elif 'against ships' in bonus_string or 'against warships' in bonus_string:
-                armour_number += 0.16
+                armour_number += 0.4096
             elif 'against siege' in bonus_string:
-                armour_number += 0.20
-            elif 'against walls' in bonus_string:
-                armour_number += 0.22
+                armour_number += 0.5120
             elif 'against gunpowder' in bonus_string:
-                armour_number += 0.23
-            elif 'against monks' in bonus_string:
-                armour_number += 0.25
+                armour_number += 0.5888
             elif 'against spearmen' in bonus_string:
-                armour_number += 0.27
+                armour_number += 0.6912
             elif 'against cavalry archers' in bonus_string:
-                armour_number += 0.28
-            elif 'against eagles' in bonus_string or 'against eagle warriors' in bonus_string:
-                armour_number += 0.29
+                armour_number += 0.7168
+            elif 'against eagles' in bonus_string or 'against eagle' in bonus_string:
+                armour_number += 0.7424
             elif 'against camel' in bonus_string:
-                armour_number += 0.30
+                armour_number += 0.7680
 
                 # Add Mamelukes to the category of camels
-                bonus_stats.append(8.35)
-            elif 'against fishing ships' in bonus_string:
-                armour_number += 0.34
+                bonus_stats.append(8.8960 + bonus_number[0] / 10000)
+            else:
+                armour_number += 0.1024
+
+            # Add the number value to the armour
+            armour_number += bonus_number[0] / 10000
 
             # Add the complex armour to the list
-            bonus_stats.append(8 + armour_number)
+            bonus_stats.append(armour_number)
         elif 'attack' in bonus_string:
             bonus_stats.append(9)
         elif 'range' in bonus_string:
@@ -531,6 +531,9 @@ def create_bonus(bonus_string, civ_id):
             bonus_stats.append(20)
         elif 'train' in bonus_string:
             bonus_stats.append(101)
+
+        # Remove duplicates
+        #bonus_stats = list(dict.fromkeys(bonus_stats))
 
     ## BONUS PROMPTS ##
 
@@ -753,11 +756,53 @@ def create_bonus(bonus_string, civ_id):
         # Create effect commands
         bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 83, 109, 2, 0))
 
-    # Error out
+    # [Unit] have [#/%][Stat] ++ in the [Age]
     else:
-        print("\033[31mERROR: Invalid bonus description.\033[0m")
-        return [], []
+        try:
+            # Get items
+            get_bonus_units()
+            get_bonus_buildings()
+            get_bonus_number()
+            get_bonus_stats()
+            get_bonus_age()
 
+            # Break if no items were found
+            if len(bonus_unit_lines) == 0 or bonus_number[0] == 0 or bonus_stats == []:
+                print("\033[31mERROR: Invalid bonus description.\033[0m")
+                print("\033[31mTry using the format: [Unit] have [#/%][Stat] ++ in the [Age]\033[0m")
+                return [], []
+
+            # Get effect ID
+            if bonus_number[1] == '+':
+                effect_id = 4
+            elif bonus_number[1] == '*':
+                effect_id = 5
+
+            # Create effect commands
+            for unit_id in (primary_units + bonus_buildings):
+                # Check for unit category
+                if int(unit_id) != unit_id:
+                    unit_category_id = int(unit_id)
+                    unit_id_post = -1
+                else:
+                    unit_category_id = -1
+                    unit_id_post = unit_id
+
+                # Change stat
+                for stat in bonus_stats:
+                    # Get advanced armour information
+                    if int(stat) == 8:
+                        armour = int(str(stat)[2:6])
+                        bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, int(stat), armour))
+                        # EffectCommand(type=4, a=-1, b=6, c=8, d=1025.0)
+                    else:
+                        bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, stat, bonus_number[0]))
+        except Exception as e:
+            # Error out
+            print(e)
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            return [], []
+        
     # Add the effect commands to the bonus
     bonus_effect.effect_commands = bonus_effect_commands
 
@@ -1504,7 +1549,7 @@ def main():
                                 # Remove bonus
                                 elif bonus_selection.isdigit():
                                     # Check to make sure
-                                    remove_check = input(f'\nAre you sure you want to remove bonus {int(bonus_selection)}: {description_lines[2 + int(bonus_selection)][2:]}? (y/n):')
+                                    remove_check = input(f'\nAre you sure you want to remove bonus {int(bonus_selection)}: {description_lines[2 + int(bonus_selection)][2:]}? (y/n): ')
 
                                     if remove_check.lower() == 'y' or remove_check.lower() == 'yes':
                                         # Get current bonuses
@@ -1537,16 +1582,16 @@ def main():
                                             time.sleep(1)
 
                                 # Team bonus
-                                elif bonus_selection.lower().startswith('team bonus:'):
+                                elif bonus_selection.lower().startswith('team bonus:') or bonus_selection.lower().startswith('t:') or bonus_selection.lower().startswith('team:'):
                                     # Get user prompt
-                                    bonus_to_add_ORIGINAL = bonus_selection[11:].strip()
+                                    bonus_to_add_ORIGINAL = bonus_selection.split(':')[1].strip().capitalize()
                                     bonus_to_add = bonus_to_add_ORIGINAL.lower()
 
                                     # Generate the bonus
                                     bonus_tech, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
 
                                     # Exit if nothing was found
-                                    if len(bonus_effect.effect_commands) == 0:
+                                    if bonus_effect == []:
                                         break
 
                                     # Find the previous team effect
@@ -1581,7 +1626,7 @@ def main():
                                     bonus_tech, bonus_effect = create_bonus(bonus_change_to, selected_civ_index)
 
                                     # Exit if nothing was found
-                                    if len(bonus_effect.effect_commands) == 0:
+                                    if bonus_effect == []:
                                         break
 
                                     # Find the existing bonus effect
