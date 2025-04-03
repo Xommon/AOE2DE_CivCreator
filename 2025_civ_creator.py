@@ -23,6 +23,7 @@ from genieutils.graphic import GraphicAngleSound
 import genieutils.effect
 import json
 import re
+import string
 import pyperclip
 from prompt_toolkit import prompt
 
@@ -96,14 +97,32 @@ def get_unit_name(unit_id):
                     # Return nothing if the language dll name is 0
                     if DATA.civs[1].units[unit_id].language_dll_name == 0:
                         new_name = ''
-                    return new_name.strip('"')
+                    return new_name.strip('"')[:-2]
         except:
             return 'NOT_FOUND^'
             
-def get_unit_id(internal_name):
-    for i, unit in enumerate(DATA.civs[1].units):
-        if unit.internal_name == internal_name:
-            return i
+def get_unit_id(name):
+    try:
+        for i, unit in enumerate(DATA.civs[1].units):
+            if unit.name.lower() == name.lower():
+                return i
+    except:
+        # As a backup, search for name in the strings JSON file
+        string_ids = []
+        with open(ORIGINAL_STRINGS, 'r') as file:
+            get_unit_id_lines = file.readlines()
+            for line in get_unit_id_lines:
+                if f'"{name.lower()}"' in line.lower():
+                    match = re.match(r'\d+', line)
+                    if match:
+                        string_ids.append(match.group())
+
+        for i, unit in enumerate(DATA.civs[1].units):
+            try:
+                if str(unit.language_dll_name) in string_ids:
+                    return i
+            except:
+                pass
         
 def get_tech_id(name):
     # Search with internal_name
@@ -116,7 +135,7 @@ def get_tech_id(name):
     with open(ORIGINAL_STRINGS, 'r') as file:
         get_tech_id_lines = file.readlines()
         for line in get_tech_id_lines:
-            if name in line:
+            if name in line.lower():
                 string_id = re.sub(r'^\d+\s+', '', line)
 
     for i, tech in enumerate(DATA.techs):
@@ -253,7 +272,7 @@ def create_bonus(bonus_string, civ_id):
         'canoe line' : [],
         'camels' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
         'camel units' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
-        'villagers' : [83, 293, 590, 592, 123, 218, 122, 216, 56, 57, 120, 124, 354, 118, 212, 156, 220, 222, 214, 259, 579, 581],
+        #'villagers' : [83, 293, 590, 592, 123, 218, 122, 216, 56, 57, 120, 124, 354, 118, 212, 156, 220, 222, 214, 259, 579, 581],
         'shepherds' : [590, 592],
         'lumberjacks' : [123, 218],
         'hunters' : [122, 216],
@@ -809,6 +828,119 @@ def create_bonus(bonus_string, civ_id):
     # Return the effect commands
     return bonus_technology, bonus_effect
 
+def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
+    # Get unit name
+    unit = get_unit_name(unit_index).lower()
+
+    # Determine whether enabling or disabling
+    if mode == 'toggle' and TECH_TREE[unit] == 0:
+        mode = 'enable'
+    elif mode == 'toggle' and TECH_TREE[unit] == 1:
+        mode = 'disable'
+
+    # Update JSON file
+    trigger_tech_id = -1
+    json_line_start = 0
+    with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
+        if unit in TECH_TREE:
+            lines = file.readlines()
+
+            # Find the line where the current civ starts
+            for i, line in enumerate(lines):
+                if f'"civ_id": "{selected_civ_name.upper()}"' in line:
+                    json_line_start = i
+
+            # Change the lines in the file
+            for i in range(json_line_start, len(lines)):
+                if f'\"Name\": \"{unit.title()}\"' in lines[i]:
+                    if mode == 'enable':
+                        lines[i + 3] = f'          "Node Status": "ResearchedCompleted",\n'
+                    elif mode == 'disable':
+                        lines[i + 3] = f'          "Node Status\": "NotAvailable",\n'
+                    break
+
+            # Save the file
+            file.seek(0)
+            file.writelines(lines)
+            file.truncate()
+
+    # Get tech index
+    found = False
+    for i, tech in enumerate(DATA.techs):
+        for ec in DATA.effects[tech.effect_id].effect_commands:
+            if (ec.type == 2 and ec.a == unit_index) or (ec.type == 3 and ec.b == unit_index):
+                tech_index = i
+                found = True
+                break
+        if found:
+            break
+        
+    # Update .dat file
+    if mode == 'enable':
+        for i, effect_command in enumerate(DATA.effects[tech_tree_index].effect_commands):
+            if effect_command.type == 102 and effect_command.d == tech_index:
+                DATA.effects[tech_tree_index].effect_commands.pop(i)
+    elif mode == 'disable':
+        DATA.effects[tech_tree_index].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))
+        
+
+    '''# Get the unit name
+    unit_name = get_unit_name(unit_index)
+
+    # Get the tech tree
+    tech_tree_index = -1
+    for i, effect in enumerate(DATA.effects):
+        if 'tech tree' in effect.name.lower() and selected_civ_name.lower() in effect.name.lower():
+            tech_tree_index = i
+            break
+        
+    # Enable/Disable unit in the JSON file
+    with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
+        lines = file.readlines()
+        for i in range(tech_tree_index, len(lines)):
+            if f'"Name": "{unit_name.title()}"' in lines[i]:
+                if TECH_TREE[unit_name.lower()] == 1 and mode == 'toggle' or mode == 'enable':
+                    lines[i + 3] = f'          "Node Status": "ResearchedCompleted",\n'
+                elif TECH_TREE[unit_name.lower()] != 1 and mode == 'toggle' or mode == 'disable':
+                    lines[i + 3] = f'          "Node Status": "NotAvailable",\n'
+                break
+
+        file.seek(0)
+        file.writelines(lines)
+        file.truncate()
+
+    # Find the relevant effect
+    effect_index = -1
+    for i, effect in enumerate(DATA.effects):
+        for ec in effect.effect_commands:
+            # Look for the unit being mentioned in the effect commands
+            if (ec.type == 2 and ec.a == unit_index) or (ec.type == 3 and ec.b == unit_index):
+                print(f'Effect found at {i}')
+                effect_index = i
+    
+    # Find the relevant tech
+    tech_indexes = []
+    for i, tech in enumerate(DATA.techs):
+        if tech.effect_id == effect_index:
+            tech_indexes.append(i)
+            print(f'Tech found at {i}')
+        
+    print('unit status:', TECH_TREE[unit_name.lower()], mode)
+    # Enable unit in the .dat file
+    if TECH_TREE[unit_name.lower()] == 0 and mode == 'toggle' or mode == 'enable':
+        for i, effect_command in enumerate(DATA.effects[tech_tree_index].effect_commands):
+            if effect_command.type == 102 and effect_command.d in tech_indexes:
+                # Remove the effect command that disables the unit, enabling it
+                DATA.effects[tech_tree_index].effect_commands.pop(i)
+                print('Enabled')
+
+    # Disable unit in the .dat file
+    elif TECH_TREE[unit_name.lower()] != 0 and mode == 'toggle' or mode == 'disable':
+        # Create the disabling effect command
+        for tech_index in tech_indexes:
+            DATA.effects[tech_tree_index].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))
+        print('Disabled')'''
+
 def open_mod(mod_folder):
     print('\nLoading mod...')
     global DATA
@@ -1118,6 +1250,7 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
                 #1157 - (Gajah Mada)
                 #1067 - Skull Knight (Itzcoatl)
                 #188 - Flamethrower
+                #1574 - ??? (Sosso Guard)
                 line_count = 0
                 unit_bank = [
                     ['Amazon Warrior', 'Amazon Warriors', r'Fast-moving infantry unit. Strong vs. buildings and siege weapons. Weak vs. archers and cavalry. <i> Upgrades: attack, armor (Blacksmith); speed (Barracks); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
@@ -1240,6 +1373,19 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
     for i, tech_id in enumerate(preexisting_bonuses):
         DATA.techs[tech_id].name = new_existing_bonus_names[i]
         DATA.effects[DATA.techs[tech_id].effect_id].name = new_existing_bonus_names[i]
+
+    # Fix the Tech Tree JSON names
+    with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
+        lines = file.readlines()
+        file.seek(0)              # Go back to the start of the file
+        file.truncate()           # Clear the file content
+
+        for line in lines:
+            if line.strip() == '"civ_id": "INDIANS",':
+                line = '      "civ_id": "HINDUSTANIS",\n'
+            elif line.strip() == '"civ_id": "MAGYAR",':
+                line = '      "civ_id": "MAGYARS",\n'
+            file.write(line)
 
     # Save changes
     DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
@@ -1486,7 +1632,7 @@ def main():
                     # Title
                     if selection == '1':
                         # Get user input
-                        new_title = input(f"\nEnter new civilization title for {selected_civ_name} (ex. Infantry and Monk): ")
+                        new_title = input(f"\nEnter new civilization title for {selected_civ_name}: ")
 
                         # Quit if blank
                         if new_title == '':
@@ -2114,262 +2260,288 @@ def main():
                     # Tech Tree
                     elif selection == '7':
                         # Import the tech tree
-                        tech_tree = {}
-                        with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
-                            # Get the line of the selected civ
-                            lines = file.readlines()
-                            civ_id_line_indexes = [i for i, line in enumerate(lines) if '"civ_id":' in line]
-                            index = civ_id_line_indexes[selected_civ_index] + 1
+                        while True:
+                            # Tech tree main menu
+                            print("\033[32m\n--- Tech Tree Menu ---\033[0m")
+                            print("\033[33m0: Barracks\033[0m")
+                            print("\033[33m1: Archery Range\033[0m")
+                            print("\033[33m2: Stable\033[0m")
+                            print("\033[33m3: Blacksmith\033[0m")
+                            print("\033[33m4: Market\033[0m")
+                            print("\033[33m5: Dock\033[0m")
+                            print("\033[33m6: Siege Workshop\033[0m")
+                            print("\033[33m7: University\033[0m")
+                            print("\033[33m8: Monastery\033[0m")
+                            print("\033[33m9: Defensive\033[0m")
+                            print("\033[33m10: Castle\033[0m")
+                            print("\033[33m11: Economic\033[0m")
+                            selection = input("Selection: ")
 
-                            # Get the tech tree of the selected civ
-                            for line in lines[index:]:
-                                if '\"Name\":' in line:
-                                    selected_unit = line.split('\"Name\": "')[1].split('",')[0].lower()
-                                elif '\"Node Status\":' in line:
-                                    selected_status = line.split('\"Node Status\": "')[1].split('",')[0]
+                            # Set the tree
+                            if selection == '0':
+                                branch_title = 'Barracks'
+                                tree = [
+                                    ['Barracks (B)'],
+                                    ['Militia (U)', 'Man-at-Arms (U)', 'Long Swordsman (U)', 'Legionary (X)', 'Two-Handed Swordsman (U)', 'Champion (U)'],
+                                    ['Supplies (T)', 'Gambesons (T)'],
+                                    ['Spearman (U)', 'Pikeman (U)', 'Halberdier (U)'],
+                                    ['Eagle Scout (U)', 'Eagle Warrior (U)', 'Elite Eagle Warrior (U)'],
+                                    ['Squires (U)'],
+                                    ['Arson (U)'],
+                                    ['Condottiero (X2)'],
+                                    ['Flemish Militia (X2)']
+                                ]
+                            elif selection == '1':
+                                branch_title = 'Archery Range'
+                                tree = [
+                                    ['Archery Range (B)'],
+                                    ['Archer (U)', 'Crossbowman (U)', 'Arbalester (U)'],
+                                    ['Skirmisher (U)', 'Elite Skirmisher (U)', 'Imperial Skirmisher (X)'],
+                                    ['Slinger (X2)'], 
+                                    ['Hand Cannoneer (U2)'],
+                                    ['Cavalry Archer (U2)', 'Heavy Cavalry Archer (U2)'],
+                                    ['Elephant Archer (U2)', 'Elite Elephant Archer (U2)'],
+                                    ['Genitour (X)', 'Elite Genitour (X)'],
+                                    ['Thumb Ring (T)'],
+                                    ['Parthian Tactics (T)'],
+                                ]
+                            elif selection == '2':
+                                branch_title = 'Stable'
+                                tree = [
+                                    ['Stable (B)'],
+                                    ['Scout Cavalry (U)', 'Light Cavalry (U)', 'Winged Hussar (X)', 'Hussar (U)'],
+                                    ['Shrivamsha Rider (X)', 'Elite Shrivamsha Rider (X)'],
+                                    ['Bloodlines (T)'],
+                                    ['Knight (U)', 'Cavalier (U)', 'Savar (X)', 'Paladin (U)'],
+                                    ['Steppe Lancer (U)', 'Elite Steppe Lancer (U)'],
+                                    ['Camel Scout (X)', 'Camel Rider (U)', 'Heavy Camel Rider (U)', 'Imperial Camel Rider (X)'],
+                                    ['Battle Elephant (U)', 'Elite Battle Elephant (U)'],
+                                    ['Xolotl Warrior (X)'],
+                                    ['Husbandry (T)'],
+                                ]
+                            elif selection == '3':
+                                branch_title = 'Blacksmith'
+                                tree = [
+                                    ['Blacksmith (B)'],
+                                    ['Padded Archer Armor (T)', 'Leather Archer Armor (T)', 'Ring Archer Armor (T)'],
+                                    ['Fletching (T)', 'Bodkin Arrow (T)', 'Bracer (T)'],
+                                    ['Forging (T)', 'Iron Casting (T)', 'Blast Furnace (T)'],
+                                    ['Scale Barding Armor (T)', 'Chain Barding Armor (T)', 'Plate Barding Armor (T)'],
+                                    ['Scale Mail Armor (T)', 'Chain Mail Armor (T)', 'Plate Mail Armor (T)'],
+                                ]
+                            elif selection == '4':
+                                branch_title = 'Market'
+                                tree = [
+                                    ['Market (B)'],
+                                    ['Trade Cart (U)'],
+                                    ['Coinage (T)', 'Banking (T)'],
+                                    ['Caravan (T)'],
+                                    ['Guilds (T)'],
+                                ]
+                            elif selection == '5':
+                                branch_title = 'Dock'
+                                tree = [
+                                    ['Dock (B)'],
+                                    ['Fishing Ship (U)'],
+                                    ['Transport Ship (U)'],
+                                    ['Fire Galley (U)', 'Fire Ship (U)', 'Fast Fire Ship (U)'],
+                                    ['Trade Cog (U)'],
+                                    ['Gillnets (T)'],
+                                    ['Cannon Galleon (U)', 'Elite Cannon Galleon (U)'],
+                                    ['Demolition Raft (U)', 'Demolition Ship (U)', 'Heavy Demolition Ship (U)'],
+                                    ['Galley (U)', 'War Galley (U)', 'Galleon (U)'],
+                                    ['Dromon (X)'],
+                                    ['Turtle Ship (X2)', 'Elite Turtle Ship (X2)'],
+                                    ['Longboat (X2)', 'Elite Longboat (X2)'],
+                                    ['Caravel (X2)', 'Elite Caravel (X2)'],
+                                    ['Thirisadai (X2)'],
+                                    ['Careening (T)', 'Dry Dock (T)'],
+                                    ['Shipwright (T)'],
+                                    ['Fish Trap (U)'],
+                                ]
+                            elif selection == '6':
+                                branch_title = 'Siege Workshop'
+                                tree = [
+                                    ['Siege Workshop (B)'],
+                                    ['Battering Ram (U2)', 'Capped Ram (U2)', 'Siege Ram (U2)'],
+                                    ['Armored Elephant (U2)', 'Siege Elephant (U2)'],
+                                    ['Flaming Camel (X)'],
+                                    ['Mangonel (U)', 'Onager (U)', 'Siege Onager (U)'],
+                                    ['Scorpion (U)', 'Heavy Scorpion (U)'],
+                                    ['Siege Tower (U)'],
+                                    ['Bombard Cannon (U3)', 'Houfnice (X3)'],
+                                    ['Flamethrower (X3)']
+                                ]
+                            elif selection == '7':
+                                branch_title = 'University'
+                                tree = [
+                                    ['University (B)'],
+                                    ['Masonry (T)', 'Architecture (T)'],
+                                    ['Fortified Wall (T)'],
+                                    ['Chemistry (T)', 'Bombard Tower (T)'],
+                                    ['Ballistics (T)'],
+                                    ['Siege Engineers (T)'],
+                                    ['Guard Tower (T)', 'Keep (T)'],
+                                    ['Heated Shot (T)'],
+                                    ['Arrowslits (T)'],
+                                    ['Murder Holes (T)'],
+                                    ['Treadmill Crane (T)'],
+                                ]
+                            elif selection == '8':
+                                branch_title = 'Monastery'
+                                tree = [
+                                    ['Monastery (B2)'],
+                                    ['Fortified Church (B2)'],
+                                    ['Monk (U)'],
+                                    ['Missionary (X3)'],
+                                    ['Warrior Priest (X3)'],
+                                    ['Illumination (T)'],
+                                    ['Block Printing (T)'],
+                                    ['Devotion (T)', 'Faith (T)'],
+                                    ['Redemption (T)'],
+                                    ['Theocracy (T)'],
+                                    ['Atonement (T)'],
+                                    ['Herbal Medicine (T)'],
+                                    ['Heresy (T)'],
+                                    ['Sanctity (T)'],
+                                    ['Fervor (T)'],
+                                ]
+                            elif selection == '9':
+                                branch_title = 'Defensive'
+                                tree = [
+                                    ['Outpost (B)'],
+                                    ['Watch Tower (B)', 'Guard Tower (B)', 'Keep (B)', 'Bombard Tower (B)'],
+                                    ['Palisade Wall (B)'],
+                                    ['Stone Wall (B)', 'Fortified Wall (B)'],
+                                ]
+                            elif selection == '10':
+                                branch_title = 'Castle'
+                                tree = [
+                                    ['Castle (B)'],
+                                    ['Petard (U)'],
+                                    ['Trebuchet (U)'],
+                                    ['Hoardings (T)'],
+                                    ['Sappers (T)'],
+                                    ['Conscription (T)'],
+                                    ['Spies/Treason (T)'],
+                                ]
+                            elif selection == '11':
+                                branch_title = 'Economic'
+                                tree = [
+                                    ['House (B)'],
+                                    ['Town Center (B)'],
+                                    ['Villager (U)'],
+                                    ['Town Watch (T)', 'Town Patrol (T)'],
+                                    ['Loom (T)'],
+                                    ['Wheelbarrow (T)', 'Hand Cart (T)'],
+                                    ['Mining Camp (B)'],
+                                    ['Gold Mining (T)', 'Gold Shaft Mining (T)'],
+                                    ['Stone Mining (T)', 'Stone Shaft Mining (T)'],
+                                    ['Lumber Camp (B2)'],
+                                    ['Mule Cart (B2)'],
+                                    ['Double-Bit Axe (T)', 'Bow Saw (T)', 'Two-Man Saw (T)'],
+                                    ['Mill (B3)'],
+                                    ['Folwark (B3)'],
+                                    ['Farm (B)'],
+                                    ['Horse Collar (T)', 'Heavy Plow (T)', 'Crop Rotation (T)'],
+                                ]
+                            elif selection == '':
+                                break
 
-                                    # Convert status to integer
-                                    if selected_status == 'NotAvailable':
-                                        selected_status = 0
-                                    elif selected_status == 'ResearchedCompleted':
-                                        selected_status = 1
-                                    elif selected_status == 'ResearchRequired':
-                                        selected_status = 2
+                            while True:
+                                global TECH_TREE
+                                TECH_TREE = {}
+                                with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
+                                    # Get the line of the selected civ
+                                    lines = file.readlines()
+                                    civ_id_line_indexes = [i for i, line in enumerate(lines) if '"civ_id":' in line]
+                                    index = civ_id_line_indexes[selected_civ_index] + 1
 
-                                    # Add to tech tree
-                                    tech_tree[selected_unit] = selected_status
+                                    # Get the tech tree of the selected civ
+                                    for line in lines[index:]:
+                                        if '\"Name\":' in line:
+                                            selected_unit = line.split('\"Name\": "')[1].split('",')[0].lower()
+                                        elif '\"Node Status\":' in line:
+                                            selected_status = line.split('\"Node Status\": "')[1].split('",')[0]
 
-                                # Check for the end of the tech tree section
-                                if 'civ_id' in line:
-                                    break
+                                            # Convert status to integer
+                                            if selected_status == 'NotAvailable':
+                                                selected_status = 0
+                                            elif selected_status == 'ResearchedCompleted':
+                                                selected_status = 1
+                                            elif selected_status == 'ResearchRequired':
+                                                selected_status = 2
 
-                        # Tech tree menu
-                        while selection != 3:
-                            with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
-                                # Get index of selected civ
-                                lines = file.readlines()
-                                tech_tree_indexes = []
-                                for i, line in enumerate(lines):
-                                    if "civ_id" in line:
-                                        tech_tree_indexes.append(i)
-                                tech_tree_index = tech_tree_indexes[selected_civ_index]
-                                tech_tree_indexes = [254, 258, 259, 262, 255, 257, 256, 260, 261, 263, 276, 277, 275, 446, 447, 449, 448, 504, 10, 1, 3, 5, 7, 31, 48, 42, 37, 646, 648, 650, 652, 706, 708, 710, 712, 782, 784, 801, 803, 838, 840, 842, 890, 925, 927]
+                                            # Add to tech tree
+                                            TECH_TREE[selected_unit] = selected_status
 
-                                # Show menu
-                                print("\033[32m\n--- Tech Tree Menu ---\033[0m")
-                                print("\033[33m0: View Tech Tree\033[0m")
-                                print("\033[33m1: Enable Items\033[0m")
-                                print("\033[33m2: Disable Items\033[0m")
-                                selection = input("Selection: ")
-
-                                # Exit
-                                if selection == '':
-                                    break
-
-                                # Enable or Disable Items
-                                elif selection == '1' or selection == '2':
-                                    # Choose whether enabling or disabling
-                                    if selection == '1':
-                                        enable_disable = 'enable'
-                                    else:
-                                        enable_disable = 'disable'
-
-                                    unit = 'X'
-                                    while unit != '':
-                                        unit = input(f'\nEnter the unit, building, or technology name to {enable_disable}: ').lower()
-
-                                        # Save changes
-                                        if unit == '':
-                                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                        # Check for the end of the tech tree section
+                                        if 'civ_id' in line:
                                             break
 
-                                        if unit in tech_tree:
-                                            # Update .json file
-                                            for i in range(tech_tree_index, len(lines)):
-                                                if f'\"Name\": \"{unit.title()}\"' in lines[i]:
-                                                    if enable_disable == 'enable':
-                                                        lines[i + 3] = f'          \"Node Status\": \"ResearchedCompleted\",\n'
-                                                    else:
-                                                        lines[i + 3] = f'          \"Node Status\": \"NotAvailable\",\n'
-                                                    break
-                                            file.seek(0)
-                                            file.writelines(lines)
-                                            file.truncate()
-
-                                            # Get unit index
-                                            match = re.search(r'\d+', lines[i + 2])
-                                            if match:
-                                                unit_index = int(match.group())
-
-                                            # Get tech index
-                                            found = False
-                                            for i, tech in enumerate(DATA.techs):
-                                                for ec in DATA.effects[tech.effect_id].effect_commands:
-                                                    if (ec.type == 2 and ec.a == unit_index) or (ec.type == 3 and ec.b == unit_index):
-                                                        tech_index = i
-                                                        found = True
-                                                        break
-                                                if found:
-                                                    break
-
-                                            # Update .dat file
-                                            unit_changed = False
-                                            if enable_disable == 'enable':
-                                                for i, effect_command in enumerate(DATA.effects[tech_tree_indexes[selected_civ_index + 1]].effect_commands):
-                                                    if effect_command.type == 102 and effect_command.d == tech_index:
-                                                        DATA.effects[tech_tree_indexes[selected_civ_index + 1]].effect_commands.pop(i)
-                                                        unit_changed = True
-                                            elif enable_disable == 'disable':
-                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))
-                                                unit_changed = True
-
-                                            if unit_changed:
-                                                print(f'{unit.title()} {enable_disable}d.')
+                                # Print the respective branch of the tree
+                                print(f"\033[32m\n--- {branch_title} Branch Menu ---\033[0m")
+                                tree_string = ''
+                                for i, branch in enumerate(tree):
+                                    twig_string = ''
+                                    for letter, twig in zip(string.ascii_uppercase, branch):
+                                        try:
+                                            if (TECH_TREE[twig.lower()[:-4]] == 0):
+                                                twig_string += f'[{i}{letter}] \033[31m{twig[:-4]}\033[0m --> '
                                             else:
-                                                print(f'{unit.title()} was already {enable_disable}d.')
-                                        elif unit != '':
-                                            print(f"\033[31mERROR: {unit.title()} not found.\033[0m")
+                                                twig_string += f'[{i}{letter}] \033[32m{twig[:-4]}\033[0m --> '
+                                        except:
+                                            pass
+                                    tree_string += twig_string
+                                    print(twig_string[:-4])
+                                toggle_selection = input("Addresses: ")
 
-                                # View Tech Tree
-                                if selection == '0':
-                                    print('\nKEY: 0 = Disabled, 1 = Enabled, 2 = Enabled (Research Required)')
-                                    time.sleep(2)
-                                    print(f'\n-- ARCHERY RANGE -- [{tech_tree["Archery Range"]}]')
-                                    print(f'Archer [{tech_tree["Archer"]}] --> Crossbowman [{tech_tree["Crossbowman"]}] --> Arbalester [{tech_tree["Arbalester"]}]')
-                                    print(f'Skirmisher [{tech_tree["Skirmisher"]}] --> Elite Skirmisher [{tech_tree["Elite Skirmisher"]}]')
-                                    print(f'Hand Cannoneer [{tech_tree["Hand Cannoneer"]}]')
-                                    print(f'Cavalry Archer [{tech_tree["Cavalry Archer"]}] --> Heavy Cavalry Archer [{tech_tree["Heavy Cavalry Archer"]}]')
-                                    print(f'Elephant Archer [{tech_tree["Elephant Archer"]}] --> Elite Elephant Archer [{tech_tree["Elite Elephant Archer"]}]')
-                                    print(f'Thumb Ring [{tech_tree["Thumb Ring"]}]')
-                                    print(f'Parthian Tactics [{tech_tree["Parthian Tactics"]}]')
+                                # Exit
+                                if toggle_selection == '':
+                                    break
 
-                                    time.sleep(1)
-                                    print(f'\n-- BARRACKS -- [{tech_tree["Barracks"]}]')
-                                    print(f'Militia [{tech_tree["Militia"]}] --> Man-at-Arms [{tech_tree["Man-at-Arms"]}] --> Long Swordsman [{tech_tree["Long Swordsman"]}] --> Two-Handed Swordsman [{tech_tree["Two-Handed Swordsman"]}] --> Champion [{tech_tree["Champion"]}]')
-                                    print(f'Supplies [{tech_tree["Supplies"]}] --> Gambesons [{tech_tree["Gambesons"]}]')
-                                    print(f'Spearman [{tech_tree["Spearman"]}] --> Pikeman [{tech_tree["Pikeman"]}] --> Halberdier [{tech_tree["Halberdier"]}]')
-                                    print(f'Eagle Scout [{tech_tree["Eagle Scout"]}] --> Eagle Warrior [{tech_tree["Eagle Warrior"]}] --> Elite Eagle Warrior [{tech_tree["Elite Eagle Warrior"]}]')
-                                    print(f'Squires [{tech_tree["Squires"]}]')
-                                    print(f'Arson [{tech_tree["Arson"]}]')
+                                # Help
+                                elif toggle_selection == '?':
+                                    print('\n\x1b[35mGreen items are enabled. Red items are disabled.\x1b[0m')
+                                    print('\x1b[35mType any address to toggle enable/disable the item.\x1b[0m')
+                                    print('\x1b[35mYou may stack several addresses in one line, separated by a space.\x1b[0m')
 
-                                    time.sleep(1)
-                                    print(f'\n-- STABLE -- [{tech_tree["Stable"]}]')
-                                    print(f'Scout Cavalry [{tech_tree["Scout Cavalry"]}] --> Light Cavalry [{tech_tree["Light Cavalry"]}] --> Hussar [{tech_tree["Hussar"]}]')
-                                    print(f'Bloodlines [{tech_tree["Bloodlines"]}]')
-                                    print(f'Knight [{tech_tree["Knight"]}] --> Cavalier [{tech_tree["Cavalier"]}] --> Paladin [{tech_tree["Paladin"]}]')
-                                    print(f'Steppe Lancer [{tech_tree["Steppe Lancer"]}] --> Elite Steppe Lancer [{tech_tree["Elite Steppe Lancer"]}]')
-                                    print(f'Camel Rider [{tech_tree["Camel Rider"]}] --> Heavy Camel Rider [{tech_tree["Heavy Camel Rider"]}]')
-                                    print(f'Battle Elephant [{tech_tree["Battle Elephant"]}] --> Elite Battle Elephant [{tech_tree["Elite Battle Elephant"]}]')
-                                    print(f'Husbandry [{tech_tree["Husbandry"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- SIEGE WORKSHOP -- [{tech_tree["Siege Workshop"]}]')
-                                    print(f'Battering Ram [{tech_tree["Battering Ram"]}] --> Capped Ram [{tech_tree["Capped Ram"]}] --> Siege Ram [{tech_tree["Siege Ram"]}]')
-                                    print(f'Armored Elephant [{tech_tree["Armored Elephant"]}] --> Siege Elephant [{tech_tree["Siege Elephant"]}]')
-                                    print(f'Mangonel [{tech_tree["Mangonel"]}] --> Onager [{tech_tree["Onager"]}] --> Siege Onager [{tech_tree["Siege Onager"]}]')
-                                    print(f'Scorpion [{tech_tree["Scorpion"]}] --> Heavy Scorpion [{tech_tree["Heavy Scorpion"]}]')
-                                    print(f'Siege Tower [{tech_tree["Siege Tower"]}]')
-                                    print(f'Bombard Cannon [{tech_tree["Bombard Cannon"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- BLACKSMITH -- [{tech_tree["Blacksmith"]}]')
-                                    print(f'Padded Archer Armor [{tech_tree["Padded Archer Armor"]}] --> Leather Archer Armor [{tech_tree["Leather Archer Armor"]}] --> Ring Archer Armor [{tech_tree["Ring Archer Armor"]}]')
-                                    print(f'Fletching [{tech_tree["Fletching"]}] --> Bodkin Arrow [{tech_tree["Bodkin Arrow"]}] --> Bracer [{tech_tree["Bracer"]}]')
-                                    print(f'Forging [{tech_tree["Forging"]}] --> Iron Casting [{tech_tree["Iron Casting"]}] --> Blast Furnace [{tech_tree["Blast Furnace"]}]')
-                                    print(f'Scale Barding Armor [{tech_tree["Scale Barding Armor"]}] --> Chain Barding Armor [{tech_tree["Chain Barding Armor"]}] --> Plate Barding Armor [{tech_tree["Plate Barding Armor"]}]')
-                                    print(f'Scale Mail Armor [{tech_tree["Scale Mail Armor"]}] --> Chain Mail Armor [{tech_tree["Chain Mail Armor"]}] --> Plate Mail Armor [{tech_tree["Plate Mail Armor"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- DOCK -- [{tech_tree["Dock"]}]')
-                                    print(f'Fishing Ship [{tech_tree["Fishing Ship"]}]')
-                                    print(f'Transport Ship [{tech_tree["Transport Ship"]}]')
-                                    print(f'Fire Galley [{tech_tree["Fire Galley"]}] --> Fire Ship [{tech_tree["Fire Ship"]}] --> Fast Fire Ship [{tech_tree["Fast Fire Ship"]}]')
-                                    print(f'Trade Cog [{tech_tree["Trade Cog"]}]')
-                                    print(f'Gillnets [{tech_tree["Gillnets"]}]')
-                                    print(f'Cannon Galleon [{tech_tree["Cannon Galleon"]}] --> Elite Cannon Galleon [{tech_tree["Elite Cannon Galleon"]}]')
-                                    print(f'Demolition Raft [{tech_tree["Demolition Raft"]}] --> Demolition Ship [{tech_tree["Demolition Ship"]}] --> Heavy Demolition Ship [{tech_tree["Heavy Demolition Ship"]}]')
-                                    print(f'Galley [{tech_tree["Galley"]}] --> War Galley [{tech_tree["War Galley"]}] --> Galleon [{tech_tree["Galleon"]}]')
-                                    print(f'Dromon [{tech_tree["Dromon"]}]')
-                                    print(f'Careening [{tech_tree["Careening"]}] --> Dry Dock [{tech_tree["Dry Dock"]}]')
-                                    print(f'Shipwright [{tech_tree["Shipwright"]}]')
-                                    print(f'Fish Trap [{tech_tree["Fish Trap"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- UNIVERSITY -- [{tech_tree["University"]}]')
-                                    print(f'Masonry [{tech_tree["Masonry"]}] --> Architecture [{tech_tree["Architecture"]}]')
-                                    print(f'Fortified Wall [{tech_tree["Fortified Wall"]}]')
-                                    print(f'Chemistry [{tech_tree["Chemistry"]}] --> Bombard Tower [{tech_tree["Bombard Tower"]}]')
-                                    print(f'Ballistics [{tech_tree["Ballistics"]}]')
-                                    print(f'Siege Engineers [{tech_tree["Siege Engineers"]}]')
-                                    print(f'Guard Tower [{tech_tree["Guard Tower"]}] --> Keep [{tech_tree["Keep"]}]')
-                                    print(f'Heated Shot [{tech_tree["Heated Shot"]}]')
-                                    print(f'Arrowslits [{tech_tree["Arrowslits"]}]')
-                                    print(f'Murder Holes [{tech_tree["Murder Holes"]}]')
-                                    print(f'Treadmill Crane [{tech_tree["Treadmill Crane"]}]')
-
-                                    time.sleep(1)
-                                    print(f'OUTPOST [{tech_tree["Outpost"]}]')
-                                    print(f'WATCH TOWER [{tech_tree["Watch Tower"]}]')
-                                    print(f'GUARD TOWER [{tech_tree["Guard Tower"]}]')
-                                    print(f'KEEP [{tech_tree["Keep"]}]')
-                                    print(f'BOMBARD TOWER [{tech_tree["Bombard Tower"]}]')
-                                    print(f'PALISADE WALL [{tech_tree["Palisade Wall"]}]')
-                                    print(f'STONE WALL [{tech_tree["Stone Wall"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- CASTLE -- [{tech_tree["Castle"]}]')
-                                    print(f'Petard [{tech_tree["Petard"]}]')
-                                    print(f'Trebuchet [{tech_tree["Trebuchet (Packed)"]}]')
-                                    print(f'Hoardings [{tech_tree["Hoardings"]}]')
-                                    print(f'Sappers [{tech_tree["Sappers"]}]')
-                                    print(f'Conscription [{tech_tree["Conscription"]}]')
-                                    print(f'Spies/Treason [{tech_tree["Spies/Treason"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- MONASTERY -- [{tech_tree["Monastery"]}]')
-                                    print(f'Monk [{tech_tree["Monk"]}]')
-                                    print(f'Illumination [{tech_tree["Illumination"]}]')
-                                    print(f'Block Printing [{tech_tree["Block Printing"]}]')
-                                    print(f'Devotion [{tech_tree["Devotion"]}] --> Faith [{tech_tree["Faith"]}]')
-                                    print(f'Redemption [{tech_tree["Redemption"]}]')
-                                    print(f'Theocracy [{tech_tree["Theocracy"]}]')
-                                    print(f'Atonement [{tech_tree["Atonement"]}]')
-                                    print(f'Herbal Medicine [{tech_tree["Herbal Medicine"]}]')
-                                    print(f'Heresy [{tech_tree["Heresy"]}]')
-                                    print(f'Sanctity [{tech_tree["Sanctity"]}]')
-                                    print(f'Fervor [{tech_tree["Fervor"]}]')
-
-                                    time.sleep(1)
-                                    print(f'HOUSE [{tech_tree["House"]}]')
-                                    print(f'\n-- TOWN CENTER -- [{tech_tree["Town Center"]}]')
-                                    print(f'Villager [{tech_tree["Villager"]}]')
-                                    print(f'Town Watch [{tech_tree["Town Watch"]}] --> Town Patrol [{tech_tree["Town Patrol"]}]')
-                                    print(f'Loom [{tech_tree["Loom"]}]')
-                                    print(f'Wheelbarrow [{tech_tree["Wheelbarrow"]}] --> Hand Cart [{tech_tree["Hand Cart"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- MINING CAMP -- [{tech_tree["Mining Camp"]}]')
-                                    print(f'Gold Mining [{tech_tree["Gold Mining"]}] --> Gold Shaft Mining [{tech_tree["Gold Shaft Mining"]}]')
-                                    print(f'Stone Mining [{tech_tree["Stone Mining"]}] --> Stone Shaft Mining [{tech_tree["Stone Shaft Mining"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- LUMBER CAMP -- [{tech_tree["Lumber Camp"]}]')
-                                    print(f'Double-Bit Axe [{tech_tree["Double-Bit Axe"]}] --> Bow Saw [{tech_tree["Bow Saw"]}] --> Two-Man Saw [{tech_tree["Two-Man Saw"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- MARKET -- [{tech_tree["Market"]}]')
-                                    print(f'Trade Cart [{tech_tree["Trade Cart"]}]')
-                                    print(f'Coinage [{tech_tree["Coinage"]}] --> Banking [{tech_tree["Banking"]}]')
-                                    print(f'Caravan [{tech_tree["Caravan"]}]')
-                                    print(f'Guilds [{tech_tree["Guilds"]}]')
-
-                                    time.sleep(1)
-                                    print(f'\n-- MILL -- [{tech_tree["Mill"]}]')
-                                    print(f'Farm [{tech_tree["Farm"]}]')
-                                    print(f'Horse Collar [{tech_tree["Horse Collar"]}] --> Heavy Plow [{tech_tree["Heavy Plow"]}] --> Crop Rotation [{tech_tree["Crop Rotation"]}]')
-
+                                # Toggle units
                                 else:
-                                    print("Invalid selection. Try again.")
+                                    toggle_addresses = toggle_selection.split(' ')
+
+                                    # Toggle each unit
+                                    for address in toggle_addresses:
+                                        try:
+                                            # Convert the address into the unit's name
+                                            unit_to_toggle = tree[int(address[0])][ord(address[1].upper()) - ord('A')][:-4]
+
+                                            # Toggle the unit's value in the tree between 0 and 1
+                                            TECH_TREE[unit_to_toggle.lower()] = abs(TECH_TREE[unit_to_toggle.lower()])
+
+                                            # Get the tech tree effect index
+                                            for i, effect in enumerate(DATA.effects):
+                                                if 'tech tree' in effect.name.lower() and selected_civ_name.lower() in effect.name.lower():
+                                                    tech_tree_index = i
+                                                    break
+
+                                            # Toggle the unit
+                                            toggle_unit(get_unit_id(unit_to_toggle), 'toggle', tech_tree_index, selected_civ_name)
+
+                                            # Follow toggle rules
+                                            # If disabling, disable all non-X units that are higher
+                                            # If enabling, enable all non-X units that are lower
+                                            # If enabling an X unit, disable all non-X that are higher
+                                            # If enabling a tiered unit, disable all units in the same tier on the same branch
+                                            
+                                        except Exception as e:
+                                            print(e)
+                                            #print(f'Invalid address: {address.upper()}')
+
+                                    # Save the .dat file and tell the user the update is complete
+                                    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                    print(f'{selected_civ_name} Tech Tree updated.')
+                                    time.sleep(1)
             else:
                 print("Invalid selection. Try again.")
         except ValueError:
