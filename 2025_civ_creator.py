@@ -666,7 +666,7 @@ def create_bonus(bonus_string, civ_id):
             # Change work rate
             bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id, -1, 14, bonus_number[0]))
 
-    # Start with [#] [Resource] # INACTIVE
+    # Start with [#] [Resource]
     elif 'start with' in bonus_string or 'starts with' in bonus_string:
         # Get items
         get_bonus_tech_resource()
@@ -687,7 +687,7 @@ def create_bonus(bonus_string, civ_id):
         # Create effect commands
         for resource_id in bonus_tech_resource:
             # Change work rate
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, resource_id, 1, -1, bonus_number[0]))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, 91 + resource_id, 1, -1, bonus_number[0]))
 
     # Relics generate [%] gold
     elif 'relics generate' in bonus_string or 'relic generates' in bonus_string:
