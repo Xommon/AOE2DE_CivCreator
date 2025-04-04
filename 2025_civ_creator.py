@@ -922,11 +922,12 @@ def open_mod(mod_folder):
     with open(f'{MOD_FOLDER}/{mod_folder.split("/")[-1]}.pkl', 'rb') as file:
         while True:
             try:
-                architecture_set = pickle.load(file)
-                ARCHITECTURE_SETS.append(architecture_set)
-                file.readline()  # Read the newline character
+                units = pickle.load(file)
+                ARCHITECTURE_SETS.append(units)
             except EOFError:
                 break
+
+    # Tell the user that the mod was loaded
     print('Mod loaded!')
     
 def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
@@ -1300,7 +1301,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     with open(f'{MOD_FOLDER}/{mod_name}.pkl', 'wb') as file:
         for civ in DATA.civs:
             pickle.dump(civ.units, file)
-            file.write(b'\n')
 
     # Correct name mistakes for the Britons and the Franks
     DATA.civs[1].name = 'Britons'
@@ -1493,8 +1493,9 @@ def main():
                             # Get the graphic of the unit
                             unit_id = int(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic[0])
 
+                            # Determine which architecture set is currently being used
                             # KEY: (university: 209, castle: 82, wonder: 276)
-                            architecture_sets = {'African': [9084, 8747], 'Central Asian': [12084, 11747], 'Central European': [566, 171], 'East Asian': [567, 172], 'Eastern European': [8084, 7747], 'Mediterranean': [593, 177], 'Middle Eastern': [568, 173], 'American': [7084, 6747], 'South Asian': [10084, 12477], 'Southeast Asian': [11084, 10747], 'Southeast European': [15806, 15848], 'Western European': [569, 174]}
+                            architecture_sets = {'African': [9084, 8747], 'Central Asian': [12084, 11747], 'Central European': [566, 171], 'East Asian': [567, 172], 'Eastern European': [8084, 7747], 'Mediterranean': [593, 177], 'Middle Eastern': [568, 173], 'Mesoamerican': [7084, 6747], 'South Asian': [10084, 12477], 'Southeast Asian': [11084, 10747], 'Southeast European': [15806, 15848], 'Western European': [569, 174]}
                             for arch, ids in architecture_sets.items():
                                 if unit_id in ids:
                                     return arch
@@ -2061,9 +2062,15 @@ def main():
                         # Architecture
                         elif selection == '5':
                             # Gather base architectures
-                            base_architectures = []
-                            for i in range(1, len(DATA.civs)):
-                                base_architectures.append(DATA.civs[i].name)
+                            base_architectures = [
+                                ["African", "Central Asian", "Central European", "East Asian", "Eastern European", "Mediterranean", "Middle Eastern", "Mesoamerican", "South Asian", "Southeast Asian", "Western European", "Southeast European"],
+                                [],
+                                []
+                            ]
+                            for civ in DATA.civs:
+                                if civ.name != 'Spartans' and civ.name != 'Athenians' and civ.name != 'Achaemenids' and civ.name != 'Gaia':
+                                    base_architectures[1].append(civ.name)
+                                    base_architectures[2].append(civ.name)
 
                             # Gather custom architectures
                             custom_arcs = [
@@ -2078,105 +2085,79 @@ def main():
                             print('\n')
                             for i in range(3):
                                 # Assemble all architecture options
-                                all_architectures = base_architectures + custom_arcs[i]
+                                all_architectures = base_architectures[i] + custom_arcs[i]
 
-                                architecture_selection = '?'
-                                while architecture_selection == '?':
+                                while True:
+                                    # Get user input
                                     architecture_selection = input(f"Enter {architecture_types[i]} architecture for {selected_civ_name}: ").lower()
 
+                                    # Help
                                     if architecture_selection == '?':
                                         # Print all available options
-                                        print(', '.join(all_architectures))
-                                        print('Leave blank to leave the architecture type unchanged')
-                                        print('Type \'default\' to switch back to the Civilization\'s original architecture.')
+                                        for j, arc in enumerate(all_architectures):
+                                            print(f'{j}: {arc}')
+                                        print('Leave blank to leave the architecture type unchanged.\n')
+                                        #print('Type \'default\' to switch back to the Civilization\'s original architecture.')
                                         continue
-                                    
-                                    # Check against architecture options
-                                    for i2 in range(len(all_architectures)):
-                                        if architecture_selection == all_architectures[i2].lower():
-                                            architecture_changes[i] = i2
-                                            break
-                                        
-                                    # Use previous architecture if blank
-                                    if architecture_selection == '':
+                                    elif architecture_selection == '':
                                         architecture_changes[i] = -1
+                                        break
 
-                                    # Use default architecture
-                                    elif architecture_selection == 'default':
-                                        architecture_changes[i] = selected_civ_index
+                                    # Try to convert to an integer
+                                    try:
+                                        architecture_selection = int(architecture_selection)
+                                    except:
+                                        print(f'\033[31mERROR: {architecture_types[i]} architecture index not valid.\n\033[0m')
+                                        continue
 
-                                    # Check if architecture is invalid
-                                    elif architecture_changes[i] == -1:
-                                        architecture_selection = '?'
-                                        print(f'\033[31mERROR: {architecture_types[i]} architecture type not valid.\n\033[0m')
+                                    # Check against architecture options
+                                    if architecture_selection > -1 and architecture_selection < len(all_architectures):
+                                        architecture_changes[i] = architecture_selection
+
+                                        if i == 0:
+                                            # Convert int into the place of the architecture index in the file
+                                            architecture_indexes_in_file = [26, 34, 3, 5, 23, 14, 8, 15, 20, 28, 1, 7]
+                                            architecture_selection = architecture_indexes_in_file[architecture_selection]
+                                        break
+                                    else:
+                                        # Print error
+                                        print(f'\033[31mERROR: {architecture_types[i]} architecture index not valid.\n\033[0m')
 
                             for i in range(3):
                                 # Skip if unspecified
                                 if architecture_changes[i] == -1:
                                     continue
 
-                                # Load architecture graphics
-                                try:
-                                    original_units = ARCHITECTURE_SETS[architecture_changes[i] + 1]
-                                except:
-                                    original_units = ARCHITECTURE_SETS[architecture_changes[1]]
-
                                 # Specify which unit IDs need to change
-                                if i == 0:
+                                if i == 0: # General
                                     all_units_to_change = range(0, len(DATA.civs[1].units))
-                                elif i == 1:
+                                elif i == 1: # Castle
                                     all_units_to_change = [82, 1430]
-                                elif i == 2:
+                                elif i == 2: # Wonder
                                     all_units_to_change = [276, 1445]
 
                                 for unit_id in all_units_to_change:
-                                    # Select which unit will be the basis for change
-                                    if (architecture_changes[i] < len(DATA.civs) - 1):
-                                        unit_to_change_to = original_units[unit_id]
+                                    # Replace the unit or the graphics
+                                    if architecture_changes[i] < len(base_architectures[i]):
+                                        # Base units
+                                        if i == 0:
+                                            DATA.civs[selected_civ_index + 1].units[unit_id] = ARCHITECTURE_SETS[architecture_changes[i]][unit_id]
+                                        else:
+                                            DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].standing_graphic
+                                            DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].dying_graphic
+                                            DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].damage_graphics
                                     else:
-                                        # Custom unit
-                                        custom_ids = [
-                                            [],
-                                            [[445, 1488]],
-                                            [[1622, 1517], [690, 1482], [1369, 1493], [1217, 1487], [1773, 1530], [689, 1515], [873, 1489], [1367, 1491], [1368, 1492]]
-                                        ]
-
-                                        custom_unit_id = custom_ids[i][architecture_changes[i] - len(DATA.civs) + 1][all_units_to_change.index(unit_id)]
-                                        unit_to_change_to = original_units[custom_unit_id]
-
-                                    # Look for custom unit
-                                    if len(custom_arcs[i]) > 0:
-                                        for j, custom_arc in enumerate(custom_arcs[i]):
-                                            if architecture_selection == custom_arc:
-                                                unit_to_change_to = DATA.civs[selected_civ_index].units.index(custom_arc)
-                                                print(unit_to_change_to)
-                                                break
-
-                                    # Standing graphic
-                                    try:
-                                        standing_graphic_list = list(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic)  # Convert to list for modification
-                                        standing_graphic_list[0] = int(unit_to_change_to.standing_graphic[0])  # Ensure it's an integer
-                                        DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = tuple(standing_graphic_list)  # Convert back to tuple
-                                    except:
-                                        pass
-
-                                    # Dying graphic
-                                    try:
-                                        DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = unit_to_change_to.dying_graphic  # Ensure it's an integer
-                                    except:
-                                        pass
-
-                                    # Damage graphics
-                                    try:
-                                        for j in range(3):  # Loop through the first 3 damage graphics
-                                            if j < len(DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics):
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics[j].graphic_id = unit_to_change_to.damage_graphics[j].graphic_id # Ensure it's an integer
-                                    except:
-                                        pass
+                                        # Custom units
+                                        if i == 0:
+                                            DATA.civs[selected_civ_index + 1].units[unit_id] = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])]
+                                        else:
+                                            DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].standing_graphic
+                                            DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].dying_graphic
+                                            DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].damage_graphics
 
                             # Save changes
                             DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                            print(f"Architecture changed.")
+                            print(f"Architecture changed for {selected_civ_name}.")
                             time.sleep(1)
 
                         # Language
