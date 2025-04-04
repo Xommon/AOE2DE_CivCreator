@@ -26,6 +26,8 @@ import re
 import string
 import pyperclip
 from prompt_toolkit import prompt
+import platform
+import subprocess
 
 class Building:
     def __init__(self):
@@ -378,12 +380,8 @@ def create_bonus(bonus_string, civ_id):
         # Add exception units
         for i, unit in enumerate(DATA.civs[1].units):
             try:
-                if get_unit_name(i).lower() == 'militia':
-                    print('militia')
-
                 if get_unit_name(i).lower() in bonus_string and get_unit_name(i) != '':
                     unit_line_index = bonus_string.find(get_unit_name(i).lower())
-                    print(parentheses_positions[0], '<', unit_line_index, '>', parentheses_positions[1])
 
                     if unit_line_index > parentheses_positions[0] and unit_line_index < parentheses_positions[1]:
                         excluded_units.append(i)
@@ -829,8 +827,12 @@ def create_bonus(bonus_string, civ_id):
     return bonus_technology, bonus_effect
 
 def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
-    # Get unit name
-    unit = get_unit_name(unit_index).lower()
+    # Get unit name or tech name
+    is_tech = '_' in str(unit_index)
+    if is_tech:
+        unit = DATA.techs[int(unit_index[1:])].name.lower()
+    else:
+        unit = get_unit_name(unit_index).lower()
 
     # Determine whether enabling or disabling
     if mode == 'toggle' and TECH_TREE[unit] == 0:
@@ -865,15 +867,18 @@ def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
             file.truncate()
 
     # Get tech index
-    found = False
-    for i, tech in enumerate(DATA.techs):
-        for ec in DATA.effects[tech.effect_id].effect_commands:
-            if (ec.type == 2 and ec.a == unit_index) or (ec.type == 3 and ec.b == unit_index):
-                tech_index = i
-                found = True
+    if not is_tech:
+        found = False
+        for i, tech in enumerate(DATA.techs):
+            for ec in DATA.effects[tech.effect_id].effect_commands:
+                if (ec.type == 2 and ec.a == unit_index) or (ec.type == 3 and ec.b == unit_index):
+                    tech_index = i
+                    found = True
+                    break
+            if found:
                 break
-        if found:
-            break
+    else:
+        tech_index = int(unit_index[1:])
         
     # Update .dat file
     if mode == 'enable':
@@ -882,64 +887,6 @@ def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
                 DATA.effects[tech_tree_index].effect_commands.pop(i)
     elif mode == 'disable':
         DATA.effects[tech_tree_index].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))
-        
-
-    '''# Get the unit name
-    unit_name = get_unit_name(unit_index)
-
-    # Get the tech tree
-    tech_tree_index = -1
-    for i, effect in enumerate(DATA.effects):
-        if 'tech tree' in effect.name.lower() and selected_civ_name.lower() in effect.name.lower():
-            tech_tree_index = i
-            break
-        
-    # Enable/Disable unit in the JSON file
-    with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
-        lines = file.readlines()
-        for i in range(tech_tree_index, len(lines)):
-            if f'"Name": "{unit_name.title()}"' in lines[i]:
-                if TECH_TREE[unit_name.lower()] == 1 and mode == 'toggle' or mode == 'enable':
-                    lines[i + 3] = f'          "Node Status": "ResearchedCompleted",\n'
-                elif TECH_TREE[unit_name.lower()] != 1 and mode == 'toggle' or mode == 'disable':
-                    lines[i + 3] = f'          "Node Status": "NotAvailable",\n'
-                break
-
-        file.seek(0)
-        file.writelines(lines)
-        file.truncate()
-
-    # Find the relevant effect
-    effect_index = -1
-    for i, effect in enumerate(DATA.effects):
-        for ec in effect.effect_commands:
-            # Look for the unit being mentioned in the effect commands
-            if (ec.type == 2 and ec.a == unit_index) or (ec.type == 3 and ec.b == unit_index):
-                print(f'Effect found at {i}')
-                effect_index = i
-    
-    # Find the relevant tech
-    tech_indexes = []
-    for i, tech in enumerate(DATA.techs):
-        if tech.effect_id == effect_index:
-            tech_indexes.append(i)
-            print(f'Tech found at {i}')
-        
-    print('unit status:', TECH_TREE[unit_name.lower()], mode)
-    # Enable unit in the .dat file
-    if TECH_TREE[unit_name.lower()] == 0 and mode == 'toggle' or mode == 'enable':
-        for i, effect_command in enumerate(DATA.effects[tech_tree_index].effect_commands):
-            if effect_command.type == 102 and effect_command.d in tech_indexes:
-                # Remove the effect command that disables the unit, enabling it
-                DATA.effects[tech_tree_index].effect_commands.pop(i)
-                print('Enabled')
-
-    # Disable unit in the .dat file
-    elif TECH_TREE[unit_name.lower()] != 0 and mode == 'toggle' or mode == 'disable':
-        # Create the disabling effect command
-        for tech_index in tech_indexes:
-            DATA.effects[tech_tree_index].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))
-        print('Disabled')'''
 
 def open_mod(mod_folder):
     print('\nLoading mod...')
@@ -982,46 +929,43 @@ def open_mod(mod_folder):
                 break
     print('Mod loaded!')
     
-def new_mod(mod_folder, aoe2_folder, mod_name, revert):
+def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # Announce revert
     if revert:
-        print(f'Reverting {mod_name}...')
+        print(f'Reverting {_mod_name}...')
 
-        os.chdir(mod_folder)
+        os.chdir(_mod_folder)
         os.chdir('..')
 
         # Delete existing mod folder
-        shutil.rmtree(mod_folder)
+        shutil.rmtree(_mod_folder)
 
-        # Ensure the working directory is set correctly before creating a new folder
-        #os.chdir(mod_folder.split('/'))  # Go to the parent mods folder
-        #os.chdir('..')  # Go to the parent folder
-        print(os.getcwd())
-        return
+        # Move back a folder
+        _mod_folder = os.path.dirname(_mod_folder)
 
     # Get local mods folder
-    if mod_folder == '':
+    if _mod_folder == '':
         local_mods_folder = input("\nEnter local mods folder location: ")
         if local_mods_folder == '':
             local_mods_folder = '/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local'
     else:
-        local_mods_folder = mod_folder
+        local_mods_folder = _mod_folder
 
     # Get original AoE2DE folder
-    if aoe2_folder == '':
+    if _aoe2_folder == '':
         aoe2_folder = input("Select original \"AoE2DE\" folder location: ")
         if aoe2_folder == '':
             aoe2_folder = '/home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE'
     else:
-        aoe2_folder = aoe2_folder
+        aoe2_folder = _aoe2_folder
 
     # Get name for mod
-    if mod_name == '':
+    if _mod_name == '':
         mod_name = input("Enter new mod name: ")
+        if mod_name == '':
+            mod_name = 'Test'
     else:
-        mod_name = mod_name
-    if mod_name == '':
-        mod_name = 'Test'
+        mod_name = _mod_name
 
     mod_folder = local_mods_folder + '/' + mod_name
 
@@ -1392,7 +1336,7 @@ def new_mod(mod_folder, aoe2_folder, mod_name, revert):
 
     # Open the new mod
     if revert:
-        print(f"{mod_name} reverted successfully!\n")
+        print(f"{mod_name} reverted successfully!")
     else:
         print(mod_name, "created!")
     open_mod(MOD_FOLDER)
@@ -1443,10 +1387,36 @@ def main():
         print(f"\033[32m\n--- {mod_name} Menu ---\033[0m")
         print("\033[33m0: Edit Civilization\033[0m")
         print("\033[33m1: Revert Mod\033[0m")
+        print("\033[33m2: Open Mod Directory\033[0m")
         mod_menu_selection = input("Selection: ")
 
+        # Open Mod Directory
+        if mod_menu_selection == '2':
+            try:
+                system = platform.system()
+                if system == "Windows":
+                    os.startfile(previous_mod_folder)
+                elif system == "Darwin":  # macOS
+                    subprocess.Popen(["open", previous_mod_folder])
+                else:  # Linux
+                    subprocess.Popen(["xdg-open", previous_mod_folder])
+            except:
+                print("\033[31mERROR: Mod directory not found in local mods folder.\033[0m")
+
+        # Revert Mod
+        elif mod_menu_selection == '1':
+            print("\n\033[31mWARNING: Reverting the mod will completely erase all changes made to the modded files. THIS CHANGE IS IRREVERSIBLE.\033[0m")
+            time.sleep(0.5)
+            yes = input("Enter 'Y' to continue: ")
+
+            if yes:
+                new_mod(MOD_FOLDER, ORIGINAL_FOLDER, MOD_NAME, True)
+            else:
+                print("Mod was not reverted.\n")
+            time.sleep(1)
+
         # Edit Civilisation
-        if mod_menu_selection == '0':
+        elif mod_menu_selection == '0':
             # Display all civilisations
             selected_civ_index = -1
             all_civs = []
@@ -1493,1059 +1463,1065 @@ def main():
                 description_lines = [s.replace('"', '') for s in description_lines]
                 description_lines = [s.replace('\n', '') for s in description_lines]
 
-        # Revert Mod
-        elif mod_menu_selection == '1':
-            print("\033[31mWARNING: Reverting the mod will completely erase all changes made to the modded files. THIS CHANGE IS IRREVERSIBLE.\033[0m")
-            time.sleep(0.5)
-            yes = input("Enter 'Y' to continue: ")
+            # Edit civilisation
+            try:
+                edit_civ_index = int(selection)
+                if 0 <= edit_civ_index < len(DATA.civs):
+                    # Edit civilisation menu
+                    while True:
+                        # Get current unique unit
+                        for i, line in enumerate(description_lines):
+                            if 'unique unit' in line.lower():
+                                current_unique_unit = description_lines[i + 1].split(',')[0]
 
-            new_mod(MOD_FOLDER, ORIGINAL_FOLDER, MOD_NAME, True)
-
-            print("Mod reverted successfully!\n")
-
-        # Edit civilisation
-        try:
-            edit_civ_index = int(selection)
-            if 0 <= edit_civ_index < len(DATA.civs):
-                # Edit civilisation menu
-                while True:
-                    # Get current unique unit
-                    for i, line in enumerate(description_lines):
-                        if 'unique unit' in line.lower():
-                            current_unique_unit = description_lines[i + 1].split(',')[0]
-
-                    # Get current unique techs
-                    current_unique_techs = ''
-                    for word in description_lines[-5].strip('•').split(' '):
-                        if '(' in word:
-                            break
-                        current_unique_techs += word + ' '
-
-                    current_unique_techs += '/'
-
-                    for word in description_lines[-4].strip('•').split(' '):
-                        if '(' in word:
-                            break
-                        current_unique_techs += word + ' '
-
-                    # Get current architecture
-                    def get_architecture_list(unit_id):
-                        # Get the graphic of the unit
-                        unit_id = int(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic[0])
-
-                        # KEY: (university: 209, castle: 82, wonder: 276)
-                        architecture_sets = {'African': [9084, 8747], 'Central Asian': [12084, 11747], 'Central European': [566, 171], 'East Asian': [567, 172], 'Eastern European': [8084, 7747], 'Mediterranean': [593, 177], 'Middle Eastern': [568, 173], 'American': [7084, 6747], 'South Asian': [10084, 12477], 'Southeast Asian': [11084, 10747], 'Southeast European': [15806, 15848], 'Western European': [569, 174]}
-                        for arch, ids in architecture_sets.items():
-                            if unit_id in ids:
-                                return arch
-                        return ''  # or 'Unknown' if you prefer a string
-
-                    # Get current language
-                    current_language = ''
-                    for sound_item in DATA.sounds[301].items:
-                        if sound_item.civilization == selected_civ_index + 1:
-                            current_language = sound_item.filename.split('_')[0]
-
-                    # Print the civilization menu
-                    print(f"\033[32m\n--- Edit {selected_civ_name} ---\033[0m")
-                    print(f"\033[33m0: Name\033[0m -- {selected_civ_name}")
-                    print(f"\033[33m1: Title\033[0m -- {description_lines[0]}")
-                    print(f"\033[33m2: Bonuses\033[0m")
-                    print(f"\033[33m3: Unique Unit\033[0m -- {current_unique_unit}")
-                    print(f"\033[33m4: Unique Techs\033[0m -- {current_unique_techs}")
-                    print(f"\033[33m5: Architecture\033[0m -- {get_architecture_list(209)}")
-                    print(f"\033[33m6: Language\033[0m -- {current_language}")
-                    print(f"\033[33m7: Tech Tree\033[0m")
-                    selection = input("Selection: ")
-
-                    # Exit
-                    if selection == '':
-                        break
-
-                    # Read description
-                    with open(MOD_STRINGS, 'r+') as file:
-                        # Read and separate the lines
-                        lines = file.readlines()
-                        line_index = selected_civ_index + len(DATA.civs) - 1
-                        line = lines[line_index]
-                        line_code = line[:6]
-                        split_lines = line.split(r'\n')
-
-                    # Info
-                    if selection == '?':
-                        print('0: Change the name of the civilization.')
-                        print('1: Change the title of the civilization in its description (ex. Archer civilization).')
-                        print('2: Add, remove, or change the civilization bonuses and the team bonus.')
-                        print('3: Change the unique unit that can be trained from the civilization\'s castle')
-                        print('4: Change the civilization\'s graphics for the general architecture, castle, wonder, and monk.')
-                        print('5: Change the language spoken by the units of the civilization.')
-                        print('6: Enable or disable units, buildings, and technologies for the civilization. Add additional unique/regional units.')
-
-                    # Name
-                    if selection == '0':
-                        new_name = input(f"\nEnter new name for {selected_civ_name}: ")
-                        old_name = selected_civ_name
-
-                        # Check to see if name already exists
-                        for civ in DATA.civs:
-                            if civ.name.lower() == new_name.lower():
-                                print("\033[31mERROR: Civilization name already assigned to another civilization.\033[0m")
-                                time.sleep(1)
+                        # Get current unique techs
+                        current_unique_techs = ''
+                        for word in description_lines[-5].strip('•').split(' '):
+                            if '(' in word:
                                 break
+                            current_unique_techs += word + ' '
 
-                        if new_name != '' and new_name != selected_civ_name:
-                            # Change name
-                            DATA.civs[edit_civ_index + 1].name = new_name
-                            with open(MOD_STRINGS, 'r+') as file:
-                                lines = file.readlines()  # Read all lines
-                                lines[selected_civ_index] = lines[selected_civ_index][:5] + f' "{new_name}"\n'  # Modify the specific line
-                                selected_civ_name = new_name  # Update the selected civ name
+                        current_unique_techs += '/'
 
-                                file.seek(0)  # Move to the beginning of the file
-                                file.writelines(lines)  # Write all lines back
+                        for word in description_lines[-4].strip('•').split(' '):
+                            if '(' in word:
+                                break
+                            current_unique_techs += word + ' '
 
-                            # Change name of tech tree, team bonus, and civilization bonus effects
-                            for i, effect in enumerate(DATA.effects):
-                                if effect.name == f'{old_name.title()} Tech Tree':
-                                    effect.name = f'{selected_civ_name.title()} Tech Tree'
-                                elif effect.name == f'{old_name.title()} Team Bonus':
-                                    effect.name = f'{selected_civ_name.title()} Team Bonus'
-                                elif f'{old_name.upper()}' in effect.name:
-                                    name_list = effect.name.split(':')
-                                    name_list[0] = new_name.upper()
-                                    effect.name = ':'.join(name_list)
+                        # Get current architecture
+                        def get_architecture_list(unit_id):
+                            # Get the graphic of the unit
+                            unit_id = int(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic[0])
 
-                            # Change the name of the bonus techs
-                            for i, tech in enumerate(DATA.techs):
-                                if f'{old_name.upper()}' in tech.name:
-                                    name_list = tech.name.split(':')
-                                    name_list[0] = new_name.upper()
-                                    tech.name = ':'.join(name_list)
+                            # KEY: (university: 209, castle: 82, wonder: 276)
+                            architecture_sets = {'African': [9084, 8747], 'Central Asian': [12084, 11747], 'Central European': [566, 171], 'East Asian': [567, 172], 'Eastern European': [8084, 7747], 'Mediterranean': [593, 177], 'Middle Eastern': [568, 173], 'American': [7084, 6747], 'South Asian': [10084, 12477], 'Southeast Asian': [11084, 10747], 'Southeast European': [15806, 15848], 'Western European': [569, 174]}
+                            for arch, ids in architecture_sets.items():
+                                if unit_id in ids:
+                                    return arch
+                            return ''  # or 'Unknown' if you prefer a string
 
-                            # Update the name
-                            print(f'Civilization name changed from {old_name} to {selected_civ_name}.')
-                        else:
-                            # Do not update the name
-                            print(f'Civilization name not changed for {selected_civ_name}.')
-                        time.sleep(1)
+                        # Get current language
+                        current_language = ''
+                        for sound_item in DATA.sounds[301].items:
+                            if sound_item.civilization == selected_civ_index + 1:
+                                current_language = sound_item.filename.split('_')[0]
 
-                    # Title
-                    if selection == '1':
-                        # Get user input
-                        new_title = input(f"\nEnter new civilization title for {selected_civ_name}: ")
+                        # Print the civilization menu
+                        print(f"\033[32m\n--- Edit {selected_civ_name} ---\033[0m")
+                        print(f"\033[33m0: Name\033[0m -- {selected_civ_name}")
+                        print(f"\033[33m1: Title\033[0m -- {description_lines[0]}")
+                        print(f"\033[33m2: Bonuses\033[0m")
+                        print(f"\033[33m3: Unique Unit\033[0m -- {current_unique_unit}")
+                        print(f"\033[33m4: Unique Techs\033[0m -- {current_unique_techs}")
+                        print(f"\033[33m5: Architecture\033[0m -- {get_architecture_list(209)}")
+                        print(f"\033[33m6: Language\033[0m -- {current_language}")
+                        print(f"\033[33m7: Tech Tree\033[0m")
+                        selection = input("Selection: ")
 
-                        # Quit if blank
-                        if new_title == '':
-                            continue
+                        # Exit
+                        if selection == '':
+                            break
 
-                        # Replace the title
-                        if new_title.endswith('civilization') or new_title.endswith('civilisation'):
-                            new_title = new_title[:-12].strip()
+                        # Read description
+                        with open(MOD_STRINGS, 'r+') as file:
+                            # Read and separate the lines
+                            lines = file.readlines()
+                            line_index = selected_civ_index + len(DATA.civs) - 1
+                            line = lines[line_index]
+                            line_code = line[:6]
+                            split_lines = line.split(r'\n')
 
-                        # Apply the Civilization ending
-                        description_lines[0] = new_title + ' civilization'
+                        # Info
+                        if selection == '?':
+                            print('0: Change the name of the civilization.')
+                            print('1: Change the title of the civilization in its description (ex. Archer civilization).')
+                            print('2: Add, remove, or change the civilization bonuses and the team bonus.')
+                            print('3: Change the unique unit that can be trained from the civilization\'s castle')
+                            print('4: Change the civilization\'s graphics for the general architecture, castle, wonder, and monk.')
+                            print('5: Change the language spoken by the units of the civilization.')
+                            print('6: Enable or disable units, buildings, and technologies for the civilization. Add additional unique/regional units.')
 
-                        # Update the description
-                        save_description(description_code, description_lines)
-                        print(f'Title updated for {selected_civ_name} to {description_lines[0]}')
-                        time.sleep(1)
+                        # Name
+                        if selection == '0':
+                            new_name = input(f"\nEnter new name for {selected_civ_name}: ")
+                            old_name = selected_civ_name
 
-                    # Bonuses
-                    elif selection == '2':
-                        while True:
-                            with open(MOD_STRINGS, 'r+') as file:
-                                # Read and separate the lines
-                                lines = file.readlines()
-                                line_index = selected_civ_index + len(DATA.civs) - 1
-                                line = lines[line_index]
-                                line_code = line[:6]
-                                split_lines = line.split(r'\n')
-
-                                # Show the bonuses menu
-                                print("\033[32m\n--- Bonuses Menu ---\033[0m")
-                                bonus_count = 0
-                                searching_for_dots = True
-                                next_line = False
-                                for line in split_lines:
-                                    if 'Unique' in line:
-                                        searching_for_dots = False
-                                    elif '•' in line and searching_for_dots:
-                                        print(f"\033[33m{str(bonus_count)}: {line[2:]}\033[0m")
-                                        bonus_count += 1
-                                    elif 'Team Bonus' in line:
-                                        next_line = True
-                                    elif next_line:
-                                        print(f"\033[33mTeam Bonus: {line[:-2]}\033[0m")
-                                bonus_selection = input("Bonus action: ")
-
-                                # Show instructions
-                                if bonus_selection == '?':
-                                    print('\n\x1b[35mEnter bonus description to add a new bonus.\x1b[0m')
-                                    print('\x1b[35mEnter existing bonus index number to remove that bonus.\x1b[0m')
-                                    print('\x1b[35mEnter existing bonus index, a colon (:), and then the bonus description to change an existing bonus.\x1b[0m')
-                                    print('\x1b[35mEnter "Team bonus: " followed by the bonus description to change the team bonus.\x1b[0m')
-                                    time.sleep(1)
-                                    continue
-                                
-                                # Quit menu
-                                if bonus_selection == '':
+                            # Check to see if name already exists
+                            for civ in DATA.civs:
+                                if civ.name.lower() == new_name.lower():
+                                    print("\033[31mERROR: Civilization name already assigned to another civilization.\033[0m")
                                     time.sleep(1)
                                     break
 
-                                # Remove bonus
-                                elif bonus_selection.isdigit():
-                                    # Check to make sure
-                                    remove_check = input(f'\nAre you sure you want to remove bonus {int(bonus_selection)}: {description_lines[2 + int(bonus_selection)][2:]}? (y/n): ')
+                            if new_name != '' and new_name != selected_civ_name:
+                                # Change name
+                                DATA.civs[edit_civ_index + 1].name = new_name
+                                with open(MOD_STRINGS, 'r+') as file:
+                                    lines = file.readlines()  # Read all lines
+                                    lines[selected_civ_index] = lines[selected_civ_index][:5] + f' "{new_name}"\n'  # Modify the specific line
+                                    selected_civ_name = new_name  # Update the selected civ name
 
-                                    if remove_check.lower() == 'y' or remove_check.lower() == 'yes':
-                                        # Get current bonuses
-                                        bonus_count = 0
-                                        searching_for_dots = True
-                                        options = []
-                                        for line in split_lines:
-                                            if 'Unique' in line:
-                                                searching_for_dots = False
-                                            elif '•' in line and searching_for_dots:
-                                                options.append(line[2:])
-                                                bonus_count += 1
+                                    file.seek(0)  # Move to the beginning of the file
+                                    file.writelines(lines)  # Write all lines back
 
-                                        # Unpair the effect from the tech to disable it
-                                        remove_bonus_selection = int(bonus_selection)
-                                        if remove_bonus_selection != '':
-                                            for tech in DATA.techs:
-                                                if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
-                                                    tech.effect_id = -1
+                                # Change name of tech tree, team bonus, and civilization bonus effects
+                                for i, effect in enumerate(DATA.effects):
+                                    if effect.name == f'{old_name.title()} Tech Tree':
+                                        effect.name = f'{selected_civ_name.title()} Tech Tree'
+                                    elif effect.name == f'{old_name.title()} Team Bonus':
+                                        effect.name = f'{selected_civ_name.title()} Team Bonus'
+                                    elif f'{old_name.upper()}' in effect.name:
+                                        name_list = effect.name.split(':')
+                                        name_list[0] = new_name.upper()
+                                        effect.name = ':'.join(name_list)
 
-                                            # Remove from the description
-                                            for line in description_lines:
-                                                if options[int(remove_bonus_selection)] in line:
-                                                    description_lines.remove(line)
-                                                    save_description(description_code, description_lines)
+                                # Change the name of the bonus techs
+                                for i, tech in enumerate(DATA.techs):
+                                    if f'{old_name.upper()}' in tech.name:
+                                        name_list = tech.name.split(':')
+                                        name_list[0] = new_name.upper()
+                                        tech.name = ':'.join(name_list)
 
-                                            # Save changes
-                                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                            print(f'Bonus removed for {selected_civ_name}: {options[int(remove_bonus_selection)]}')
-                                            time.sleep(1)
+                                # Update the name
+                                print(f'Civilization name changed from {old_name} to {selected_civ_name}.')
+                            else:
+                                # Do not update the name
+                                print(f'Civilization name not changed for {selected_civ_name}.')
+                            time.sleep(1)
 
-                                # Team bonus
-                                elif bonus_selection.lower().startswith('team bonus:') or bonus_selection.lower().startswith('t:') or bonus_selection.lower().startswith('team:'):
-                                    # Get user prompt
-                                    bonus_to_add_ORIGINAL = bonus_selection.split(':')[1].strip().capitalize()
-                                    bonus_to_add = bonus_to_add_ORIGINAL.lower()
+                        # Title
+                        if selection == '1':
+                            # Get user input
+                            new_title = input(f"\nEnter new civilization title for {selected_civ_name}: ")
 
-                                    # Generate the bonus
-                                    bonus_tech, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
+                            # Quit if blank
+                            if new_title == '':
+                                continue
 
-                                    # Exit if nothing was found
-                                    if bonus_effect == []:
+                            # Replace the title
+                            if new_title.endswith('civilization') or new_title.endswith('civilisation'):
+                                new_title = new_title[:-12].strip()
+
+                            # Apply the Civilization ending
+                            description_lines[0] = new_title + ' civilization'
+
+                            # Update the description
+                            save_description(description_code, description_lines)
+                            print(f'Title updated for {selected_civ_name} to {description_lines[0]}')
+                            time.sleep(1)
+
+                        # Bonuses
+                        elif selection == '2':
+                            while True:
+                                with open(MOD_STRINGS, 'r+') as file:
+                                    # Read and separate the lines
+                                    lines = file.readlines()
+                                    line_index = selected_civ_index + len(DATA.civs) - 1
+                                    line = lines[line_index]
+                                    line_code = line[:6]
+                                    split_lines = line.split(r'\n')
+
+                                    # Show the bonuses menu
+                                    print("\033[32m\n--- Bonuses Menu ---\033[0m")
+                                    bonus_count = 0
+                                    searching_for_dots = True
+                                    next_line = False
+                                    for line in split_lines:
+                                        if 'Unique' in line:
+                                            searching_for_dots = False
+                                        elif '•' in line and searching_for_dots:
+                                            print(f"\033[33m{str(bonus_count)}: {line[2:]}\033[0m")
+                                            bonus_count += 1
+                                        elif 'Team Bonus' in line:
+                                            next_line = True
+                                        elif next_line:
+                                            print(f"\033[33mTeam Bonus: {line[:-2]}\033[0m")
+                                    bonus_selection = input("Bonus action: ")
+
+                                    # Show instructions
+                                    if bonus_selection == '?':
+                                        print('\n\x1b[35mEnter bonus description to add a new bonus.\x1b[0m')
+                                        print('\x1b[35mEnter existing bonus index number to remove that bonus.\x1b[0m')
+                                        print('\x1b[35mEnter existing bonus index, a colon (:), and then the bonus description to change an existing bonus.\x1b[0m')
+                                        print('\x1b[35mEnter "Team bonus: " followed by the bonus description to change the team bonus.\x1b[0m')
+                                        time.sleep(1)
+                                        continue
+                                    
+                                    # Quit menu
+                                    if bonus_selection == '':
+                                        time.sleep(1)
                                         break
 
-                                    # Find the previous team effect
-                                    team_bonus_effect = None
-                                    for i, effect in enumerate(DATA.effects):
-                                        if effect.name == f'{selected_civ_name.title()} Team Bonus':
-                                            team_bonus_effect = effect
+                                    # Remove bonus
+                                    elif bonus_selection.isdigit():
+                                        # Check to make sure
+                                        remove_check = input(f'\nAre you sure you want to remove bonus {int(bonus_selection)}: {description_lines[2 + int(bonus_selection)][2:]}? (y/n): ')
 
-                                    # Update the team bonus
-                                    team_bonus_effect.effect_commands = bonus_effect.effect_commands
+                                        if remove_check.lower() == 'y' or remove_check.lower() == 'yes' or remove_check.lower() == 'ye':
+                                            # Get current bonuses
+                                            bonus_count = 0
+                                            searching_for_dots = True
+                                            options = []
+                                            for line in split_lines:
+                                                if 'Unique' in line:
+                                                    searching_for_dots = False
+                                                elif '•' in line and searching_for_dots:
+                                                    options.append(line[2:])
+                                                    bonus_count += 1
 
-                                    # Change team bonus in description
-                                    bonus_found = False
-                                    description_lines[-1] = bonus_to_add_ORIGINAL
-#
-                                    # Update the description
-                                    save_description(description_code, description_lines)
+                                            # Unpair the effect from the tech to disable it
+                                            remove_bonus_selection = int(bonus_selection)
+                                            if remove_bonus_selection != '':
+                                                for tech in DATA.techs:
+                                                    if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
+                                                        tech.effect_id = -1
 
-                                    # Save changes
-                                    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                    print(f'Team bonus changed for {selected_civ_name}.')
-                                    time.sleep(1)
+                                                # Remove from the description
+                                                for line in description_lines:
+                                                    if options[int(remove_bonus_selection)] in line:
+                                                        description_lines.remove(line)
+                                                        save_description(description_code, description_lines)
 
-                                # Change bonus
-                                elif bonus_selection[0].isdigit() and bonus_selection[1] == ':':
-                                    # Get starting variables
-                                    bonus_change_index = int(bonus_selection[0])
-                                    bonus_change_from = description_lines[2 + bonus_change_index][2:]
-                                    bonus_change_to = bonus_selection[2:].strip()
+                                                # Save changes
+                                                DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                                print(f'Bonus removed for {selected_civ_name}: {options[int(remove_bonus_selection)]}')
+                                                time.sleep(1)
 
-                                    # Generate the bonus
-                                    bonus_tech, bonus_effect = create_bonus(bonus_change_to, selected_civ_index)
+                                    # Team bonus
+                                    elif bonus_selection.lower().startswith('team bonus:') or bonus_selection.lower().startswith('t:') or bonus_selection.lower().startswith('team:'):
+                                        # Get user prompt
+                                        bonus_to_add_ORIGINAL = bonus_selection.split(':')[1].strip().capitalize()
+                                        bonus_to_add = bonus_to_add_ORIGINAL.lower()
 
-                                    # Exit if nothing was found
-                                    if bonus_effect == []:
-                                        break
+                                        # Generate the bonus
+                                        bonus_tech, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
 
-                                    # Find the existing bonus effect
-                                    for i, effect in enumerate(DATA.effects):
-                                        if selected_civ_name.lower() in effect.name.lower() and bonus_change_from in effect.name:
-                                            DATA.effects[i] = bonus_effect
-                                            DATA.effects[i].name = f'{selected_civ_name.upper()}: {bonus_change_to}'
+                                        # Exit if nothing was found
+                                        if bonus_effect == []:
                                             break
 
-                                    # Find the existing bonus tech
-                                    for j, tech in enumerate(DATA.techs):
-                                        if tech.civ == selected_civ_index + 1 and bonus_change_from in tech.name:
-                                            DATA.techs[j] = bonus_tech[0]
-                                            DATA.techs[j].name = f'{selected_civ_name.upper()}: {bonus_change_to}'
-                                            DATA.techs[j].effect_id = i
-                                            break
+                                        # Find the previous team effect
+                                        team_bonus_effect = None
+                                        for i, effect in enumerate(DATA.effects):
+                                            if effect.name == f'{selected_civ_name.title()} Team Bonus':
+                                                team_bonus_effect = effect
 
-                                    # Update the description
-                                    description_lines[2 + bonus_change_index] = f'• {bonus_change_to}'
-                                    save_description(description_code, description_lines)
+                                        # Update the team bonus
+                                        team_bonus_effect.effect_commands = bonus_effect.effect_commands
 
-                                    # Save changes
-                                    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                    print(f'Bonus {bonus_change_index} changed for {selected_civ_name}.')
-                                    time.sleep(1)
-
-                                # Add bonus
-                                else:
-                                    # Get user prompt
-                                    bonus_to_add_ORIGINAL = bonus_selection
-                                    bonus_to_add = bonus_to_add_ORIGINAL.lower()
-
-                                    # Generate the bonus
-                                    bonus_techs, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
-
-                                    # Use the old tech if it exists
-                                    if bonus_effect != []:
-                                        tech_found = False
-                                        for bonus_tech in bonus_techs:
-                                            for tech in DATA.techs:
-                                                if tech.name == bonus_tech.name:
-                                                    bonus_tech = tech
-                                                    tech.effect_id = DATA.effects.index(bonus_effect)
-                                                    tech_found = True
-                                                    break
-
-                                            if not tech_found:
-                                                # Add the tech if it didn't exist before
-                                                DATA.techs.append(bonus_tech)
-
-                                            # Add the new effect if it doesn't already exist
-                                            effect_found = False
-                                            for i, effect in enumerate(DATA.effects):
-                                                if effect.name == bonus_effect.name:
-                                                    # Give the new effect commands to the old effect
-                                                    effect.effect_commands = bonus_effect.effect_commands
-                                                    bonus_tech.effect_id = i
-                                                    effect_found = True
-                                                    break
-                                                
-                                            if not effect_found:
-                                                # Add the effect if it didn't exist before
-                                                DATA.effects.append(bonus_effect)
-
-                                            # Connect the effect to the tech
-                                            bonus_tech.effect_id = DATA.effects.index(bonus_effect)
-
-                                        # Append bonus to description
+                                        # Change team bonus in description
                                         bonus_found = False
-                                        for i, line in enumerate(description_lines):
-                                            # Add new bonus to the end of the bonuses list
-                                            if bonus_to_add_ORIGINAL.lower() in description_lines[i].lower():
-                                                break
-                                            if '•' in description_lines[i]:
-                                                bonus_found = True
-                                            elif description_lines[i] == '' and bonus_found:
-                                                description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
-                                                break
+                                        description_lines[-1] = bonus_to_add_ORIGINAL
 #   
                                         # Update the description
                                         save_description(description_code, description_lines)
 
                                         # Save changes
                                         DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                        print(f'Bonus added for {selected_civ_name}: {bonus_to_add_ORIGINAL}')
+                                        print(f'Team bonus changed for {selected_civ_name}.')
                                         time.sleep(1)
 
-                    # Unique Unit
-                    elif selection == '3':
-                        # Populate all castle units
-                        all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel"]
-                        new_castle_unit = '?'
+                                    # Change bonus
+                                    elif bonus_selection[0].isdigit() and bonus_selection[1] == ':':
+                                        # Get starting variables
+                                        bonus_change_index = int(bonus_selection[0])
+                                        bonus_change_from = description_lines[2 + bonus_change_index][2:]
+                                        bonus_change_to = bonus_selection[2:].strip()
 
-                        # Get user input
-                        while new_castle_unit == '?':
-                            new_castle_unit = input(f"\nEnter unique Castle unit for {selected_civ_name}: ").lower()
+                                        # Generate the new bonus
+                                        bonus_tech, bonus_effect = create_bonus(bonus_change_to, selected_civ_index)
 
-                            if new_castle_unit == '':
-                                break
-                            elif new_castle_unit not in all_castle_units:
-                                new_castle_unit = '?'
-                                print("\033[31mERROR: Unit not found.\033[0m")
-                            elif new_castle_unit == '?':
-                                print(all_castle_units)
-                                continue
-
-                        # Get elite upgrade tech
-                        elite_upgrade_tech = None
-                        for tech in DATA.techs:
-                            if tech.civ == selected_civ_index + 1 and 'elite' in tech.name.lower():
-                                elite_upgrade_tech = tech
-
-                        # Get the original costs from the .dat file
-                        elite_upgrade_cost = [0, 0, 0] # Food, Wood, Gold
-                        for resource_cost in elite_upgrade_tech.resource_costs:
-                            # Correct for gold index
-                            resource_index = resource_cost.type
-                            if resource_index == -1:
-                                continue
-                            elif resource_index == 3:
-                                resource_index = 2
-
-                            elite_upgrade_cost[resource_index] = resource_cost.amount
-                        
-                        # Get user input
-                        def get_resource_cost(resource_name: str, default: int) -> int:
-                            while True:
-                                value = prompt(f"Change {resource_name} cost for elite upgrade: ", default=str(default))
-
-                                if value.strip() == '':
-                                    return default
-
-                                try:
-                                    value = int(value)
-                                    if 0 <= value <= 9999:
-                                        return value
-                                except:
-                                    pass
-                                
-                                print(f'\033[31mERROR: Entry must be a whole number from 0 to 9999.\n\033[0m')
-
-                        # Use the function for each cost
-                        elite_upgrade_cost[0] = get_resource_cost("food", elite_upgrade_cost[0])
-                        elite_upgrade_cost[1] = get_resource_cost("wood", elite_upgrade_cost[1])
-                        elite_upgrade_cost[2] = get_resource_cost("gold", elite_upgrade_cost[2])
-
-                        # Clear the previous costs
-                        for resource_cost in elite_upgrade_tech.resource_costs:
-                            resource_cost.type = -1
-                            resource_cost.amount = 0
-                            resource_cost.flag = 0
-
-                        # Set the costs for the .dat file
-                        resource_cost_index = 0
-                        for i, cost in enumerate(elite_upgrade_cost):
-                            if cost > 0:
-                                gold_correction = 0
-                                if i == 2:
-                                    gold_correction = 1
-
-                                elite_upgrade_tech.resource_costs[i].type = i + gold_correction
-                                elite_upgrade_tech.resource_costs[i].amount = cost
-                                elite_upgrade_tech.resource_costs[i].flag = 1
-                                resource_cost_index += 1
-
-                        # Change research time
-                        while True:
-                            try:
-                                new_time = int(prompt(f"Enter research time in seconds for elite upgrade: ", default=str(elite_upgrade_tech.research_time)))
-                                if new_time == '':
-                                    new_time = elite_upgrade_tech.research_time
-                                elite_upgrade_tech.research_time = new_time
-                                break
-                            except:
-                                print(f'\033[31mERROR: Invalid research time entry.\n\033[0m\n')
-
-                        # Get unit indexes
-                        castle_unit_indexes = [-1, -1, -1, -1]
-                        with open(ORIGINAL_STRINGS, 'r') as file:
-                            lines = file.readlines()
-                            for i, unit in enumerate(DATA.civs[selected_civ_index + 1].units):
-                                try:
-                                    # Get the name of the unit
-                                    unit_name_id = int(unit.language_dll_name)
-                                    unit_name = None
-
-                                    # Extract unit name from ORIGINAL_STRINGS
-                                    for line in lines:
-                                        if line.startswith(f"{unit_name_id} "):
-                                            unit_name = line.split('"')[1].lower()
+                                        # Exit if nothing was found
+                                        if bonus_effect == []:
                                             break
-                                        
-                                    # Get the units IDs
-                                    if unit_name:
-                                        if unit_name == all_castle_units[selected_civ_index]:
-                                            castle_unit_indexes[0] = i
-                                        elif unit_name == f'elite {all_castle_units[selected_civ_index]}':
-                                            castle_unit_indexes[1] = i
-                                        elif unit_name == new_castle_unit:
-                                            castle_unit_indexes[2] = i
-                                        elif unit_name == f'elite {new_castle_unit}':
-                                            castle_unit_indexes[3] = i
-                                except:
-                                    pass
 
-                        # Change Castle Unit
-                        effect_commands = [
-                            genieutils.effect.EffectCommand(3, castle_unit_indexes[0], castle_unit_indexes[2], -1, 0),
-                            genieutils.effect.EffectCommand(3, castle_unit_indexes[1], castle_unit_indexes[3], -1, 0)
-                        ]
+                                        # Unpair the effect from the original tech to disable it
+                                        remove_bonus_selection = int(bonus_selection[0])
+                                        if remove_bonus_selection != '':
+                                            for tech in DATA.techs:
+                                                if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
+                                                    tech.effect_id = -1
 
-                        effect_found = False
-                        effect_name = selected_civ_name + " (Castle Unit)"
+                                        # Find the existing bonus effect and give it the new bonus effect commands
+                                        for i, effect in enumerate(DATA.effects):
+                                            if selected_civ_name.lower() in effect.name.lower() and bonus_change_from in effect.name:
+                                                DATA.effects[i] = bonus_effect
+                                                DATA.effects[i].name = f'{selected_civ_name.upper()}: {bonus_change_to}'
+                                                break
 
-                        for i, effect in enumerate(DATA.effects):
-                            if effect.name == effect_name:
-                                effect.effect_commands = effect_commands
-                                effect_found = True
-                                effect_index = i
-                                break
-                            
-                        if not effect_found:
-                            new_effect = genieutils.effect.Effect(effect_name, effect_commands)
-                            DATA.effects.append(new_effect)
-                            effect_index = len(DATA.effects) - 1
-                        
-                        # Create the tech that replaces the old unit
-                        new_tech = DATA.techs[1101]
-                        new_tech.effect_id = effect_index
-                        new_tech.name = effect_name
-                        new_tech.civ = selected_civ_index + 1
+                                        # Find the existing bonus tech
+                                        for j, tech in enumerate(DATA.techs):
+                                            if tech.civ == selected_civ_index + 1 and bonus_change_from in tech.name:
+                                                DATA.techs[j] = bonus_tech[0]
+                                                DATA.techs[j].name = f'{selected_civ_name.upper()}: {bonus_change_to}'
+                                                DATA.techs[j].effect_id = i
+                                                break
 
-                        for tech in DATA.techs:
-                            if tech.name == effect_name:
-                                DATA.techs.remove(tech)
-                        DATA.techs.append(new_tech)
+                                        # Update the description
+                                        description_lines[2 + bonus_change_index] = f'• {bonus_change_to}'
+                                        save_description(description_code, description_lines)
 
-                        # Assemble unit classes
-                        classes = {0: 'archer', 6: 'infantry', 12: 'cavalry', 13: 'siege', 18: 'monk', 23: 'mounted hand cannoneer', 36: 'cavalry archer', 38: 'archer', 44: 'hand cannoneer', 55: 'siege weapon'}
-                        try:
-                            unit_class = classes[DATA.civs[1].units[castle_unit_indexes[2]].class_]
-                        except:
-                            unit_class = 'unknown'
-                            print(DATA.civs[1].units[castle_unit_indexes[2]].class_)
+                                        # Save changes
+                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                        print(f'Bonus {bonus_change_index} changed for {selected_civ_name}.')
+                                        time.sleep(1)
 
-                        # Update description
-                        new_unit_description = f'{new_castle_unit.title()} ({unit_class})'
-                        for i, line in enumerate(description_lines):
-                            if 'unique unit' in line.lower():
-                                description_lines[i + 1] = new_unit_description
-                                save_description(line_code, description_lines)
+                                    # Add bonus
+                                    else:
+                                        # Get user prompt
+                                        bonus_to_add_ORIGINAL = bonus_selection
+                                        bonus_to_add = bonus_to_add_ORIGINAL.lower()
 
-                        # Save changes
-                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                        print(f"{selected_civ_name.title()} unique unit set to {new_castle_unit.title()}.")
-                        time.sleep(1)
+                                        # Generate the bonus
+                                        bonus_techs, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
 
-                    # Unique Techs
-                    elif selection == '4':
-                        # Get current techs information
-                        unique_techs_names = current_unique_techs.split(' / ')
-                        unique_techs_ids = [-1, -1]
-                        for i, tech in enumerate(DATA.techs):
-                            if tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 102 and tech.research_location == 82:
-                                unique_techs_ids[0] = i
-                            elif tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 103 and tech.research_location == 82:
-                                unique_techs_ids[1] = i
+                                        # Use the old tech if it exists
+                                        if bonus_effect != []:
+                                            tech_found = False
+                                            for bonus_tech in bonus_techs:
+                                                for tech in DATA.techs:
+                                                    if tech.name == bonus_tech.name:
+                                                        bonus_tech = tech
+                                                        tech.effect_id = DATA.effects.index(bonus_effect)
+                                                        tech_found = True
+                                                        break
 
-                        # Prompt the user for Castle Age tech
-                        new_castle_tech_name = prompt(f"\nChange Castle Age tech name: ", default=unique_techs_names[0])
-                        if new_castle_tech_name == '':
-                            new_castle_tech_name = unique_techs_names[0]
-                        while True:
-                            prompt_default_text = description_lines[-5].split('(')[1].strip(')')
-                            new_castle_tech_description = prompt(f"Change Castle Age tech description: ", default=prompt_default_text)
+                                                if not tech_found:
+                                                    # Add the tech if it didn't exist before
+                                                    DATA.techs.append(bonus_tech)
 
-                            new_castle_tech, new_castle_effect = create_bonus(new_castle_tech_description, selected_civ_index)
-                            if len(new_castle_effect.effect_commands) == 0:
-                                print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
-                                continue
-                            else:
-                                DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id].name = new_castle_tech_description
-                                DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id].effect_commands = new_castle_effect.effect_commands
-                                break
+                                                # Add the new effect if it doesn't already exist
+                                                effect_found = False
+                                                for i, effect in enumerate(DATA.effects):
+                                                    if effect.name == bonus_effect.name:
+                                                        # Give the new effect commands to the old effect
+                                                        effect.effect_commands = bonus_effect.effect_commands
+                                                        bonus_tech.effect_id = i
+                                                        effect_found = True
+                                                        break
+                                                    
+                                                if not effect_found:
+                                                    # Add the effect if it didn't exist before
+                                                    DATA.effects.append(bonus_effect)
 
+                                                # Connect the effect to the tech
+                                                bonus_tech.effect_id = DATA.effects.index(bonus_effect)
 
-                        new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ", default=unique_techs_names[1])
-                        if new_imperial_tech_name == '':
-                            new_imperial_tech_name = unique_techs_names[1]
-                        while True:
-                            prompt_default_text = description_lines[-4].split('(')[1].strip(')')
-                            new_imperial_tech_description = prompt(f"Change Imperial Age tech description: ", default=prompt_default_text)
+                                            # Append bonus to description
+                                            bonus_found = False
+                                            for i, line in enumerate(description_lines):
+                                                # Add new bonus to the end of the bonuses list
+                                                if bonus_to_add_ORIGINAL.lower() in description_lines[i].lower():
+                                                    break
+                                                if '•' in description_lines[i]:
+                                                    bonus_found = True
+                                                elif description_lines[i] == '' and bonus_found:
+                                                    description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
+                                                    break
+#       
+                                            # Update the description
+                                            save_description(description_code, description_lines)
 
-                            new_imperial_tech, new_imperial_effect = create_bonus(new_imperial_tech_description, selected_civ_index)
-                            if len(new_imperial_effect.effect_commands) == 0:
-                                print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
-                                continue
-                            else:
-                                DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id].name = new_imperial_tech_description
-                                DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id].effect_commands = new_imperial_effect.effect_commands
-                                break
-                            
-                        # Change the names
-                        change_string(DATA.techs[unique_techs_ids[0]].language_dll_name, new_castle_tech_name)
-                        change_string(DATA.techs[unique_techs_ids[1]].language_dll_name, new_imperial_tech_name)
-                        DATA.techs[unique_techs_ids[0]].name = new_castle_tech_name
-                        DATA.techs[unique_techs_ids[1]].name = new_imperial_tech_name
+                                            # Save changes
+                                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                            print(f'Bonus added for {selected_civ_name}: {bonus_to_add_ORIGINAL}')
+                                            time.sleep(1)
 
-                        # Update the description
-                        description_lines[-5] = f'• {new_castle_tech_name} ({new_castle_tech_description})'
-                        description_lines[-4] = f'• {new_imperial_tech_name} ({new_imperial_tech_description})'
-                        save_description(description_code, description_lines)
+                        # Unique Unit
+                        elif selection == '3':
+                            # Populate all castle units
+                            all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel"]
+                            new_castle_unit = '?'
 
-                        # Save file
-                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                        print(f'Unique techs changed for {selected_civ_name}.')
-                        time.sleep(1)
+                            # Get user input
+                            while new_castle_unit == '?':
+                                new_castle_unit = input(f"\nEnter unique Castle unit for {selected_civ_name}: ").lower()
 
-                    # Architecture
-                    elif selection == '5':
-                        # Gather base architectures
-                        base_architectures = []
-                        for i in range(1, len(DATA.civs)):
-                            base_architectures.append(DATA.civs[i].name)
-
-                        # Gather custom architectures
-                        custom_arcs = [
-                            [],
-                            ['Poenari Castle'],
-                            ['Aachen Cathedral', 'Dome of the Rock', 'Dormition Cathedral', 'Gol Gumbaz', 'Minaret of Jam', 'Pyramid', 'Quimper Cathedral', 'Sankore Madrasah', 'Tower of London']
-                        ]
-
-                        # User prompts
-                        architecture_types = ["General", "Castle", "Wonder"]
-                        architecture_changes = [-1, -1, -1]
-                        print('\n')
-                        for i in range(3):
-                            # Assemble all architecture options
-                            all_architectures = base_architectures + custom_arcs[i]
-
-                            architecture_selection = '?'
-                            while architecture_selection == '?':
-                                architecture_selection = input(f"Enter {architecture_types[i]} architecture for {selected_civ_name}: ").lower()
-                                
-                                if architecture_selection == '?':
-                                    # Print all available options
-                                    print(', '.join(all_architectures))
-                                    print('Leave blank to leave the architecture type unchanged')
-                                    print('Type \'default\' to switch back to the Civilization\'s original architecture.')
+                                if new_castle_unit == '':
+                                    break
+                                elif new_castle_unit not in all_castle_units:
+                                    new_castle_unit = '?'
+                                    print("\033[31mERROR: Unit not found.\033[0m")
+                                elif new_castle_unit == '?':
+                                    print(all_castle_units)
                                     continue
-                                
-                                # Check against architecture options
-                                for i2 in range(len(all_architectures)):
-                                    if architecture_selection == all_architectures[i2].lower():
-                                        architecture_changes[i] = i2
-                                        break
-                                
-                                # Use previous architecture if blank
-                                if architecture_selection == '':
-                                    architecture_changes[i] = -1
 
-                                # Use default architecture
-                                elif architecture_selection == 'default':
-                                    architecture_changes[i] = selected_civ_index
+                            # Get elite upgrade tech
+                            elite_upgrade_tech = None
+                            for tech in DATA.techs:
+                                if tech.civ == selected_civ_index + 1 and 'elite' in tech.name.lower():
+                                    elite_upgrade_tech = tech
 
-                                # Check if architecture is invalid
-                                elif architecture_changes[i] == -1:
-                                    architecture_selection = '?'
-                                    print(f'\033[31mERROR: {architecture_types[i]} architecture type not valid.\n\033[0m')
+                            # Get the original costs from the .dat file
+                            elite_upgrade_cost = [0, 0, 0] # Food, Wood, Gold
+                            for resource_cost in elite_upgrade_tech.resource_costs:
+                                # Correct for gold index
+                                resource_index = resource_cost.type
+                                if resource_index == -1:
+                                    continue
+                                elif resource_index == 3:
+                                    resource_index = 2
 
-                        for i in range(3):
-                            # Skip if unspecified
-                            if architecture_changes[i] == -1:
-                                continue
+                                elite_upgrade_cost[resource_index] = resource_cost.amount
 
-                            # Load architecture graphics
-                            try:
-                                original_units = ARCHITECTURE_SETS[architecture_changes[i] + 1]
-                            except:
-                                original_units = ARCHITECTURE_SETS[architecture_changes[1]]
+                            # Get user input
+                            def get_resource_cost(resource_name: str, default: int) -> int:
+                                while True:
+                                    value = prompt(f"Change {resource_name} cost for elite upgrade: ", default=str(default))
 
-                            # Specify which unit IDs need to change
-                            if i == 0:
-                                all_units_to_change = range(0, len(DATA.civs[1].units))
-                            elif i == 1:
-                                all_units_to_change = [82, 1430]
-                            elif i == 2:
-                                all_units_to_change = [276, 1445]
+                                    if value.strip() == '':
+                                        return default
 
-                            for unit_id in all_units_to_change:
-                                # Select which unit will be the basis for change
-                                if (architecture_changes[i] < len(DATA.civs) - 1):
-                                    unit_to_change_to = original_units[unit_id]
-                                else:
-                                    # Custom unit
-                                    custom_ids = [
-                                        [],
-                                        [[445, 1488]],
-                                        [[1622, 1517], [690, 1482], [1369, 1493], [1217, 1487], [1773, 1530], [689, 1515], [873, 1489], [1367, 1491], [1368, 1492]]
-                                    ]
+                                    try:
+                                        value = int(value)
+                                        if 0 <= value <= 9999:
+                                            return value
+                                    except:
+                                        pass
+                                    
+                                    print(f'\033[31mERROR: Entry must be a whole number from 0 to 9999.\n\033[0m')
 
-                                    custom_unit_id = custom_ids[i][architecture_changes[i] - len(DATA.civs) + 1][all_units_to_change.index(unit_id)]
-                                    unit_to_change_to = original_units[custom_unit_id]
+                            # Use the function for each cost
+                            elite_upgrade_cost[0] = get_resource_cost("food", elite_upgrade_cost[0])
+                            elite_upgrade_cost[1] = get_resource_cost("wood", elite_upgrade_cost[1])
+                            elite_upgrade_cost[2] = get_resource_cost("gold", elite_upgrade_cost[2])
 
-                                # Look for custom unit
-                                if len(custom_arcs[i]) > 0:
-                                    for j, custom_arc in enumerate(custom_arcs[i]):
-                                        if architecture_selection == custom_arc:
-                                            unit_to_change_to = DATA.civs[selected_civ_index].units.index(custom_arc)
-                                            print(unit_to_change_to)
-                                            break
+                            # Clear the previous costs
+                            for resource_cost in elite_upgrade_tech.resource_costs:
+                                resource_cost.type = -1
+                                resource_cost.amount = 0
+                                resource_cost.flag = 0
 
-                                # Standing graphic
-                                try:
-                                    standing_graphic_list = list(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic)  # Convert to list for modification
-                                    standing_graphic_list[0] = int(unit_to_change_to.standing_graphic[0])  # Ensure it's an integer
-                                    DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = tuple(standing_graphic_list)  # Convert back to tuple
-                                except:
-                                    pass
+                            # Set the costs for the .dat file
+                            resource_cost_index = 0
+                            for i, cost in enumerate(elite_upgrade_cost):
+                                if cost > 0:
+                                    gold_correction = 0
+                                    if i == 2:
+                                        gold_correction = 1
 
-                                # Dying graphic
-                                try:
-                                    DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = unit_to_change_to.dying_graphic  # Ensure it's an integer
-                                except:
-                                    pass
+                                    elite_upgrade_tech.resource_costs[i].type = i + gold_correction
+                                    elite_upgrade_tech.resource_costs[i].amount = cost
+                                    elite_upgrade_tech.resource_costs[i].flag = 1
+                                    resource_cost_index += 1
 
-                                # Damage graphics
-                                try:
-                                    for j in range(3):  # Loop through the first 3 damage graphics
-                                        if j < len(DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics):
-                                            DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics[j].graphic_id = unit_to_change_to.damage_graphics[j].graphic_id # Ensure it's an integer
-                                except:
-                                    pass
-
-                        # Save changes
-                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                        print(f"Architecture changed.")
-                        time.sleep(1)
-
-                    # Language
-                    elif selection == '6':
-                        # Assemble all of the language options
-                        all_languages = []
-                        for civ in DATA.civs[1:]:
-                            if civ.name == 'British':
-                                all_languages.append('Britons')
-                            elif civ.name == 'French':
-                                all_languages.append('Franks')
-                            else:
-                                all_languages.append(civ.name)
-
-                        # Change language
-                        while True:
-                            new_language = input(f"\nEnter new language for {selected_civ_name}: ").title()
-
-                            if new_language == '':
-                                break
-                            elif new_language == '?':
-                                print(', '.join(all_languages))
-                            elif new_language.title() in all_languages:
-                                # Change sounds
-                                sound_ids = {303: 'Villager_Male_Select_4', 301: 'Villager_Male_Move_4', 295: 'Villager_Male_Build_1', 299: 'Villager_Male_Chop_1', 455: 'Villager_Male_Farm_1', 448: 'Villager_Male_Fish_1', 297: 'Villager_Male_Forage_1', 298: 'Villager_Male_Hunt_1', 300: 'Villager_Male_Mine_1', 302: 'Villager_Male_Repair_1', 435: 'Villager_Female_Select_4', 434: 'Villager_Female_Move_4', 437: 'Villager_Female_Build_1', 442: 'Villager_Female_Chop_1', 438: 'Villager_Female_Farm_1', 487: 'Villager_Female_Fish_1', 440: 'Villager_Female_Forage_1', 441: 'Villager_Female_Hunt_1', 443: 'Villager_Female_Mine_1', 444: 'Villager_Female_Repair_1', 420: 'Soldier_Select_3', 421: 'Soldier_Move_3', 422: 'Soldier_Attack_3', 423: 'Monk_Select_3', 424: 'Monk_Move_3', 479: 'King_Select_3', 480: 'King_Move_3'}
-
-                                # Change the sounds in the .dat file
-                                for civ in DATA.civs[1:]:
-                                    for sound_id in sound_ids:
-                                        # Get the amount of sound items to add
-                                        sound_count = int(sound_ids[sound_id][-1])
-
-                                        # Change the sound items in the sound
-                                        for i, item in enumerate(DATA.sounds[sound_id].items):
-                                            if item.civilization == selected_civ_index + 1:
-                                                new_name = item.filename.split('_')
-                                                new_name[0] = new_language
-                                                item.filename = '_'.join(new_name)
-
-                                # Save changes
-                                DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                print(f"Language for {selected_civ_name} changed to {new_language}.")
-                                break
-                            else:
-                                print("\033[31mERROR: Language not found.\033[0m")
-                        pass
-
-                    # Tech Tree
-                    elif selection == '7':
-                        # Import the tech tree
-                        while True:
-                            # Tech tree main menu
-                            print("\033[32m\n--- Tech Tree Menu ---\033[0m")
-                            print("\033[33m0: Barracks\033[0m")
-                            print("\033[33m1: Archery Range\033[0m")
-                            print("\033[33m2: Stable\033[0m")
-                            print("\033[33m3: Blacksmith\033[0m")
-                            print("\033[33m4: Market\033[0m")
-                            print("\033[33m5: Dock\033[0m")
-                            print("\033[33m6: Siege Workshop\033[0m")
-                            print("\033[33m7: University\033[0m")
-                            print("\033[33m8: Monastery\033[0m")
-                            print("\033[33m9: Defensive\033[0m")
-                            print("\033[33m10: Castle\033[0m")
-                            print("\033[33m11: Economic\033[0m")
-                            selection = input("Selection: ")
-
-                            # Set the tree
-                            if selection == '0':
-                                branch_title = 'Barracks'
-                                tree = [
-                                    ['Barracks (B)'],
-                                    ['Militia (U)', 'Man-at-Arms (U)', 'Long Swordsman (U)', 'Legionary (X)', 'Two-Handed Swordsman (U)', 'Champion (U)'],
-                                    ['Supplies (T)', 'Gambesons (T)'],
-                                    ['Spearman (U)', 'Pikeman (U)', 'Halberdier (U)'],
-                                    ['Eagle Scout (U)', 'Eagle Warrior (U)', 'Elite Eagle Warrior (U)'],
-                                    ['Squires (U)'],
-                                    ['Arson (U)'],
-                                    ['Condottiero (X2)'],
-                                    ['Flemish Militia (X2)']
-                                ]
-                            elif selection == '1':
-                                branch_title = 'Archery Range'
-                                tree = [
-                                    ['Archery Range (B)'],
-                                    ['Archer (U)', 'Crossbowman (U)', 'Arbalester (U)'],
-                                    ['Skirmisher (U)', 'Elite Skirmisher (U)', 'Imperial Skirmisher (X)'],
-                                    ['Slinger (X2)'], 
-                                    ['Hand Cannoneer (U2)'],
-                                    ['Cavalry Archer (U2)', 'Heavy Cavalry Archer (U2)'],
-                                    ['Elephant Archer (U2)', 'Elite Elephant Archer (U2)'],
-                                    ['Genitour (X)', 'Elite Genitour (X)'],
-                                    ['Thumb Ring (T)'],
-                                    ['Parthian Tactics (T)'],
-                                ]
-                            elif selection == '2':
-                                branch_title = 'Stable'
-                                tree = [
-                                    ['Stable (B)'],
-                                    ['Scout Cavalry (U)', 'Light Cavalry (U)', 'Winged Hussar (X)', 'Hussar (U)'],
-                                    ['Shrivamsha Rider (X)', 'Elite Shrivamsha Rider (X)'],
-                                    ['Bloodlines (T)'],
-                                    ['Knight (U)', 'Cavalier (U)', 'Savar (X)', 'Paladin (U)'],
-                                    ['Steppe Lancer (U)', 'Elite Steppe Lancer (U)'],
-                                    ['Camel Scout (X)', 'Camel Rider (U)', 'Heavy Camel Rider (U)', 'Imperial Camel Rider (X)'],
-                                    ['Battle Elephant (U)', 'Elite Battle Elephant (U)'],
-                                    ['Xolotl Warrior (X)'],
-                                    ['Husbandry (T)'],
-                                ]
-                            elif selection == '3':
-                                branch_title = 'Blacksmith'
-                                tree = [
-                                    ['Blacksmith (B)'],
-                                    ['Padded Archer Armor (T)', 'Leather Archer Armor (T)', 'Ring Archer Armor (T)'],
-                                    ['Fletching (T)', 'Bodkin Arrow (T)', 'Bracer (T)'],
-                                    ['Forging (T)', 'Iron Casting (T)', 'Blast Furnace (T)'],
-                                    ['Scale Barding Armor (T)', 'Chain Barding Armor (T)', 'Plate Barding Armor (T)'],
-                                    ['Scale Mail Armor (T)', 'Chain Mail Armor (T)', 'Plate Mail Armor (T)'],
-                                ]
-                            elif selection == '4':
-                                branch_title = 'Market'
-                                tree = [
-                                    ['Market (B)'],
-                                    ['Trade Cart (U)'],
-                                    ['Coinage (T)', 'Banking (T)'],
-                                    ['Caravan (T)'],
-                                    ['Guilds (T)'],
-                                ]
-                            elif selection == '5':
-                                branch_title = 'Dock'
-                                tree = [
-                                    ['Dock (B)'],
-                                    ['Fishing Ship (U)'],
-                                    ['Transport Ship (U)'],
-                                    ['Fire Galley (U)', 'Fire Ship (U)', 'Fast Fire Ship (U)'],
-                                    ['Trade Cog (U)'],
-                                    ['Gillnets (T)'],
-                                    ['Cannon Galleon (U)', 'Elite Cannon Galleon (U)'],
-                                    ['Demolition Raft (U)', 'Demolition Ship (U)', 'Heavy Demolition Ship (U)'],
-                                    ['Galley (U)', 'War Galley (U)', 'Galleon (U)'],
-                                    ['Dromon (X)'],
-                                    ['Turtle Ship (X2)', 'Elite Turtle Ship (X2)'],
-                                    ['Longboat (X2)', 'Elite Longboat (X2)'],
-                                    ['Caravel (X2)', 'Elite Caravel (X2)'],
-                                    ['Thirisadai (X2)'],
-                                    ['Careening (T)', 'Dry Dock (T)'],
-                                    ['Shipwright (T)'],
-                                    ['Fish Trap (U)'],
-                                ]
-                            elif selection == '6':
-                                branch_title = 'Siege Workshop'
-                                tree = [
-                                    ['Siege Workshop (B)'],
-                                    ['Battering Ram (U2)', 'Capped Ram (U2)', 'Siege Ram (U2)'],
-                                    ['Armored Elephant (U2)', 'Siege Elephant (U2)'],
-                                    ['Flaming Camel (X)'],
-                                    ['Mangonel (U)', 'Onager (U)', 'Siege Onager (U)'],
-                                    ['Scorpion (U)', 'Heavy Scorpion (U)'],
-                                    ['Siege Tower (U)'],
-                                    ['Bombard Cannon (U3)', 'Houfnice (X3)'],
-                                    ['Flamethrower (X3)']
-                                ]
-                            elif selection == '7':
-                                branch_title = 'University'
-                                tree = [
-                                    ['University (B)'],
-                                    ['Masonry (T)', 'Architecture (T)'],
-                                    ['Fortified Wall (T)'],
-                                    ['Chemistry (T)', 'Bombard Tower (T)'],
-                                    ['Ballistics (T)'],
-                                    ['Siege Engineers (T)'],
-                                    ['Guard Tower (T)', 'Keep (T)'],
-                                    ['Heated Shot (T)'],
-                                    ['Arrowslits (T)'],
-                                    ['Murder Holes (T)'],
-                                    ['Treadmill Crane (T)'],
-                                ]
-                            elif selection == '8':
-                                branch_title = 'Monastery'
-                                tree = [
-                                    ['Monastery (B2)'],
-                                    ['Fortified Church (B2)'],
-                                    ['Monk (U)'],
-                                    ['Missionary (X3)'],
-                                    ['Warrior Priest (X3)'],
-                                    ['Illumination (T)'],
-                                    ['Block Printing (T)'],
-                                    ['Devotion (T)', 'Faith (T)'],
-                                    ['Redemption (T)'],
-                                    ['Theocracy (T)'],
-                                    ['Atonement (T)'],
-                                    ['Herbal Medicine (T)'],
-                                    ['Heresy (T)'],
-                                    ['Sanctity (T)'],
-                                    ['Fervor (T)'],
-                                ]
-                            elif selection == '9':
-                                branch_title = 'Defensive'
-                                tree = [
-                                    ['Outpost (B)'],
-                                    ['Watch Tower (B)', 'Guard Tower (B)', 'Keep (B)', 'Bombard Tower (B)'],
-                                    ['Palisade Wall (B)'],
-                                    ['Stone Wall (B)', 'Fortified Wall (B)'],
-                                ]
-                            elif selection == '10':
-                                branch_title = 'Castle'
-                                tree = [
-                                    ['Castle (B)'],
-                                    ['Petard (U)'],
-                                    ['Trebuchet (U)'],
-                                    ['Hoardings (T)'],
-                                    ['Sappers (T)'],
-                                    ['Conscription (T)'],
-                                    ['Spies/Treason (T)'],
-                                ]
-                            elif selection == '11':
-                                branch_title = 'Economic'
-                                tree = [
-                                    ['House (B)'],
-                                    ['Town Center (B)'],
-                                    ['Villager (U)'],
-                                    ['Town Watch (T)', 'Town Patrol (T)'],
-                                    ['Loom (T)'],
-                                    ['Wheelbarrow (T)', 'Hand Cart (T)'],
-                                    ['Mining Camp (B)'],
-                                    ['Gold Mining (T)', 'Gold Shaft Mining (T)'],
-                                    ['Stone Mining (T)', 'Stone Shaft Mining (T)'],
-                                    ['Lumber Camp (B2)'],
-                                    ['Mule Cart (B2)'],
-                                    ['Double-Bit Axe (T)', 'Bow Saw (T)', 'Two-Man Saw (T)'],
-                                    ['Mill (B3)'],
-                                    ['Folwark (B3)'],
-                                    ['Farm (B)'],
-                                    ['Horse Collar (T)', 'Heavy Plow (T)', 'Crop Rotation (T)'],
-                                ]
-                            elif selection == '':
-                                break
-
+                            # Change research time
                             while True:
-                                global TECH_TREE
-                                TECH_TREE = {}
-                                with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
-                                    # Get the line of the selected civ
-                                    lines = file.readlines()
-                                    civ_id_line_indexes = [i for i, line in enumerate(lines) if '"civ_id":' in line]
-                                    index = civ_id_line_indexes[selected_civ_index] + 1
+                                try:
+                                    new_time = int(prompt(f"Enter research time in seconds for elite upgrade: ", default=str(elite_upgrade_tech.research_time)))
+                                    if new_time == '':
+                                        new_time = elite_upgrade_tech.research_time
+                                    elite_upgrade_tech.research_time = new_time
+                                    break
+                                except:
+                                    print(f'\033[31mERROR: Invalid research time entry.\n\033[0m\n')
 
-                                    # Get the tech tree of the selected civ
-                                    for line in lines[index:]:
-                                        if '\"Name\":' in line:
-                                            selected_unit = line.split('\"Name\": "')[1].split('",')[0].lower()
-                                        elif '\"Node Status\":' in line:
-                                            selected_status = line.split('\"Node Status\": "')[1].split('",')[0]
+                            # Get unit indexes
+                            castle_unit_indexes = [-1, -1, -1, -1]
+                            with open(ORIGINAL_STRINGS, 'r') as file:
+                                lines = file.readlines()
+                                for i, unit in enumerate(DATA.civs[selected_civ_index + 1].units):
+                                    try:
+                                        # Get the name of the unit
+                                        unit_name_id = int(unit.language_dll_name)
+                                        unit_name = None
 
-                                            # Convert status to integer
-                                            if selected_status == 'NotAvailable':
-                                                selected_status = 0
-                                            elif selected_status == 'ResearchedCompleted':
-                                                selected_status = 1
-                                            elif selected_status == 'ResearchRequired':
-                                                selected_status = 2
+                                        # Extract unit name from ORIGINAL_STRINGS
+                                        for line in lines:
+                                            if line.startswith(f"{unit_name_id} "):
+                                                unit_name = line.split('"')[1].lower()
+                                                break
+                                            
+                                        # Get the units IDs
+                                        if unit_name:
+                                            if unit_name == all_castle_units[selected_civ_index]:
+                                                castle_unit_indexes[0] = i
+                                            elif unit_name == f'elite {all_castle_units[selected_civ_index]}':
+                                                castle_unit_indexes[1] = i
+                                            elif unit_name == new_castle_unit:
+                                                castle_unit_indexes[2] = i
+                                            elif unit_name == f'elite {new_castle_unit}':
+                                                castle_unit_indexes[3] = i
+                                    except:
+                                        pass
 
-                                            # Add to tech tree
-                                            TECH_TREE[selected_unit] = selected_status
+                            # Change Castle Unit
+                            effect_commands = [
+                                genieutils.effect.EffectCommand(3, castle_unit_indexes[0], castle_unit_indexes[2], -1, 0),
+                                genieutils.effect.EffectCommand(3, castle_unit_indexes[1], castle_unit_indexes[3], -1, 0)
+                            ]
 
-                                        # Check for the end of the tech tree section
-                                        if 'civ_id' in line:
-                                            break
+                            effect_found = False
+                            effect_name = selected_civ_name + " (Castle Unit)"
 
-                                # Print the respective branch of the tree
-                                print(f"\033[32m\n--- {branch_title} Branch Menu ---\033[0m")
-                                tree_string = ''
-                                for i, branch in enumerate(tree):
-                                    twig_string = ''
-                                    for letter, twig in zip(string.ascii_uppercase, branch):
-                                        try:
-                                            if (TECH_TREE[twig.lower()[:-4]] == 0):
-                                                twig_string += f'[{i}{letter}] \033[31m{twig[:-4]}\033[0m --> '
-                                            else:
-                                                twig_string += f'[{i}{letter}] \033[32m{twig[:-4]}\033[0m --> '
-                                        except:
-                                            pass
-                                    tree_string += twig_string
-                                    print(twig_string[:-4])
-                                toggle_selection = input("Addresses: ")
+                            for i, effect in enumerate(DATA.effects):
+                                if effect.name == effect_name:
+                                    effect.effect_commands = effect_commands
+                                    effect_found = True
+                                    effect_index = i
+                                    break
+                                
+                            if not effect_found:
+                                new_effect = genieutils.effect.Effect(effect_name, effect_commands)
+                                DATA.effects.append(new_effect)
+                                effect_index = len(DATA.effects) - 1
 
-                                # Exit
-                                if toggle_selection == '':
+                            # Create the tech that replaces the old unit
+                            new_tech = DATA.techs[1101]
+                            new_tech.effect_id = effect_index
+                            new_tech.name = effect_name
+                            new_tech.civ = selected_civ_index + 1
+
+                            for tech in DATA.techs:
+                                if tech.name == effect_name:
+                                    DATA.techs.remove(tech)
+                            DATA.techs.append(new_tech)
+
+                            # Assemble unit classes
+                            classes = {0: 'archer', 6: 'infantry', 12: 'cavalry', 13: 'siege', 18: 'monk', 23: 'mounted hand cannoneer', 36: 'cavalry archer', 38: 'archer', 44: 'hand cannoneer', 55: 'siege weapon'}
+                            try:
+                                unit_class = classes[DATA.civs[1].units[castle_unit_indexes[2]].class_]
+                            except:
+                                unit_class = 'unknown'
+                                print(DATA.civs[1].units[castle_unit_indexes[2]].class_)
+
+                            # Update description
+                            new_unit_description = f'{new_castle_unit.title()} ({unit_class})'
+                            for i, line in enumerate(description_lines):
+                                if 'unique unit' in line.lower():
+                                    description_lines[i + 1] = new_unit_description
+                                    save_description(line_code, description_lines)
+
+                            # Save changes
+                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                            print(f"{selected_civ_name.title()} unique unit set to {new_castle_unit.title()}.")
+                            time.sleep(1)
+
+                        # Unique Techs
+                        elif selection == '4':
+                            # Get current techs information
+                            unique_techs_names = current_unique_techs.split(' / ')
+                            unique_techs_ids = [-1, -1]
+                            for i, tech in enumerate(DATA.techs):
+                                if tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 102 and tech.research_location == 82:
+                                    unique_techs_ids[0] = i
+                                elif tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 103 and tech.research_location == 82:
+                                    unique_techs_ids[1] = i
+
+                            # Prompt the user for Castle Age tech
+                            new_castle_tech_name = prompt(f"\nChange Castle Age tech name: ", default=unique_techs_names[0])
+                            if new_castle_tech_name == '':
+                                new_castle_tech_name = unique_techs_names[0]
+                            while True:
+                                prompt_default_text = description_lines[-5].split('(')[1].strip(')')
+                                new_castle_tech_description = prompt(f"Change Castle Age tech description: ", default=prompt_default_text)
+
+                                new_castle_tech, new_castle_effect = create_bonus(new_castle_tech_description, selected_civ_index)
+                                if len(new_castle_effect.effect_commands) == 0:
+                                    print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
+                                    continue
+                                else:
+                                    DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id].name = new_castle_tech_description
+                                    DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id].effect_commands = new_castle_effect.effect_commands
                                     break
 
-                                # Help
-                                elif toggle_selection == '?':
-                                    print('\n\x1b[35mGreen items are enabled. Red items are disabled.\x1b[0m')
-                                    print('\x1b[35mType any address to toggle enable/disable the item.\x1b[0m')
-                                    print('\x1b[35mYou may stack several addresses in one line, separated by a space.\x1b[0m')
 
-                                # Toggle units
+                            new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ", default=unique_techs_names[1])
+                            if new_imperial_tech_name == '':
+                                new_imperial_tech_name = unique_techs_names[1]
+                            while True:
+                                prompt_default_text = description_lines[-4].split('(')[1].strip(')')
+                                new_imperial_tech_description = prompt(f"Change Imperial Age tech description: ", default=prompt_default_text)
+
+                                new_imperial_tech, new_imperial_effect = create_bonus(new_imperial_tech_description, selected_civ_index)
+                                if len(new_imperial_effect.effect_commands) == 0:
+                                    print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
+                                    continue
                                 else:
-                                    toggle_addresses = toggle_selection.split(' ')
+                                    DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id].name = new_imperial_tech_description
+                                    DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id].effect_commands = new_imperial_effect.effect_commands
+                                    break
+                                
+                            # Change the names
+                            change_string(DATA.techs[unique_techs_ids[0]].language_dll_name, new_castle_tech_name)
+                            change_string(DATA.techs[unique_techs_ids[1]].language_dll_name, new_imperial_tech_name)
+                            DATA.techs[unique_techs_ids[0]].name = new_castle_tech_name
+                            DATA.techs[unique_techs_ids[1]].name = new_imperial_tech_name
 
-                                    # Toggle each unit
-                                    for address in toggle_addresses:
-                                        try:
-                                            # Convert the address into the unit's name
-                                            unit_to_toggle = tree[int(address[0])][ord(address[1].upper()) - ord('A')][:-4]
+                            # Update the description
+                            description_lines[-5] = f'• {new_castle_tech_name} ({new_castle_tech_description})'
+                            description_lines[-4] = f'• {new_imperial_tech_name} ({new_imperial_tech_description})'
+                            save_description(description_code, description_lines)
 
-                                            # Toggle the unit's value in the tree between 0 and 1
-                                            TECH_TREE[unit_to_toggle.lower()] = abs(TECH_TREE[unit_to_toggle.lower()])
+                            # Save file
+                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                            print(f'Unique techs changed for {selected_civ_name}.')
+                            time.sleep(1)
 
-                                            # Get the tech tree effect index
-                                            for i, effect in enumerate(DATA.effects):
-                                                if 'tech tree' in effect.name.lower() and selected_civ_name.lower() in effect.name.lower():
-                                                    tech_tree_index = i
-                                                    break
+                        # Architecture
+                        elif selection == '5':
+                            # Gather base architectures
+                            base_architectures = []
+                            for i in range(1, len(DATA.civs)):
+                                base_architectures.append(DATA.civs[i].name)
 
-                                            # Toggle the unit
-                                            toggle_unit(get_unit_id(unit_to_toggle), 'toggle', tech_tree_index, selected_civ_name)
+                            # Gather custom architectures
+                            custom_arcs = [
+                                [],
+                                ['Poenari Castle'],
+                                ['Aachen Cathedral', 'Dome of the Rock', 'Dormition Cathedral', 'Gol Gumbaz', 'Minaret of Jam', 'Pyramid', 'Quimper Cathedral', 'Sankore Madrasah', 'Tower of London']
+                            ]
 
-                                            # Follow toggle rules
-                                            # If disabling, disable all non-X units that are higher
-                                            # If enabling, enable all non-X units that are lower
-                                            # If enabling an X unit, disable all non-X that are higher
-                                            # If enabling a tiered unit, disable all units in the same tier on the same branch
-                                            
-                                        except Exception as e:
-                                            print(e)
-                                            #print(f'Invalid address: {address.upper()}')
+                            # User prompts
+                            architecture_types = ["General", "Castle", "Wonder"]
+                            architecture_changes = [-1, -1, -1]
+                            print('\n')
+                            for i in range(3):
+                                # Assemble all architecture options
+                                all_architectures = base_architectures + custom_arcs[i]
 
-                                    # Save the .dat file and tell the user the update is complete
+                                architecture_selection = '?'
+                                while architecture_selection == '?':
+                                    architecture_selection = input(f"Enter {architecture_types[i]} architecture for {selected_civ_name}: ").lower()
+
+                                    if architecture_selection == '?':
+                                        # Print all available options
+                                        print(', '.join(all_architectures))
+                                        print('Leave blank to leave the architecture type unchanged')
+                                        print('Type \'default\' to switch back to the Civilization\'s original architecture.')
+                                        continue
+                                    
+                                    # Check against architecture options
+                                    for i2 in range(len(all_architectures)):
+                                        if architecture_selection == all_architectures[i2].lower():
+                                            architecture_changes[i] = i2
+                                            break
+                                        
+                                    # Use previous architecture if blank
+                                    if architecture_selection == '':
+                                        architecture_changes[i] = -1
+
+                                    # Use default architecture
+                                    elif architecture_selection == 'default':
+                                        architecture_changes[i] = selected_civ_index
+
+                                    # Check if architecture is invalid
+                                    elif architecture_changes[i] == -1:
+                                        architecture_selection = '?'
+                                        print(f'\033[31mERROR: {architecture_types[i]} architecture type not valid.\n\033[0m')
+
+                            for i in range(3):
+                                # Skip if unspecified
+                                if architecture_changes[i] == -1:
+                                    continue
+
+                                # Load architecture graphics
+                                try:
+                                    original_units = ARCHITECTURE_SETS[architecture_changes[i] + 1]
+                                except:
+                                    original_units = ARCHITECTURE_SETS[architecture_changes[1]]
+
+                                # Specify which unit IDs need to change
+                                if i == 0:
+                                    all_units_to_change = range(0, len(DATA.civs[1].units))
+                                elif i == 1:
+                                    all_units_to_change = [82, 1430]
+                                elif i == 2:
+                                    all_units_to_change = [276, 1445]
+
+                                for unit_id in all_units_to_change:
+                                    # Select which unit will be the basis for change
+                                    if (architecture_changes[i] < len(DATA.civs) - 1):
+                                        unit_to_change_to = original_units[unit_id]
+                                    else:
+                                        # Custom unit
+                                        custom_ids = [
+                                            [],
+                                            [[445, 1488]],
+                                            [[1622, 1517], [690, 1482], [1369, 1493], [1217, 1487], [1773, 1530], [689, 1515], [873, 1489], [1367, 1491], [1368, 1492]]
+                                        ]
+
+                                        custom_unit_id = custom_ids[i][architecture_changes[i] - len(DATA.civs) + 1][all_units_to_change.index(unit_id)]
+                                        unit_to_change_to = original_units[custom_unit_id]
+
+                                    # Look for custom unit
+                                    if len(custom_arcs[i]) > 0:
+                                        for j, custom_arc in enumerate(custom_arcs[i]):
+                                            if architecture_selection == custom_arc:
+                                                unit_to_change_to = DATA.civs[selected_civ_index].units.index(custom_arc)
+                                                print(unit_to_change_to)
+                                                break
+
+                                    # Standing graphic
+                                    try:
+                                        standing_graphic_list = list(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic)  # Convert to list for modification
+                                        standing_graphic_list[0] = int(unit_to_change_to.standing_graphic[0])  # Ensure it's an integer
+                                        DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = tuple(standing_graphic_list)  # Convert back to tuple
+                                    except:
+                                        pass
+
+                                    # Dying graphic
+                                    try:
+                                        DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = unit_to_change_to.dying_graphic  # Ensure it's an integer
+                                    except:
+                                        pass
+
+                                    # Damage graphics
+                                    try:
+                                        for j in range(3):  # Loop through the first 3 damage graphics
+                                            if j < len(DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics):
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics[j].graphic_id = unit_to_change_to.damage_graphics[j].graphic_id # Ensure it's an integer
+                                    except:
+                                        pass
+
+                            # Save changes
+                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                            print(f"Architecture changed.")
+                            time.sleep(1)
+
+                        # Language
+                        elif selection == '6':
+                            # Assemble all of the language options
+                            all_languages = []
+                            for civ in DATA.civs[1:]:
+                                if civ.name == 'British':
+                                    all_languages.append('Britons')
+                                elif civ.name == 'French':
+                                    all_languages.append('Franks')
+                                else:
+                                    all_languages.append(civ.name)
+                            all_languages.append('Greek')
+
+                            # Change language
+                            while True:
+                                new_language = input(f"\nEnter new language for {selected_civ_name}: ").title()
+
+                                if new_language == '':
+                                    break
+                                elif new_language == '?':
+                                    print(', '.join(all_languages))
+                                elif new_language.title() in all_languages:
+                                    # Change sounds
+                                    sound_ids = {303: 'Villager_Male_Select_4', 301: 'Villager_Male_Move_4', 295: 'Villager_Male_Build_1', 299: 'Villager_Male_Chop_1', 455: 'Villager_Male_Farm_1', 448: 'Villager_Male_Fish_1', 297: 'Villager_Male_Forage_1', 298: 'Villager_Male_Hunt_1', 300: 'Villager_Male_Mine_1', 302: 'Villager_Male_Repair_1', 435: 'Villager_Female_Select_4', 434: 'Villager_Female_Move_4', 437: 'Villager_Female_Build_1', 442: 'Villager_Female_Chop_1', 438: 'Villager_Female_Farm_1', 487: 'Villager_Female_Fish_1', 440: 'Villager_Female_Forage_1', 441: 'Villager_Female_Hunt_1', 443: 'Villager_Female_Mine_1', 444: 'Villager_Female_Repair_1', 420: 'Soldier_Select_3', 421: 'Soldier_Move_3', 422: 'Soldier_Attack_3', 423: 'Monk_Select_3', 424: 'Monk_Move_3', 479: 'King_Select_3', 480: 'King_Move_3'}
+
+                                    # Change the sounds in the .dat file
+                                    for civ in DATA.civs[1:]:
+                                        for sound_id in sound_ids:
+                                            # Get the amount of sound items to add
+                                            sound_count = int(sound_ids[sound_id][-1])
+
+                                            # Change the sound items in the sound
+                                            for i, item in enumerate(DATA.sounds[sound_id].items):
+                                                if item.civilization == selected_civ_index + 1:
+                                                    new_name = item.filename.split('_')
+                                                    new_name[0] = new_language
+                                                    item.filename = '_'.join(new_name)
+
+                                    # Save changes
                                     DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
-                                    print(f'{selected_civ_name} Tech Tree updated.')
-                                    time.sleep(1)
-            else:
-                print("Invalid selection. Try again.")
-        except ValueError:
-            print("Please enter a valid number.")
+                                    print(f"Language for {selected_civ_name} changed to {new_language}.")
+                                    break
+                                else:
+                                    print("\033[31mERROR: Language not found.\033[0m")
+                            pass
+
+                        # Tech Tree
+                        elif selection == '7':
+                            # Import the tech tree
+                            while True:
+                                # Tech tree main menu
+                                print("\033[32m\n--- Tech Tree Menu ---\033[0m")
+                                print("\033[33m0: Barracks\033[0m")
+                                print("\033[33m1: Archery Range\033[0m")
+                                print("\033[33m2: Stable\033[0m")
+                                print("\033[33m3: Blacksmith\033[0m")
+                                print("\033[33m4: Market\033[0m")
+                                print("\033[33m5: Dock\033[0m")
+                                print("\033[33m6: Siege Workshop\033[0m")
+                                print("\033[33m7: University\033[0m")
+                                print("\033[33m8: Monastery\033[0m")
+                                print("\033[33m9: Defensive\033[0m")
+                                print("\033[33m10: Castle\033[0m")
+                                print("\033[33m11: Economic\033[0m")
+                                selection = input("Selection: ")
+
+                                # Set the tree
+                                if selection == '0':
+                                    branch_title = 'Barracks'
+                                    tree = [
+                                        ['Barracks (B)'],
+                                        ['Militia (U)', 'Man-at-Arms (U)', 'Long Swordsman (U)', 'Legionary (X)', 'Two-Handed Swordsman (U)', 'Champion (U)'],
+                                        ['Supplies (T)', 'Gambesons (T)'],
+                                        ['Spearman (U)', 'Pikeman (U)', 'Halberdier (U)'],
+                                        ['Eagle Scout (U)', 'Eagle Warrior (U)', 'Elite Eagle Warrior (U)'],
+                                        ['Squires (U)'],
+                                        ['Arson (U)'],
+                                        ['Condottiero (X2)'],
+                                        ['Flemish Militia (X2)']
+                                    ]
+                                elif selection == '1':
+                                    branch_title = 'Archery Range'
+                                    tree = [
+                                        ['Archery Range (B)'],
+                                        ['Archer (U)', 'Crossbowman (U)', 'Arbalester (U)'],
+                                        ['Skirmisher (U)', 'Elite Skirmisher (U)', 'Imperial Skirmisher (X)'],
+                                        ['Slinger (X2)'], 
+                                        ['Hand Cannoneer (U2)'],
+                                        ['Cavalry Archer (U2)', 'Heavy Cavalry Archer (U2)'],
+                                        ['Elephant Archer (U2)', 'Elite Elephant Archer (U2)'],
+                                        ['Genitour (X)', 'Elite Genitour (X)'],
+                                        ['Thumb Ring (T)'],
+                                        ['Parthian Tactics (T)'],
+                                    ]
+                                elif selection == '2':
+                                    branch_title = 'Stable'
+                                    tree = [
+                                        ['Stable (B)'],
+                                        ['Scout Cavalry (U)', 'Light Cavalry (U)', 'Winged Hussar (X)', 'Hussar (U)'],
+                                        ['Shrivamsha Rider (X)', 'Elite Shrivamsha Rider (X)'],
+                                        ['Bloodlines (T)'],
+                                        ['Knight (U)', 'Cavalier (U)', 'Savar (X)', 'Paladin (U)'],
+                                        ['Steppe Lancer (U)', 'Elite Steppe Lancer (U)'],
+                                        ['Camel Scout (X)', 'Camel Rider (U)', 'Heavy Camel Rider (U)', 'Imperial Camel Rider (X)'],
+                                        ['Battle Elephant (U)', 'Elite Battle Elephant (U)'],
+                                        ['Husbandry (T)'],
+                                    ]
+                                elif selection == '3':
+                                    branch_title = 'Blacksmith'
+                                    tree = [
+                                        ['Blacksmith (B)'],
+                                        ['Padded Archer Armor (T)', 'Leather Archer Armor (T)', 'Ring Archer Armor (T)'],
+                                        ['Fletching (T)', 'Bodkin Arrow (T)', 'Bracer (T)'],
+                                        ['Forging (T)', 'Iron Casting (T)', 'Blast Furnace (T)'],
+                                        ['Scale Barding Armor (T)', 'Chain Barding Armor (T)', 'Plate Barding Armor (T)'],
+                                        ['Scale Mail Armor (T)', 'Chain Mail Armor (T)', 'Plate Mail Armor (T)'],
+                                    ]
+                                elif selection == '4':
+                                    branch_title = 'Market'
+                                    tree = [
+                                        ['Market (B)'],
+                                        ['Trade Cart (U)'],
+                                        ['Coinage (T)', 'Banking (T)'],
+                                        ['Caravan (T)'],
+                                        ['Guilds (T)'],
+                                    ]
+                                elif selection == '5':
+                                    branch_title = 'Dock'
+                                    tree = [
+                                        ['Dock (B)'],
+                                        ['Fishing Ship (U)'],
+                                        ['Transport Ship (U)'],
+                                        ['Fire Galley (U)', 'Fire Ship (U)', 'Fast Fire Ship (U)'],
+                                        ['Trade Cog (U)'],
+                                        ['Gillnets (T)'],
+                                        ['Cannon Galleon (U)', 'Elite Cannon Galleon (U)'],
+                                        ['Demolition Raft (U)', 'Demolition Ship (U)', 'Heavy Demolition Ship (U)'],
+                                        ['Galley (U)', 'War Galley (U)', 'Galleon (U)'],
+                                        ['Dromon (X)'],
+                                        ['Turtle Ship (X2)', 'Elite Turtle Ship (X2)'],
+                                        ['Longboat (X2)', 'Elite Longboat (X2)'],
+                                        ['Caravel (X2)', 'Elite Caravel (X2)'],
+                                        ['Thirisadai (X2)'],
+                                        ['Careening (T)', 'Dry Dock (T)'],
+                                        ['Shipwright (T)'],
+                                        ['Fish Trap (U)'],
+                                    ]
+                                elif selection == '6':
+                                    branch_title = 'Siege Workshop'
+                                    tree = [
+                                        ['Siege Workshop (B)'],
+                                        ['Battering Ram (U2)', 'Capped Ram (U2)', 'Siege Ram (U2)'],
+                                        ['Armored Elephant (U2)', 'Siege Elephant (U2)'],
+                                        ['Flaming Camel (X)'],
+                                        ['Mangonel (U)', 'Onager (U)', 'Siege Onager (U)'],
+                                        ['Scorpion (U)', 'Heavy Scorpion (U)'],
+                                        ['Siege Tower (U)'],
+                                        ['Bombard Cannon (U3)', 'Houfnice (X3)'],
+                                        ['Flamethrower (X3)']
+                                    ]
+                                elif selection == '7':
+                                    branch_title = 'University'
+                                    tree = [
+                                        ['University (B)'],
+                                        ['Masonry (T)', 'Architecture (T)'],
+                                        ['Fortified Wall (T)'],
+                                        ['Chemistry (T)', 'Bombard Tower (T)'],
+                                        ['Ballistics (T)'],
+                                        ['Siege Engineers (T)'],
+                                        ['Guard Tower (T)', 'Keep (T)'],
+                                        ['Heated Shot (T)'],
+                                        ['Arrowslits (T)'],
+                                        ['Murder Holes (T)'],
+                                        ['Treadmill Crane (T)'],
+                                    ]
+                                elif selection == '8':
+                                    branch_title = 'Monastery'
+                                    tree = [
+                                        ['Monastery (B2)'],
+                                        ['Fortified Church (B2)'],
+                                        ['Monk (U)'],
+                                        ['Missionary (X3)'],
+                                        ['Warrior Priest (X3)'],
+                                        ['Illumination (T)'],
+                                        ['Block Printing (T)'],
+                                        ['Devotion (T)', 'Faith (T)'],
+                                        ['Redemption (T)'],
+                                        ['Theocracy (T)'],
+                                        ['Atonement (T)'],
+                                        ['Herbal Medicine (T)'],
+                                        ['Heresy (T)'],
+                                        ['Sanctity (T)'],
+                                        ['Fervor (T)'],
+                                    ]
+                                elif selection == '9':
+                                    branch_title = 'Defensive'
+                                    tree = [
+                                        ['Outpost (B)'],
+                                        ['Watch Tower (B)', 'Guard Tower (B)', 'Keep (B)', 'Bombard Tower (B)'],
+                                        ['Palisade Wall (B)'],
+                                        ['Stone Wall (B)', 'Fortified Wall (B)'],
+                                    ]
+                                elif selection == '10':
+                                    branch_title = 'Castle'
+                                    tree = [
+                                        ['Castle (B)'],
+                                        ['Petard (U)'],
+                                        ['Trebuchet (U)'],
+                                        ['Hoardings (T)'],
+                                        ['Sappers (T)'],
+                                        ['Conscription (T)'],
+                                        ['Spies/Treason (T)'],
+                                    ]
+                                elif selection == '11':
+                                    branch_title = 'Economic'
+                                    tree = [
+                                        ['House (B)'],
+                                        ['Town Center (B)'],
+                                        ['Villager (U)'],
+                                        ['Town Watch (T)', 'Town Patrol (T)'],
+                                        ['Loom (T)'],
+                                        ['Wheelbarrow (T)', 'Hand Cart (T)'],
+                                        ['Mining Camp (B)'],
+                                        ['Gold Mining (T)', 'Gold Shaft Mining (T)'],
+                                        ['Stone Mining (T)', 'Stone Shaft Mining (T)'],
+                                        ['Lumber Camp (B2)'],
+                                        ['Mule Cart (B2)'],
+                                        ['Double-Bit Axe (T)', 'Bow Saw (T)', 'Two-Man Saw (T)'],
+                                        ['Mill (B3)'],
+                                        ['Folwark (B3)'],
+                                        ['Farm (B)'],
+                                        ['Horse Collar (T)', 'Heavy Plow (T)', 'Crop Rotation (T)'],
+                                    ]
+                                elif selection == '':
+                                    break
+
+                                while True:
+                                    global TECH_TREE
+                                    TECH_TREE = {}
+                                    with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
+                                        # Get the line of the selected civ
+                                        lines = file.readlines()
+                                        civ_id_line_indexes = [i for i, line in enumerate(lines) if '"civ_id":' in line]
+                                        index = civ_id_line_indexes[selected_civ_index] + 1
+
+                                        # Get the tech tree of the selected civ
+                                        for line in lines[index:]:
+                                            if '\"Name\":' in line:
+                                                selected_unit = line.split('\"Name\": "')[1].split('",')[0].lower()
+                                            elif '\"Node Status\":' in line:
+                                                selected_status = line.split('\"Node Status\": "')[1].split('",')[0]
+
+                                                # Convert status to integer
+                                                if selected_status == 'NotAvailable':
+                                                    selected_status = 0
+                                                elif selected_status == 'ResearchedCompleted':
+                                                    selected_status = 1
+                                                elif selected_status == 'ResearchRequired':
+                                                    selected_status = 2
+
+                                                # Add to tech tree
+                                                TECH_TREE[selected_unit] = selected_status
+
+                                            # Check for the end of the tech tree section
+                                            if 'civ_id' in line:
+                                                break
+
+                                    # Print the respective branch of the tree
+                                    print(f"\033[32m\n--- {selected_civ_name} {branch_title} Branch Menu ---\033[0m")
+                                    tree_string = ''
+                                    for i, branch in enumerate(tree):
+                                        twig_string = ''
+                                        for letter, twig in zip(string.ascii_uppercase, branch):
+                                            try:
+                                                if (TECH_TREE[re.sub(r'\s*\([^)]*\)', '', twig).lower()] == 0):
+                                                    twig_string += f'[{i}{letter}] \033[31m{twig[:-4]}\033[0m --> '
+                                                else:
+                                                    twig_string += f'[{i}{letter}] \033[32m{twig[:-4]}\033[0m --> '
+                                            except:
+                                                pass
+                                        tree_string += twig_string
+                                        print(twig_string[:-4])
+                                    toggle_selection = input("Addresses: ")
+
+                                    # Exit
+                                    if toggle_selection == '':
+                                        break
+
+                                    # Help
+                                    elif toggle_selection == '?':
+                                        print('\n\x1b[35mGreen items are enabled. Red items are disabled.\x1b[0m')
+                                        print('\x1b[35mType any address to toggle enable/disable the item.\x1b[0m')
+                                        print('\x1b[35mYou may stack several addresses in one line, separated by a space.\x1b[0m')
+
+                                    # Toggle units
+                                    else:
+                                        toggle_addresses = toggle_selection.split(' ')
+
+                                        # Toggle each unit
+                                        for address in toggle_addresses:
+                                            try:
+                                                # Convert the address into the unit's name
+                                                unit_to_toggle = tree[int(address[:-1])][ord(address[-1].upper()) - ord('A')][:-4]
+
+                                                # Toggle the unit's value in the tree between 0 and 1
+                                                TECH_TREE[unit_to_toggle.lower()] = abs(TECH_TREE[unit_to_toggle.lower()])
+
+                                                # Get the tech tree effect index
+                                                for i, effect in enumerate(DATA.effects):
+                                                    if 'tech tree' in effect.name.lower() and selected_civ_name.lower() in effect.name.lower():
+                                                        tech_tree_index = i
+                                                        break
+
+                                                # Determine whether it's a unit or a tech
+                                                if get_unit_id(unit_to_toggle) is None:
+                                                    item_index = f'_{get_tech_id(unit_to_toggle)}'
+                                                else:
+                                                    item_index = get_unit_id(unit_to_toggle)
+
+                                                # Toggle the unit
+                                                toggle_unit(item_index, 'toggle', tech_tree_index, selected_civ_name)
+
+                                                # Follow toggle rules
+                                                #for branch in tree:
+                                                    # If disabling, disable all non-X units that are higher
+
+
+                                                # If enabling, enable all non-X units that are lower
+                                                # If enabling an X unit, disable all non-X that are higher
+                                                # If enabling a tiered unit, disable all units in the same tier on the same branch
+
+                                            except Exception as e:
+                                                print(e)
+                                                #print(f'Invalid address: {address.upper()}')
+
+                                        # Save the .dat file and tell the user the update is complete
+                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                        print(f'{selected_civ_name} Tech Tree updated.')
+                                        time.sleep(1)
+                else:
+                    print("Invalid selection. Try again.")
+            except ValueError:
+                print("Please enter a valid number.")
 
 if __name__ == "__main__":
     main()
