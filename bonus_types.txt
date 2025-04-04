@@ -23,7 +23,7 @@ NEEDS: units, number
 KEYWORDS: do blast damage
 NEEDS: units
 
-[Exploding Unit] [%] blast radius
+// [Exploding Unit] [%] blast radius
 KEYWORDS: blast radius
 NEEDS: units, number
 

@@ -565,16 +565,23 @@ def create_bonus(bonus_string, civ_id):
 
     ## BONUS PROMPTS ##
     
-    # [Unit] do blast damage
-    if 'blast damage' in bonus_string:
+    # [Unit] [#/%] blast radius
+    if 'blast radius' in bonus_string:
         # Get items
         get_bonus_units()
+        get_bonus_number()
 
         # Break if no items were found
-        if len(primary_units) == 0:
+        if len(primary_units) == 0 or bonus_number[0] == 0:
             print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: [Unit] do blast damage\033[0m")
+            print("\033[31mTry using the format: [Unit] [%] blast radius\033[0m")
             return [], []
+        
+        # Get effect ID
+        if bonus_number[1] == '+':
+            effect_id = 4
+        elif bonus_number[1] == '*':
+            effect_id = 5
 
         # Create effect commands
         for unit_id in primary_units:
@@ -587,7 +594,7 @@ def create_bonus(bonus_string, civ_id):
                 unit_id_post = unit_id
 
             # Add blast damage
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(4, unit_id_post, unit_category_id, 22, 0.5))
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, 22, bonus_number[0]))
 
     # [Technology] free
     elif 'free' in bonus_string:
