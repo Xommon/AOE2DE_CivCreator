@@ -190,7 +190,7 @@ def create_bonus(bonus_string, civ_id):
         'all units': [0.5, 6.5, 12.5, 13.5, 18.5, 43.5, 19.5, 22.5, 2.5, 36.5, 51.5, 44.5, 54.5, 55.5, 35.5],
         'military': [0.5, 35.5, 6.5, 36.5, 47.5, 12.5, 44.5, 23.5],
         'infantry': [6.5],
-        'villager': [4.5],
+        #'villager': [4.5],
         #'monk': [18.5, 43.5],
         'all archers': [0.5],
         'cavalry': [12.5, 23.5, 47.5, 36.5],
@@ -274,7 +274,7 @@ def create_bonus(bonus_string, civ_id):
         'canoe line' : [],
         'camels' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
         'camel units' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
-        #'villagers' : [83, 293, 590, 592, 123, 218, 122, 216, 56, 57, 120, 124, 354, 118, 212, 156, 220, 222, 214, 259, 579, 581],
+        'villagers' : [83, 293, 590, 592, 123, 218, 122, 216, 56, 57, 120, 124, 354, 118, 212, 156, 220, 222, 214, 259, 579, 581],
         'shepherds' : [590, 592],
         'lumberjacks' : [123, 218],
         'hunters' : [122, 216],
@@ -340,6 +340,11 @@ def create_bonus(bonus_string, civ_id):
                 if unit_line == 'archers' and bonus_string.find('cavalry archers') == unit_line_index - 8:
                     continue
                 elif unit_line == 'cavalry' and bonus_string.find('cavalry archers') == unit_line_index:
+                    continue
+                
+                # Skip mentions of armour against a specific unit
+                elif bonus_string.find('against') == unit_line_index - len(unit_line) - 1:
+                    print(f'skipping {unit_line}')
                     continue
 
                 # Add primary unit
@@ -475,20 +480,26 @@ def create_bonus(bonus_string, civ_id):
             bonus_unit_resource.append(100)
 
     # Extract the age
-    total_ages = 0
+    #total_ages = 0
     def get_bonus_age():
         if 'feudal' in bonus_string:
-            bonus_technology[0].required_techs[0] = 101
+            new_tuple = list(bonus_technology[0].required_techs)
+            new_tuple[0] = 101
+            bonus_technology[0].required_techs = new_tuple
             bonus_technology[0].required_tech_count = 1
-            total_ages += 1
+            #total_ages += 1
         if 'castle' in bonus_string:
-            bonus_technology[0].required_techs[0] = 102
+            new_tuple = list(bonus_technology[0].required_techs)
+            new_tuple[0] = 102
+            bonus_technology[0].required_techs = new_tuple
             bonus_technology[0].required_tech_count = 1
-            total_ages += 1
+            #total_ages += 1
         if 'imperial' in bonus_string:
-            bonus_technology[0].required_techs[0] = 103
+            new_tuple = list(bonus_technology[0].required_techs)
+            new_tuple[0] = 103
+            bonus_technology[0].required_techs = new_tuple
             bonus_technology[0].required_tech_count = 1
-            total_ages += 1
+            #total_ages += 1
 
     # Extract the stats
     bonus_stats = []
@@ -506,6 +517,8 @@ def create_bonus(bonus_string, civ_id):
             # Get the specific kind of armour change
             if 'pierce' in bonus_string:
                 armour_number += 0.0768
+            elif 'against cavalry archers' in bonus_string:
+                armour_number += 0.7168
             elif 'against elephants' in bonus_string:
                 armour_number += 0.1280
             elif 'against infantry' in bonus_string:
@@ -522,8 +535,6 @@ def create_bonus(bonus_string, civ_id):
                 armour_number += 0.5888
             elif 'against spearmen' in bonus_string:
                 armour_number += 0.6912
-            elif 'against cavalry archers' in bonus_string:
-                armour_number += 0.7168
             elif 'against eagles' in bonus_string or 'against eagle' in bonus_string:
                 armour_number += 0.7424
             elif 'against camel' in bonus_string:
@@ -546,16 +557,40 @@ def create_bonus(bonus_string, civ_id):
             bonus_stats.append(23)
         elif 'minimum range' in bonus_string or 'min range' in bonus_string:
             bonus_stats.append(20)
-        elif 'train' in bonus_string:
+        elif 'train' in bonus_string or 'built' in bonus_string:
             bonus_stats.append(101)
 
         # Remove duplicates
         #bonus_stats = list(dict.fromkeys(bonus_stats))
 
     ## BONUS PROMPTS ##
+    
+    # [Unit] do blast damage
+    if 'blast damage' in bonus_string:
+        # Get items
+        get_bonus_units()
+
+        # Break if no items were found
+        if len(primary_units) == 0:
+            print("\033[31mERROR: Invalid bonus description.\033[0m")
+            print("\033[31mTry using the format: [Unit] do blast damage\033[0m")
+            return [], []
+
+        # Create effect commands
+        for unit_id in primary_units:
+            # Check for unit category
+            if int(unit_id) != unit_id:
+                unit_category_id = int(unit_id)
+                unit_id_post = -1
+            else:
+                unit_category_id = -1
+                unit_id_post = unit_id
+
+            # Add blast damage
+            bonus_effect_commands.append(genieutils.effect.EffectCommand(4, unit_id_post, unit_category_id, 22, 0.5))
 
     # [Technology] free
-    if 'free' in bonus_string:
+    elif 'free' in bonus_string:
         # Get items
         get_bonus_techs()
 
@@ -734,7 +769,7 @@ def create_bonus(bonus_string, civ_id):
 
             bonus_effect_commands.append(genieutils.effect.EffectCommand(0, unit_id_post, unit_category_id, 24, 1 - bonus_number[0]))
 
-    # Town Centers spawn [#] villagers when the next Age is reached
+    # Town Centers spawn [#] villagers when the next Age is reached INACTIVE
     elif 'spawn' in bonus_string and 'villagers when the next age is reached' in bonus_string:
         # Get items
         get_bonus_number()
@@ -758,7 +793,7 @@ def create_bonus(bonus_string, civ_id):
         # Create effect commands
         bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 83, 109, 2, 0))
 
-    # Town Centers spawn [#] villagers when reaching the [Age]
+    # Town Centers spawn [#] villagers when reaching the [Age] INACTIVE
     elif 'spawn' in bonus_string and 'villagers when reaching the' in bonus_string:
         # Get items
         get_bonus_number()
@@ -771,7 +806,7 @@ def create_bonus(bonus_string, civ_id):
             return [], []
 
         # Create effect commands
-        bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 83, 109, 2, 0))
+        bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 83, 109, bonus_number[0], 0))
 
     # [Unit] have [#/%][Stat] ++ in the [Age]
     else:
@@ -811,7 +846,6 @@ def create_bonus(bonus_string, civ_id):
                     if int(stat) == 8:
                         armour = int(str(stat)[2:6])
                         bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, int(stat), armour))
-                        # EffectCommand(type=4, a=-1, b=6, c=8, d=1025.0)
                     else:
                         bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, stat, bonus_number[0]))
         except Exception as e:

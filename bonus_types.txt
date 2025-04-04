@@ -7,7 +7,7 @@ NEEDS: units, buildings, techs, number, resource, age
 KEYWORDS: attack, movement speed, move ... faster, armor, pierce armor, range, hp, LOS
 NEEDS: units, buildings, number, stat, age
 
-[Unit] (Exception) [#/%][Att/Def] vs. [Unit]
+// [Unit] (Exception) [#/%][Att/Def] vs. [Unit]
 KEYWORDS: vs., against
 NEEDS: units, buildings, number, attack, armor, pierce armor, units2
 
@@ -19,7 +19,7 @@ NEEDS: units, buildings, number
 KEYWORDS: villagers carry
 NEEDS: units, number
 
-[Unit] do blast damage
+// [Unit] do blast damage
 KEYWORDS: do blast damage
 NEEDS: units
 
