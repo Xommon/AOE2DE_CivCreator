@@ -28,6 +28,9 @@ import pyperclip
 from prompt_toolkit import prompt
 import platform
 import subprocess
+from threading import Thread
+import sys
+from colorama import Fore, Style, Back, init
 
 class Building:
     def __init__(self):
@@ -68,6 +71,66 @@ class UnitTech:
         self.prerequisite_types = ['None', 'None', 'None', 'None', 'None']
         self.trigger_tech_id = -1
         self.use_type = ''
+
+class ProgressTracker:
+    def __init__(self, total):
+        self.total = total
+        self.current = 0
+
+def loading_bar(progress: ProgressTracker, label="Progress", length=30):
+    while progress.current < progress.total:
+        percent = progress.current / progress.total
+        filled = int(length * percent)
+        bar = colour(Fore.GREEN, '█') * filled + '-' * (length - filled)
+        sys.stdout.write(f'\r{label}: [{bar}] {int(percent * 100)}%')
+        sys.stdout.flush()
+        time.sleep(0.1)
+    sys.stdout.write(f'\r{label}: [{colour(Fore.GREEN, '█') * length}] 100%\n')
+
+def slow_task(progress: ProgressTracker, label):
+    for i in range(progress.total):
+        time.sleep(0.1)  # Simulate work
+        progress.current = i + 1  # Update progress
+
+def with_real_progress(task_func, label, total_steps):
+    progress = ProgressTracker(total_steps)
+    bar_thread = Thread(target=loading_bar, args=(progress, label))
+    bar_thread.start()
+    
+    task_func(progress)  # run your actual logic with progress tracking
+
+    bar_thread.join()
+
+def save_dat(progress: ProgressTracker, path):
+    # Simulate steps while saving (real .save() is a black box)
+    for i in range(progress.total - 1):
+        time.sleep(0.01)
+        progress.current = i + 1
+
+    DATA.save(path)
+    
+    progress.current = progress.total
+
+
+def load_dat(progress: ProgressTracker, path):
+    global DATA
+    DATA = DatFile.parse(path)
+
+    # Simulate progress steps — if you can't track real ones
+    for i in range(progress.total):
+        time.sleep(0.01)  # Very short sleep to simulate "work"
+        progress.current = i + 1
+
+def colour(*args):
+    # Last argument is the string
+    string = args[-1]
+    
+    # All previous args are styles
+    styles = args[:-1]
+
+    # Combine styles
+    new_string = ''.join(styles) + string + Style.RESET_ALL
+    return new_string
 
 def save_description(description_code_, description_lines_):
     with open(MOD_STRINGS, 'r+') as file:
@@ -564,9 +627,17 @@ def create_bonus(bonus_string, civ_id):
         #bonus_stats = list(dict.fromkeys(bonus_stats))
 
     ## BONUS PROMPTS ##
+
+    # First [Fortified Church/Monastery] receives a free Relic
+    if 'first fortified church receives a free relic' in bonus_string or 'first monastery receives a free relic' in bonus_string:
+        # Create effect commands
+        bonus_effect_commands.append(genieutils.effect.EffectCommand(1, 234, 0, -1, 1))
+        bonus_effect_commands.append(genieutils.effect.EffectCommand(1, 283, 0, -1, 1))
+        bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 285, 104, 1, 0))
+        bonus_effect_commands.append(genieutils.effect.EffectCommand(1, 283, 0, -1, 0))
     
     # [Unit] [#/%] blast radius
-    if 'blast radius' in bonus_string:
+    elif 'blast radius' in bonus_string:
         # Get items
         get_bonus_units()
         get_bonus_number()
@@ -930,9 +1001,9 @@ def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
         DATA.effects[tech_tree_index].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))
 
 def open_mod(mod_folder):
-    print('\nLoading mod...')
-    global DATA
-    DATA = DatFile.parse(rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat')
+    with_real_progress(lambda progress: load_dat(progress, rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat'), 'Loading Mod', total_steps=100)
+    #global DATA
+    #DATA = DatFile.parse(rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat')
     global MOD_STRINGS
     MOD_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-modded-strings-utf8.txt'
     global ORIGINAL_STRINGS
@@ -1048,8 +1119,9 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             shutil.copy(source_path, destination_path)  # Copy file
 
     # Open .dat file
-    global DATA
-    DATA = DatFile.parse(rf'{local_mods_folder}/{mod_name}/resources/_common/dat/empires2_x2_p1.dat')
+    #global DATA
+    #DATA = DatFile.parse(rf'{local_mods_folder}/{mod_name}/resources/_common/dat/empires2_x2_p1.dat')
+    with_real_progress(lambda progress: load_dat(progress, rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat'), 'Loading Mod', total_steps=100)
 
     # Copy over custom sounds
     sounds_source_folder = os.path.join(os.path.dirname(__file__), 'sounds')  # Path to the original 'sounds' folder
@@ -1373,7 +1445,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             file.write(line)
 
     # Save changes
-    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+    with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+    #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
 
     # Open the new mod
     if revert:
@@ -1725,7 +1798,7 @@ def main():
                                                         save_description(description_code, description_lines)
 
                                                 # Save changes
-                                                DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                                with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                                 print(f'Bonus removed for {selected_civ_name}: {options[int(remove_bonus_selection)]}')
                                                 time.sleep(1)
 
@@ -1759,7 +1832,7 @@ def main():
                                         save_description(description_code, description_lines)
 
                                         # Save changes
-                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                         print(f'Team bonus changed for {selected_civ_name}.')
                                         time.sleep(1)
 
@@ -1804,7 +1877,7 @@ def main():
                                         save_description(description_code, description_lines)
 
                                         # Save changes
-                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                         print(f'Bonus {bonus_change_index} changed for {selected_civ_name}.')
                                         time.sleep(1)
 
@@ -1865,7 +1938,7 @@ def main():
                                             save_description(description_code, description_lines)
 
                                             # Save changes
-                                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                            with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                             print(f'Bonus added for {selected_civ_name}: {bonus_to_add_ORIGINAL}')
                                             time.sleep(1)
 
@@ -2035,7 +2108,7 @@ def main():
                                     save_description(line_code, description_lines)
 
                             # Save changes
-                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                            with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                             print(f"{selected_civ_name.title()} unique unit set to {new_castle_unit.title()}.")
                             time.sleep(1)
 
@@ -2096,7 +2169,7 @@ def main():
                             save_description(description_code, description_lines)
 
                             # Save file
-                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                            with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                             print(f'Unique techs changed for {selected_civ_name}.')
                             time.sleep(1)
 
@@ -2197,7 +2270,7 @@ def main():
                                             DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].damage_graphics
 
                             # Save changes
-                            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                            with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                             print(f"Architecture changed for {selected_civ_name}.")
                             time.sleep(1)
 
@@ -2240,7 +2313,7 @@ def main():
                                                     item.filename = '_'.join(new_name)
 
                                     # Save changes
-                                    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                    with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                     print(f"Language for {selected_civ_name} changed to {new_language}.")
                                     break
                                 else:
@@ -2537,7 +2610,7 @@ def main():
                                                 #print(f'Invalid address: {address.upper()}')
 
                                         # Save the .dat file and tell the user the update is complete
-                                        DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                         print(f'{selected_civ_name} Tech Tree updated.')
                                         time.sleep(1)
                 else:

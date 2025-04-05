@@ -1,0 +1,100 @@
+# Xommon
+# 02. March 2025
+# Talofa - Age of Empires 2 Definitive Edition Civilisation Editor
+# DEBUG: wine /home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/Tools_Builds/AdvancedGenieEditor3.exe
+# DEBUG: /home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test/resources/_common/dat/empires2_x2_p1.dat
+
+import os
+import shutil
+import time
+import pickle
+import io
+import ast
+import genieutils
+from genieutils.datfile import DatFile
+from genieutils.tech import ResearchResourceCost
+import genieutils.graphic
+import genieutils.sound
+import genieutils.tech
+import genieutils.unit
+from genieutils.graphic import GraphicDelta
+from genieutils.graphic import Graphic
+from genieutils.graphic import GraphicAngleSound
+import genieutils.effect
+import json
+import re
+import string
+import pyperclip
+from prompt_toolkit import prompt
+from threading import Thread
+import sys
+from colorama import Fore, Style, Back, init
+
+class ProgressTracker:
+    def __init__(self, total):
+        self.total = total
+        self.current = 0
+
+def loading_bar(progress: ProgressTracker, label="Progress", length=30):
+    while progress.current < progress.total:
+        percent = progress.current / progress.total
+        filled = int(length * percent)
+        bar = colour(Fore.GREEN, '█') * filled + '-' * (length - filled)
+        sys.stdout.write(f'\r{label}: [{bar}] {int(percent * 100)}%')
+        sys.stdout.flush()
+        time.sleep(0.1)
+    sys.stdout.write(f'\r{label}: [{colour(Fore.GREEN, '█') * length}] 100%\n')
+
+def slow_task(progress: ProgressTracker, label):
+    for i in range(progress.total):
+        time.sleep(0.1)  # Simulate work
+        progress.current = i + 1  # Update progress
+
+def with_real_progress(task_func, label, total_steps):
+    progress = ProgressTracker(total_steps)
+    bar_thread = Thread(target=loading_bar, args=(progress, label))
+    bar_thread.start()
+    
+    task_func(progress)  # run your actual logic with progress tracking
+
+    bar_thread.join()
+
+def save_dat(progress: ProgressTracker):
+    # Simulate steps while saving (real .save() is a black box)
+    for i in range(progress.total - 1):
+        time.sleep(0.01)
+        progress.current = i + 1
+
+    DATA.save('/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test/resources/_common/dat/empires2_x2_p1.dat')
+    
+    progress.current = progress.total
+
+
+def load_dat(progress: ProgressTracker):
+    global DATA
+    DATA = DatFile.parse(rf'/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test/resources/_common/dat/empires2_x2_p1.dat')
+
+    # Simulate progress steps — if you can't track real ones
+    for i in range(progress.total):
+        time.sleep(0.01)  # Very short sleep to simulate "work"
+        progress.current = i + 1
+
+def colour(*args):
+    # Last argument is the string
+    string = args[-1]
+    
+    # All previous args are styles
+    styles = args[:-1]
+
+    # Combine styles
+    new_string = ''.join(styles) + string + Style.RESET_ALL
+    return new_string
+
+def main():
+    # Example usage
+    print(colour(Fore.BLUE, Back.MAGENTA, Style.BRIGHT, "-- Talofa - Age of Empires II DE Civ Editor --"))
+    with_real_progress(load_dat, 'Loading .DAT', total_steps=100)
+    with_real_progress(save_dat, 'Saving .DAT', total_steps=100)
+
+if __name__ == "__main__":
+    main()

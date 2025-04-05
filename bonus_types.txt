@@ -31,7 +31,7 @@ NEEDS: units, number
 KEYWORDS: technologies, more effective
 NEEDS: buildings, number
 
-First [Fortified Church/Monastery] receives a free Relic
+// First [Fortified Church/Monastery] receives a free Relic
 KEYWORDS: receives a free Relic
 NEEDS: buildings
 
