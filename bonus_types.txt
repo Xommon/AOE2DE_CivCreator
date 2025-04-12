@@ -1,3 +1,17 @@
+[Unit] [Stat] [Number] [Age]
+
+// Add blast damage and increase accuracy
+[Britons] Trebuchets deal blast damage and are more accurate
+
+
+increases 20% every age
+dark: 5
+feudal: 6 (1.2) (6/5)
+castle: 7 (1.1666666667) (7/6)
+Imperial: 8 (1.1428571429) (8/7)
+
+////////// OLD //////////
+
 // [Unit] cost [%] ++ [Resource] ++ starting in the [Age]
 KEYWORDS: cost, costs
 NEEDS: units, buildings, techs, number, resource, age

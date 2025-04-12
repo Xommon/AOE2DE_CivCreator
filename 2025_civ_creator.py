@@ -31,61 +31,72 @@ import subprocess
 from threading import Thread
 import sys
 from colorama import Fore, Style, Back, init
+from collections import defaultdict
+import readline
 
-class Building:
-    def __init__(self):
-        self.age_id = -1
-        self.building_id = -1
-        self.building_in_new_column = False
-        self.building_upgraded_from_id = -1
-        self.draw_node_type = ''
-        self.help_string_id = -1
-        self.link_id = -1
-        self.link_node_type = ''
-        self.name = ''
-        self.name_string_id = -1
-        self.node_id = -1
-        self.node_status = ''
-        self.node_type = ''
-        self.picture_index = -1
-        self.prerequisite_ids = [0, 0, 0, 0, 0]
-        self.prerequisite_types = ['None', 'None', 'None', 'None', 'None']
-        self.trigger_tech_id = -1
-        self.use_type = ''
+class Civ:
+    def __init__(self, civ_id, buildings, units):
+        self.civ_id = civ_id
+        self.buildings = buildings
+        self.units = units
 
-class UnitTech:
-    def __init__(self):
-        self.age_id = -1
-        self.building_id = -1
-        self.draw_node_type = ''
-        self.help_string_id = -1
-        self.link_id = -1
-        self.link_node_type = ''
-        self.name = ''
-        self.name_string_id = -1
-        self.node_id = -1
-        self.node_status = ''
-        self.node_type = ''
-        self.picture_index = -1
-        self.prerequisite_ids = [0, 0, 0, 0, 0]
-        self.prerequisite_types = ['None', 'None', 'None', 'None', 'None']
-        self.trigger_tech_id = -1
-        self.use_type = ''
+    def __repr__(self):
+        return f"<Civ {self.civ_id} | {len(self.buildings)} buildings, {len(self.units)} units>"
 
 class ProgressTracker:
     def __init__(self, total):
         self.total = total
         self.current = 0
 
+def import_tech_tree():
+    import json
+
+    with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r', encoding="utf-8") as file:
+        data = json.load(file)
+
+    global CIV_OBJECTS
+    CIV_OBJECTS = []
+
+    global FOREST
+    FOREST = []
+
+    seen_names = set()  # to track unique names across all civs
+
+    for civ in data["civs"]:
+        civ_id = civ.get("civ_id")
+
+        # Skips Battle for Greece civs
+        if civ_id == 'ACHAEMENIDS' or civ_id == 'ATHENIANS' or civ_id == 'SPARTANS':
+            continue
+
+        buildings = civ.get("civ_techs_buildings", [])
+        units = civ.get("civ_techs_units", [])
+
+        CIV_OBJECTS.append(Civ(civ_id, buildings, units))
+
+        # Add unique buildings to FOREST
+        for b in buildings:
+            name = b.get("Name")
+            if name and name not in seen_names:
+                seen_names.add(name)
+                FOREST.append(b)
+
+        # Add unique units to FOREST
+        for u in units:
+            name = u.get("Name")
+            if name and name not in seen_names:
+                seen_names.add(name)
+                FOREST.append(u)
+
 def loading_bar(progress: ProgressTracker, label="Progress", length=30):
     while progress.current < progress.total:
         percent = progress.current / progress.total
         filled = int(length * percent)
-        bar = colour(Fore.GREEN, '█') * filled + '-' * (length - filled)
+        bar = colour(Fore.MAGENTA, '█') * filled + '-' * (length - filled)
         sys.stdout.write(f'\r{label}: [{bar}] {int(percent * 100)}%')
         sys.stdout.flush()
         time.sleep(0.1)
-    sys.stdout.write(f'\r{label}: [{colour(Fore.GREEN, '█') * length}] 100%\n')
+    sys.stdout.write(f'\r{label}: [{colour(Fore.MAGENTA, '█') * length}] 100%\n')
 
 def slow_task(progress: ProgressTracker, label):
     for i in range(progress.total):
@@ -188,6 +199,31 @@ def get_unit_id(name):
                     return i
             except:
                 pass
+
+def get_unit_categories(name):
+    # Switch name to id
+    if int(name) != name:
+        unit_index = get_unit_id(name)
+    else:
+        unit_index = name
+
+    # Extract the description
+    try:
+        description_line = get_string(DATA.civs[1].units[unit_index].language_dll_name + 21000)
+        description_line = re.split(r'[\n.]', description_line)
+
+        # Get the categories from the line
+        categories =''.join(re.findall(r'\b[A-Z][a-z]*\b', description_line[1]))
+
+        # Add category for creation location
+        creation_locations = {87: 'archery range', 12: 'barracks', 101: 'stable', 49: 'siege workshop', 82: 'castle', 45: 'dock'}
+        if DATA.civs[1].units[unit_index].creatable.train_location_id in creation_locations:
+            categories.append(creation_locations[DATA.civs[1].units[unit_index].creatable.train_location_id])
+        #unit_line = get_unit_line(unit_index).lower()
+
+        return categories
+    except Exception as e:
+        return []
         
 def get_tech_id(name):
     # Search with internal_name
@@ -206,6 +242,19 @@ def get_tech_id(name):
     for i, tech in enumerate(DATA.techs):
         if tech.language_dll_name == string_id:
             return i
+        
+def get_string(code):
+    with open(ORIGINAL_STRINGS, 'r') as original_file:
+        original_lines = original_file.readlines()
+
+        for line in original_lines:
+            try:
+                if re.match(r'\d+', line).group() == str(code):
+                    return re.search(r'"(.*?)"', line).group(1)
+            except:
+                pass
+            
+        return ''
         
 def change_string(index, new_string):
     string_line = ''
@@ -237,11 +286,158 @@ def change_string(index, new_string):
         mod_file.writelines(mod_lines)
         mod_file.truncate()  # Ensure remaining old content is removed
 
+def get_unit_line(unit_id, civ_index=None):
+    final_unit = None
+    visited_ids = set()
+
+    # Convert name to ID if a string is passed
+    if isinstance(unit_id, str):
+        unit_id = get_unit_id(unit_id)  # make sure this returns an int or -1
+
+    while unit_id != -1 and unit_id not in visited_ids:
+        visited_ids.add(unit_id)
+        found = False
+
+        # Choose civ to search in
+        civs_to_search = [CIV_OBJECTS[civ_index]] if civ_index is not None else CIV_OBJECTS
+
+        for civ in civs_to_search:
+            for unit in civ.units:
+                if unit.get("Node ID") == unit_id:
+                    final_unit = unit
+                    unit_id = unit.get("Link ID", -1)
+                    found = True
+                    break
+            if found:
+                break
+
+        if not found:
+            break
+
+    if final_unit:
+        return final_unit
+    else:
+        return None
+
+# Complete text
+def make_completer(options_list):
+    def completer(text, state):
+        matches = [s for s in options_list if s.lower().startswith(text.lower())]
+        return matches[state] if state < len(matches) else None
+    return completer
+
 # Bonuses
-def create_bonus(bonus_string, civ_id):
+def create_bonus(bonus_string_original, civ_id):
+    # Bonus object
+    class bonus_object:
+            def __init__(self, name=None, number=None, stat=None, age_stat=None):
+                self.name = name
+                self.number = number
+                self.stat = stat
+                self.age_stat = age_stat
+
     # Create the tech and effect, set the civilisation and names
-    bonus_technology = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', repeatable=1)]
-    bonus_effect = genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', effect_commands=[])
+    final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', repeatable=1)]
+    final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', effect_commands=[])]
+
+    # Divide bonus at semicolons
+    bonus_strings = bonus_string_original.split(';')
+
+    # For each bonus that was separated by the semicolon
+    for bonus_string in bonus_strings:
+        # Create an empty list for bonus objects
+        bonus_objects = []
+
+        # Split bonus words into a list
+        bonus_words = bonus_string.lower().split()
+
+        # Find units/buildings
+        '''unit_categories = ['foot archers', 'infantry', 'cavalry']
+        bonus_units_buildings = []
+        bonus_units_buildings_names = []
+        for uc in unit_categories:
+            if uc in bonus_string_original.lower():
+                bonus_units_buildings_names.append(uc)
+
+        # Convert words into unit ids
+        for bonus_ub_name in bonus_units_buildings_names:
+            for i, unit in enumerate(DATA.civs[1].units):
+                if bonus_ub_name in get_unit_categories(i):
+                    bonus_units_buildings.append(i)
+
+        print('bonus units:', bonus_units_buildings)'''
+
+        for i, word in enumerate(bonus_words):
+            ### Foot Archers have +20% attack in the Castle Age
+            ## [foot archers, 1.2, attack, castle]
+
+            ### Foot Archers have +20/30/40% hitpoints in the Feudal/Castle/Imperial Age
+            ## [foot archers, 1.2, hp, feudal] 50 * 1.2 = 60
+            ## [foot archers, 1.3, hp, castle] 60 * 1.083 = 65
+            ## [foot archers, 1.4, hp, imperial] 60 * 1.077 = 65
+
+            ### Infantry have +1 attack and Cavalry have +2 pierce armor
+            ## [infantry, 1, attack, -]
+            ## [cavalry, 2, pierce armour, -]
+
+            ### Skirmishers have +1/+2 range in the Castle/Imperial age
+            ## [skirmishers, 1, attack, castle]
+            ## [skirmishers, 1, attack, imperial]
+
+            # Find technologies
+            bonus_techs = []
+
+            # Find numbers
+            bonus_numbers = []
+            if any(char.isdigit() for char in word):
+                old_numbers = word
+                
+                # Negative or positive
+                negative = '-' in old_numbers
+                old_numbers = old_numbers.strip('-').strip('+')
+
+                # Percent or integer
+                percent = '%' in old_numbers
+                old_numbers = old_numbers.strip('%')
+
+                # Split all numbers
+                old_numbers = old_numbers.split('/')
+
+                # Format each of those numbers
+                for number in old_numbers:
+                    # Convert all numbers into integers that can be used
+                    number = int(number)
+                    if percent and not negative:
+                        number = float(number / 100 + 1)
+                    elif percent and negative:
+                        number = float((100 - number) / 100)
+                    else:
+                        number = int(number)
+                        if negative:
+                            number *= -1
+                    # Add bonus number
+                    bonus_numbers.append(number)
+
+            # Find stats
+            bonus_stats = []
+
+            # Find ages
+            bonus_ages = []
+            if 'dark' in word or 'feudal' in word or 'castle' in word or 'imperial' in word:
+                old_ages = word.split('/')
+                for age in old_ages:
+                    if age == 'dark':
+                        bonus_ages.append(104)
+                    elif age == 'feudal':
+                        bonus_ages.append(101)
+                    elif age == 'castle':
+                        bonus_ages.append(102)
+                    elif age == 'feudal':
+                        bonus_ages.append(103)
+
+            # Create the bonus objects if they didn't exist already
+            #while len(bonus_objects) < len(bonus_numbers):
+            #    bonus_objects.append(bonus_object())
 
     # Set up the list
     bonus_effect_commands = []
@@ -347,9 +543,8 @@ def create_bonus(bonus_string, civ_id):
         'repairers' : [156, 222],
         'farmers' : [214, 259],
         'trebuchets' : [331, 42],
-        }
-    bonus_buildng_lines = {
-    # Buildings
+
+        # Buildings
         'buildings' : [30, 31, 32, 104, 71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617, 82, 103, 105, 18, 19, 209, 210, 84, 116, 137, 10, 14, 87, 49, 150, 12, 20, 132, 498, 86, 101, 153, 45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189, 598, 79, 234, 235, 236, 72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192, 1251, 1665, 70, 191, 192, 463, 464, 465, 584, 585, 586, 587, 1808, 562, 563, 564, 565, 1646, 1711, 1720, 1734, 68, 129, 130, 131, 50],
         'town centers' : [71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617],
         'town centres' : [71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617],
@@ -381,8 +576,13 @@ def create_bonus(bonus_string, civ_id):
         'folwarks' : [1711, 1720, 1734],
         'mills' : [68, 129, 130, 131],
         'farms' : [50],
+        }
+    bonus_buildng_lines = {
+    # Buildings
+        
     }
 
+    '''
     # Extract units
     primary_units = []
     secondary_units = []
@@ -930,13 +1130,13 @@ def create_bonus(bonus_string, civ_id):
             # Error out
             print(e)
             print("\033[31mERROR: Invalid bonus description.\033[0m")
-            return [], []
+            return [], []'''
         
     # Add the effect commands to the bonus
-    bonus_effect.effect_commands = bonus_effect_commands
+    #bonus_effect.effect_commands = bonus_effect_commands
 
     # Return the effect commands
-    return bonus_technology, bonus_effect
+    #return final_techs, final_effects
 
 def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
     # Get unit name or tech name
@@ -1013,6 +1213,9 @@ def open_mod(mod_folder):
     global MOD_NAME
     MOD_NAME = mod_folder.split('/')[-1]
 
+    # Import tech trees
+    import_tech_tree()
+
     # Save program settings
     with open('settings.pkl', 'wb') as settings:
         pickle.dump(mod_folder, settings)
@@ -1041,6 +1244,14 @@ def open_mod(mod_folder):
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
+
+    # DEBUG: Print attributes of the unit
+    #unit = DATA.civs[1].units[8].creatable.train_location_id
+    #attributes = [attr for attr in dir(unit) if not attr.startswith('_') and not callable(getattr(unit, attr))]
+    #for attr in attributes:
+    #    value = getattr(unit, attr)
+    #    print(f"{attr}: {value}")
+    time.sleep(1)
     
 def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # Announce revert
@@ -1119,9 +1330,16 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             shutil.copy(source_path, destination_path)  # Copy file
 
     # Open .dat file
-    #global DATA
-    #DATA = DatFile.parse(rf'{local_mods_folder}/{mod_name}/resources/_common/dat/empires2_x2_p1.dat')
-    with_real_progress(lambda progress: load_dat(progress, rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat'), 'Loading Mod', total_steps=100)
+    with_real_progress(lambda progress: load_dat(progress, rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat'), 'Creating Mod', total_steps=100)
+
+    # Clean-up JSON file
+    with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r', encoding='utf-8') as file:
+        raw = file.read()
+
+    # Remove comma after a closing brace if it's followed by just whitespace/newlines and a closing bracket
+    cleaned = re.sub(r'(})\s*,\s*(\])', r'\1\n\2', raw)
+    with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'w', encoding='utf-8') as file:
+        file.write(cleaned)
 
     # Copy over custom sounds
     sounds_source_folder = os.path.join(os.path.dirname(__file__), 'sounds')  # Path to the original 'sounds' folder
@@ -1362,8 +1580,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # Create new units
     unit_id = len(DATA.civs)
     for civ in DATA.civs:
-        civ.units.append(Unit(type=70, id=unit_id, language_dll_name=90000, language_dll_creation=90001, class_=6, standing_graphic=(8332, -1), dying_graphic=8331, undead_graphic=-1, undead_mode=0, hit_points=40, line_of_sight=6.0, garrison_capacity=0, collision_size_x=0.20000000298023224, collision_size_y=0.20000000298023224, collision_size_z=2.0, train_sound=600, damage_sound=-1, dead_unit_id=1324, blood_unit_id=-1, sort_number=5, can_be_built_on=0, icon_id=166, hide_in_editor=0, old_portrait_pict=-1, enabled=0, disabled=0, placement_side_terrain=(-1, -1), placement_terrain=(-1, -1), clearance_size=(0.20000000298023224, 0.20000000298023224), hill_mode=0, fog_visibility=0, terrain_restriction=7, fly_mode=0, resource_capacity=25, resource_decay=25.0, blast_defense_level=3, combat_level=4, interation_mode=4, minimap_mode=1, interface_kind=4, multiple_attribute_mode=1.0, minimap_color=0, language_dll_help=105303, language_dll_hotkey_text=155303, hot_key=16107, recyclable=0, enable_auto_gather=0, create_doppelganger_on_death=0, resource_gather_group=0, occlusion_mode=1, obstruction_type=5, obstruction_class=2, trait=0, civilization=0, nothing=0, selection_effect=0, editor_selection_colour=0, outline_size_x=0.20000000298023224, outline_size_y=0.20000000298023224, outline_size_z=2.0, scenario_triggers_1=-2, scenario_triggers_2=0, resource_storages=(ResourceStorage(type=4, amount=-1.0, flag=2), ResourceStorage(type=11, amount=1.0, flag=2), ResourceStorage(type=19, amount=1.0, flag=1)), damage_graphics=[], selection_sound=435, dying_sound=-1, wwise_train_sound_id=1091801433, wwise_damage_sound_id=0, wwise_selection_sound_id=349416654, wwise_dying_sound_id=0, old_attack_reaction=0, convert_terrain=0, name='Amazon Warrior', copy_id=2382, base_id=2382, speed=1.2999999523162842, dead_fish=DeadFish(walking_graphic=8334, running_graphic=-1, rotation_speed=0.0, old_size_class=0, tracking_unit=-1, tracking_unit_mode=0, tracking_unit_density=0.0, old_move_algorithm=0, turn_radius=0.0, turn_radius_speed=3.4028234663852886e+38, max_yaw_per_second_moving=3.4028234663852886e+38, stationary_yaw_revolution_time=0.0, max_yaw_per_second_stationary=3.4028234663852886e+38, min_collision_size_multiplier=0.800000011920929), bird=Bird(default_task_id=-1, search_radius=6.0, work_rate=1.0, drop_sites=[], task_swap_group=0, attack_sound=434, move_sound=434, wwise_attack_sound_id=-1015897558, wwise_move_sound_id=-378983899, run_pattern=0, tasks=[Task(task_type=1, id=0, is_default=0, action_type=7, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=1, combat_level_flag=1, gather_type=1, work_flag_2=0, target_diplomacy=5, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=1, is_default=0, action_type=3, class_id=20, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=2, is_default=0, action_type=109, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=0, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=3, is_default=0, action_type=13, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=4, is_default=0, action_type=3, class_id=3, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=5, is_default=0, action_type=3, class_id=13, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=6, is_default=0, action_type=154, class_id=2, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=7, is_default=0, action_type=154, class_id=4, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=5.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=8, is_default=0, action_type=154, class_id=18, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=9, is_default=0, action_type=154, class_id=19, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=10, is_default=0, action_type=154, class_id=43, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=11, is_default=0, action_type=154, class_id=-1, unit_id=1811, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0)]), type_50=Type50(base_armor=10000, attacks=[AttackOrArmor(class_=29, amount=2), AttackOrArmor(class_=21, amount=6), AttackOrArmor(class_=4, amount=9), AttackOrArmor(class_=8, amount=0), AttackOrArmor(class_=30, amount=0), AttackOrArmor(class_=20, amount=6)], armours=[AttackOrArmor(class_=1, amount=0), AttackOrArmor(class_=4, amount=0), AttackOrArmor(class_=3, amount=0), AttackOrArmor(class_=31, amount=0)], defense_terrain_bonus=-1, bonus_damage_resistance=0.0, max_range=0.0, blast_width=0.0, reload_time=2.0, projectile_unit_id=-1, accuracy_percent=100, break_off_combat=0, frame_delay=0, graphic_displacement=(0.0, 0.0, 0.0), blast_attack_level=2, min_range=0.0, accuracy_dispersion=0.0, attack_graphic=8330, displayed_melee_armour=0, displayed_attack=9, displayed_range=0.0, displayed_reload_time=2.0, blast_damage=-5.0), projectile=None, creatable=Creatable(resource_costs=(ResourceCost(type=0, amount=40, flag=1), ResourceCost(type=1, amount=60, flag=1), ResourceCost(type=4, amount=1, flag=0)), train_time=16, train_location_id=82, button_id=1, rear_attack_modifier=0.0, flank_attack_modifier=1.0, creatable_type=2, hero_mode=0, garrison_graphic=-1, spawning_graphic=12262, upgrade_graphic=12263, hero_glow_graphic=12218, max_charge=0.0, recharge_rate=0.0, charge_event=0, charge_type=0, min_conversion_time_mod=0.0, max_conversion_time_mod=0.0, conversion_chance_mod=0.0, total_projectiles=1.0, max_total_projectiles=1, projectile_spawning_area=(1.0, 1.0, 1.0), secondary_projectile_unit=-1, special_graphic=-1, special_ability=0, displayed_pierce_armor=0), building=None)),
-        civ.units.append(Unit(type=70, id=unit_id + 1, language_dll_name=90005, language_dll_creation=90006, class_=6, standing_graphic=(8332, -1), dying_graphic=8331, undead_graphic=-1, undead_mode=0, hit_points=50, line_of_sight=6.0, garrison_capacity=0, collision_size_x=0.20000000298023224, collision_size_y=0.20000000298023224, collision_size_z=2.0, train_sound=600, damage_sound=-1, dead_unit_id=1324, blood_unit_id=-1, sort_number=5, can_be_built_on=0, icon_id=166, hide_in_editor=0, old_portrait_pict=-1, enabled=0, disabled=0, placement_side_terrain=(-1, -1), placement_terrain=(-1, -1), clearance_size=(0.20000000298023224, 0.20000000298023224), hill_mode=0, fog_visibility=0, terrain_restriction=7, fly_mode=0, resource_capacity=25, resource_decay=25.0, blast_defense_level=3, combat_level=4, interation_mode=4, minimap_mode=1, interface_kind=4, multiple_attribute_mode=1.0, minimap_color=0, language_dll_help=105303, language_dll_hotkey_text=155303, hot_key=16107, recyclable=0, enable_auto_gather=0, create_doppelganger_on_death=0, resource_gather_group=0, occlusion_mode=1, obstruction_type=5, obstruction_class=2, trait=0, civilization=0, nothing=0, selection_effect=0, editor_selection_colour=0, outline_size_x=0.20000000298023224, outline_size_y=0.20000000298023224, outline_size_z=2.0, scenario_triggers_1=-2, scenario_triggers_2=0, resource_storages=(ResourceStorage(type=4, amount=-1.0, flag=2), ResourceStorage(type=11, amount=1.0, flag=2), ResourceStorage(type=19, amount=1.0, flag=1)), damage_graphics=[], selection_sound=435, dying_sound=-1, wwise_train_sound_id=1091801433, wwise_damage_sound_id=0, wwise_selection_sound_id=349416654, wwise_dying_sound_id=0, old_attack_reaction=0, convert_terrain=0, name='Elite Amazon Warrior', copy_id=2383, base_id=2383, speed=1.350000023841858, dead_fish=DeadFish(walking_graphic=8334, running_graphic=-1, rotation_speed=0.0, old_size_class=0, tracking_unit=-1, tracking_unit_mode=0, tracking_unit_density=0.0, old_move_algorithm=0, turn_radius=0.0, turn_radius_speed=3.4028234663852886e+38, max_yaw_per_second_moving=3.4028234663852886e+38, stationary_yaw_revolution_time=0.0, max_yaw_per_second_stationary=3.4028234663852886e+38, min_collision_size_multiplier=0.800000011920929), bird=Bird(default_task_id=-1, search_radius=6.0, work_rate=1.0, drop_sites=[], task_swap_group=0, attack_sound=434, move_sound=434, wwise_attack_sound_id=-1015897558, wwise_move_sound_id=-378983899, run_pattern=0, tasks=[Task(task_type=1, id=0, is_default=0, action_type=7, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=1, combat_level_flag=1, gather_type=1, work_flag_2=0, target_diplomacy=5, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=1, is_default=0, action_type=3, class_id=20, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=2, is_default=0, action_type=109, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=0, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=3, is_default=0, action_type=13, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=4, is_default=0, action_type=3, class_id=3, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=5, is_default=0, action_type=3, class_id=13, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=6, is_default=0, action_type=154, class_id=2, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=7, is_default=0, action_type=154, class_id=4, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=5.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=8, is_default=0, action_type=154, class_id=18, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=9, is_default=0, action_type=154, class_id=19, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=10, is_default=0, action_type=154, class_id=43, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=11, is_default=0, action_type=154, class_id=-1, unit_id=1811, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0)]), type_50=Type50(base_armor=10000, attacks=[AttackOrArmor(class_=29, amount=2), AttackOrArmor(class_=21, amount=7), AttackOrArmor(class_=4, amount=10), AttackOrArmor(class_=8, amount=0), AttackOrArmor(class_=30, amount=0), AttackOrArmor(class_=20, amount=7)], armours=[AttackOrArmor(class_=1, amount=0), AttackOrArmor(class_=4, amount=0), AttackOrArmor(class_=3, amount=0), AttackOrArmor(class_=31, amount=0)], defense_terrain_bonus=-1, bonus_damage_resistance=0.0, max_range=0.0, blast_width=0.0, reload_time=2.0, projectile_unit_id=-1, accuracy_percent=100, break_off_combat=0, frame_delay=0, graphic_displacement=(0.0, 0.0, 0.0), blast_attack_level=2, min_range=0.0, accuracy_dispersion=0.0, attack_graphic=8330, displayed_melee_armour=0, displayed_attack=10, displayed_range=0.0, displayed_reload_time=2.0, blast_damage=-5.0), projectile=None, creatable=Creatable(resource_costs=(ResourceCost(type=0, amount=40, flag=1), ResourceCost(type=1, amount=60, flag=1), ResourceCost(type=4, amount=1, flag=0)), train_time=16, train_location_id=82, button_id=1, rear_attack_modifier=0.0, flank_attack_modifier=1.0, creatable_type=2, hero_mode=0, garrison_graphic=-1, spawning_graphic=12262, upgrade_graphic=12263, hero_glow_graphic=12218, max_charge=0.0, recharge_rate=0.0, charge_event=0, charge_type=0, min_conversion_time_mod=0.0, max_conversion_time_mod=0.0, conversion_chance_mod=0.0, total_projectiles=1.0, max_total_projectiles=1, projectile_spawning_area=(1.0, 1.0, 1.0), secondary_projectile_unit=-1, special_graphic=-1, special_ability=0, displayed_pierce_armor=0), building=None)),
+        #civ.units.append(Unit(type=70, id=unit_id, language_dll_name=90000, language_dll_creation=90001, class_=6, standing_graphic=(8332, -1), dying_graphic=8331, undead_graphic=-1, undead_mode=0, hit_points=40, line_of_sight=6.0, garrison_capacity=0, collision_size_x=0.20000000298023224, collision_size_y=0.20000000298023224, collision_size_z=2.0, train_sound=600, damage_sound=-1, dead_unit_id=1324, blood_unit_id=-1, sort_number=5, can_be_built_on=0, icon_id=166, hide_in_editor=0, old_portrait_pict=-1, enabled=0, disabled=0, placement_side_terrain=(-1, -1), placement_terrain=(-1, -1), clearance_size=(0.20000000298023224, 0.20000000298023224), hill_mode=0, fog_visibility=0, terrain_restriction=7, fly_mode=0, resource_capacity=25, resource_decay=25.0, blast_defense_level=3, combat_level=4, interation_mode=4, minimap_mode=1, interface_kind=4, multiple_attribute_mode=1.0, minimap_color=0, language_dll_help=105303, language_dll_hotkey_text=155303, hot_key=16107, recyclable=0, enable_auto_gather=0, create_doppelganger_on_death=0, resource_gather_group=0, occlusion_mode=1, obstruction_type=5, obstruction_class=2, trait=0, civilization=0, nothing=0, selection_effect=0, editor_selection_colour=0, outline_size_x=0.20000000298023224, outline_size_y=0.20000000298023224, outline_size_z=2.0, scenario_triggers_1=-2, scenario_triggers_2=0, resource_storages=(ResourceStorage(type=4, amount=-1.0, flag=2), ResourceStorage(type=11, amount=1.0, flag=2), ResourceStorage(type=19, amount=1.0, flag=1)), damage_graphics=[], selection_sound=435, dying_sound=-1, wwise_train_sound_id=1091801433, wwise_damage_sound_id=0, wwise_selection_sound_id=349416654, wwise_dying_sound_id=0, old_attack_reaction=0, convert_terrain=0, name='Amazon Warrior', copy_id=2382, base_id=2382, speed=1.2999999523162842, dead_fish=DeadFish(walking_graphic=8334, running_graphic=-1, rotation_speed=0.0, old_size_class=0, tracking_unit=-1, tracking_unit_mode=0, tracking_unit_density=0.0, old_move_algorithm=0, turn_radius=0.0, turn_radius_speed=3.4028234663852886e+38, max_yaw_per_second_moving=3.4028234663852886e+38, stationary_yaw_revolution_time=0.0, max_yaw_per_second_stationary=3.4028234663852886e+38, min_collision_size_multiplier=0.800000011920929), bird=Bird(default_task_id=-1, search_radius=6.0, work_rate=1.0, drop_sites=[], task_swap_group=0, attack_sound=434, move_sound=434, wwise_attack_sound_id=-1015897558, wwise_move_sound_id=-378983899, run_pattern=0, tasks=[Task(task_type=1, id=0, is_default=0, action_type=7, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=1, combat_level_flag=1, gather_type=1, work_flag_2=0, target_diplomacy=5, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=1, is_default=0, action_type=3, class_id=20, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=2, is_default=0, action_type=109, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=0, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=3, is_default=0, action_type=13, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=4, is_default=0, action_type=3, class_id=3, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=5, is_default=0, action_type=3, class_id=13, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=6, is_default=0, action_type=154, class_id=2, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=7, is_default=0, action_type=154, class_id=4, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=5.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=8, is_default=0, action_type=154, class_id=18, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=9, is_default=0, action_type=154, class_id=19, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=10, is_default=0, action_type=154, class_id=43, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=11, is_default=0, action_type=154, class_id=-1, unit_id=1811, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0)]), type_50=Type50(base_armor=10000, attacks=[AttackOrArmor(class_=29, amount=2), AttackOrArmor(class_=21, amount=6), AttackOrArmor(class_=4, amount=9), AttackOrArmor(class_=8, amount=0), AttackOrArmor(class_=30, amount=0), AttackOrArmor(class_=20, amount=6)], armours=[AttackOrArmor(class_=1, amount=0), AttackOrArmor(class_=4, amount=0), AttackOrArmor(class_=3, amount=0), AttackOrArmor(class_=31, amount=0)], defense_terrain_bonus=-1, bonus_damage_resistance=0.0, max_range=0.0, blast_width=0.0, reload_time=2.0, projectile_unit_id=-1, accuracy_percent=100, break_off_combat=0, frame_delay=0, graphic_displacement=(0.0, 0.0, 0.0), blast_attack_level=2, min_range=0.0, accuracy_dispersion=0.0, attack_graphic=8330, displayed_melee_armour=0, displayed_attack=9, displayed_range=0.0, displayed_reload_time=2.0, blast_damage=-5.0), projectile=None, creatable=Creatable(resource_costs=(ResourceCost(type=0, amount=40, flag=1), ResourceCost(type=1, amount=60, flag=1), ResourceCost(type=4, amount=1, flag=0)), train_time=16, train_location_id=82, button_id=1, rear_attack_modifier=0.0, flank_attack_modifier=1.0, creatable_type=2, hero_mode=0, garrison_graphic=-1, spawning_graphic=12262, upgrade_graphic=12263, hero_glow_graphic=12218, max_charge=0.0, recharge_rate=0.0, charge_event=0, charge_type=0, min_conversion_time_mod=0.0, max_conversion_time_mod=0.0, conversion_chance_mod=0.0, total_projectiles=1.0, max_total_projectiles=1, projectile_spawning_area=(1.0, 1.0, 1.0), secondary_projectile_unit=-1, special_graphic=-1, special_ability=0, displayed_pierce_armor=0), building=None)),
+        #civ.units.append(Unit(type=70, id=unit_id + 1, language_dll_name=90005, language_dll_creation=90006, class_=6, standing_graphic=(8332, -1), dying_graphic=8331, undead_graphic=-1, undead_mode=0, hit_points=50, line_of_sight=6.0, garrison_capacity=0, collision_size_x=0.20000000298023224, collision_size_y=0.20000000298023224, collision_size_z=2.0, train_sound=600, damage_sound=-1, dead_unit_id=1324, blood_unit_id=-1, sort_number=5, can_be_built_on=0, icon_id=166, hide_in_editor=0, old_portrait_pict=-1, enabled=0, disabled=0, placement_side_terrain=(-1, -1), placement_terrain=(-1, -1), clearance_size=(0.20000000298023224, 0.20000000298023224), hill_mode=0, fog_visibility=0, terrain_restriction=7, fly_mode=0, resource_capacity=25, resource_decay=25.0, blast_defense_level=3, combat_level=4, interation_mode=4, minimap_mode=1, interface_kind=4, multiple_attribute_mode=1.0, minimap_color=0, language_dll_help=105303, language_dll_hotkey_text=155303, hot_key=16107, recyclable=0, enable_auto_gather=0, create_doppelganger_on_death=0, resource_gather_group=0, occlusion_mode=1, obstruction_type=5, obstruction_class=2, trait=0, civilization=0, nothing=0, selection_effect=0, editor_selection_colour=0, outline_size_x=0.20000000298023224, outline_size_y=0.20000000298023224, outline_size_z=2.0, scenario_triggers_1=-2, scenario_triggers_2=0, resource_storages=(ResourceStorage(type=4, amount=-1.0, flag=2), ResourceStorage(type=11, amount=1.0, flag=2), ResourceStorage(type=19, amount=1.0, flag=1)), damage_graphics=[], selection_sound=435, dying_sound=-1, wwise_train_sound_id=1091801433, wwise_damage_sound_id=0, wwise_selection_sound_id=349416654, wwise_dying_sound_id=0, old_attack_reaction=0, convert_terrain=0, name='Elite Amazon Warrior', copy_id=2383, base_id=2383, speed=1.350000023841858, dead_fish=DeadFish(walking_graphic=8334, running_graphic=-1, rotation_speed=0.0, old_size_class=0, tracking_unit=-1, tracking_unit_mode=0, tracking_unit_density=0.0, old_move_algorithm=0, turn_radius=0.0, turn_radius_speed=3.4028234663852886e+38, max_yaw_per_second_moving=3.4028234663852886e+38, stationary_yaw_revolution_time=0.0, max_yaw_per_second_stationary=3.4028234663852886e+38, min_collision_size_multiplier=0.800000011920929), bird=Bird(default_task_id=-1, search_radius=6.0, work_rate=1.0, drop_sites=[], task_swap_group=0, attack_sound=434, move_sound=434, wwise_attack_sound_id=-1015897558, wwise_move_sound_id=-378983899, run_pattern=0, tasks=[Task(task_type=1, id=0, is_default=0, action_type=7, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=1, combat_level_flag=1, gather_type=1, work_flag_2=0, target_diplomacy=5, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=1, is_default=0, action_type=3, class_id=20, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=2, is_default=0, action_type=109, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=0, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=3, is_default=0, action_type=13, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=4, is_default=0, action_type=3, class_id=3, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=5, is_default=0, action_type=3, class_id=13, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=6, is_default=0, action_type=154, class_id=2, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=7, is_default=0, action_type=154, class_id=4, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=5.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=8, is_default=0, action_type=154, class_id=18, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=9, is_default=0, action_type=154, class_id=19, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=10, is_default=0, action_type=154, class_id=43, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=11, is_default=0, action_type=154, class_id=-1, unit_id=1811, terrain_id=-1, resource_in=-1, resource_multiplier=274, resource_out=3, unused_resource=-1, work_value_1=20.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0)]), type_50=Type50(base_armor=10000, attacks=[AttackOrArmor(class_=29, amount=2), AttackOrArmor(class_=21, amount=7), AttackOrArmor(class_=4, amount=10), AttackOrArmor(class_=8, amount=0), AttackOrArmor(class_=30, amount=0), AttackOrArmor(class_=20, amount=7)], armours=[AttackOrArmor(class_=1, amount=0), AttackOrArmor(class_=4, amount=0), AttackOrArmor(class_=3, amount=0), AttackOrArmor(class_=31, amount=0)], defense_terrain_bonus=-1, bonus_damage_resistance=0.0, max_range=0.0, blast_width=0.0, reload_time=2.0, projectile_unit_id=-1, accuracy_percent=100, break_off_combat=0, frame_delay=0, graphic_displacement=(0.0, 0.0, 0.0), blast_attack_level=2, min_range=0.0, accuracy_dispersion=0.0, attack_graphic=8330, displayed_melee_armour=0, displayed_attack=10, displayed_range=0.0, displayed_reload_time=2.0, blast_damage=-5.0), projectile=None, creatable=Creatable(resource_costs=(ResourceCost(type=0, amount=40, flag=1), ResourceCost(type=1, amount=60, flag=1), ResourceCost(type=4, amount=1, flag=0)), train_time=16, train_location_id=82, button_id=1, rear_attack_modifier=0.0, flank_attack_modifier=1.0, creatable_type=2, hero_mode=0, garrison_graphic=-1, spawning_graphic=12262, upgrade_graphic=12263, hero_glow_graphic=12218, max_charge=0.0, recharge_rate=0.0, charge_event=0, charge_type=0, min_conversion_time_mod=0.0, max_conversion_time_mod=0.0, conversion_chance_mod=0.0, total_projectiles=1.0, max_total_projectiles=1, projectile_spawning_area=(1.0, 1.0, 1.0), secondary_projectile_unit=-1, special_graphic=-1, special_ability=0, displayed_pierce_armor=0), building=None)),
         #civ.units.append(Unit(type=70, id=unit_id + 2, language_dll_name=90010, language_dll_creation=90011, class_=0, standing_graphic=(8327, -1), dying_graphic=8326, undead_graphic=-1, undead_mode=0, hit_points=35, line_of_sight=6.0, garrison_capacity=0, collision_size_x=0.20000000298023224, collision_size_y=0.20000000298023224, collision_size_z=2.0, train_sound=601, damage_sound=-1, dead_unit_id=1325, blood_unit_id=-1, sort_number=5, can_be_built_on=0, icon_id=165, hide_in_editor=0, old_portrait_pict=-1, enabled=0, disabled=0, placement_side_terrain=(-1, -1), placement_terrain=(-1, -1), clearance_size=(0.20000000298023224, 0.20000000298023224), hill_mode=0, fog_visibility=0, terrain_restriction=7, fly_mode=0, resource_capacity=25, resource_decay=25.0, blast_defense_level=3, combat_level=4, interation_mode=4, minimap_mode=1, interface_kind=4, multiple_attribute_mode=1.0, minimap_color=0, language_dll_help=105304, language_dll_hotkey_text=155304, hot_key=16107, recyclable=0, enable_auto_gather=0, create_doppelganger_on_death=0, resource_gather_group=0, occlusion_mode=1, obstruction_type=5, obstruction_class=2, trait=0, civilization=0, nothing=0, selection_effect=0, editor_selection_colour=0, outline_size_x=0.20000000298023224, outline_size_y=0.20000000298023224, outline_size_z=2.0, scenario_triggers_1=-2, scenario_triggers_2=0, resource_storages=(ResourceStorage(type=4, amount=-1.0, flag=2), ResourceStorage(type=11, amount=1.0, flag=2), ResourceStorage(type=19, amount=1.0, flag=1)), damage_graphics=[], selection_sound=435, dying_sound=-1, wwise_train_sound_id=-1823148159, wwise_damage_sound_id=0, wwise_selection_sound_id=349416654, wwise_dying_sound_id=0, old_attack_reaction=0, convert_terrain=0, name='Amazon Archer', copy_id=2384, base_id=2384, speed=1.399999976158142, dead_fish=DeadFish(walking_graphic=8329, running_graphic=-1, rotation_speed=0.0, old_size_class=0, tracking_unit=-1, tracking_unit_mode=0, tracking_unit_density=0.0, old_move_algorithm=0, turn_radius=0.0, turn_radius_speed=3.4028234663852886e+38, max_yaw_per_second_moving=3.4028234663852886e+38, stationary_yaw_revolution_time=0.0, max_yaw_per_second_stationary=3.4028234663852886e+38, min_collision_size_multiplier=1.0), bird=Bird(default_task_id=-1, search_radius=6.0, work_rate=1.0, drop_sites=[], task_swap_group=0, attack_sound=434, move_sound=434, wwise_attack_sound_id=-1015897558, wwise_move_sound_id=-378983899, run_pattern=0, tasks=[Task(task_type=1, id=0, is_default=0, action_type=7, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=1, combat_level_flag=1, gather_type=1, work_flag_2=0, target_diplomacy=5, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=1, is_default=0, action_type=3, class_id=20, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=2, is_default=0, action_type=109, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=0, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=3, is_default=0, action_type=13, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=4, is_default=0, action_type=3, class_id=3, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=5, is_default=0, action_type=3, class_id=13, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0)]), type_50=Type50(base_armor=10000, attacks=[AttackOrArmor(class_=27, amount=4), AttackOrArmor(class_=21, amount=0), AttackOrArmor(class_=1, amount=6), AttackOrArmor(class_=3, amount=7), AttackOrArmor(class_=17, amount=0), AttackOrArmor(class_=32, amount=1)], armours=[AttackOrArmor(class_=4, amount=0), AttackOrArmor(class_=15, amount=0), AttackOrArmor(class_=3, amount=1), AttackOrArmor(class_=31, amount=0)], defense_terrain_bonus=-1, bonus_damage_resistance=0.0, max_range=4.0, blast_width=0.0, reload_time=1.899999976158142, projectile_unit_id=511, accuracy_percent=90, break_off_combat=0, frame_delay=10, graphic_displacement=(0.0, 0.5, 1.5), blast_attack_level=3, min_range=0.0, accuracy_dispersion=0.33000001311302185, attack_graphic=8325, displayed_melee_armour=0, displayed_attack=7, displayed_range=4.0, displayed_reload_time=1.899999976158142, blast_damage=1.0), projectile=None, creatable=Creatable(resource_costs=(ResourceCost(type=0, amount=50, flag=1), ResourceCost(type=1, amount=50, flag=1), ResourceCost(type=4, amount=1, flag=0)), train_time=16, train_location_id=82, button_id=1, rear_attack_modifier=0.0, flank_attack_modifier=1.0, creatable_type=3, hero_mode=0, garrison_graphic=-1, spawning_graphic=12262, upgrade_graphic=12263, hero_glow_graphic=12218, max_charge=0.0, recharge_rate=0.0, charge_event=0, charge_type=0, min_conversion_time_mod=0.0, max_conversion_time_mod=0.0, conversion_chance_mod=0.0, total_projectiles=1.0, max_total_projectiles=1, projectile_spawning_area=(1.0, 1.0, 1.0), secondary_projectile_unit=-1, special_graphic=-1, special_ability=0, displayed_pierce_armor=1), building=None)),
         #civ.units.append(Unit(type=70, id=unit_id + 3, language_dll_name=90015, language_dll_creation=90016, class_=0, standing_graphic=(8327, -1), dying_graphic=8326, undead_graphic=-1, undead_mode=0, hit_points=45, line_of_sight=6.0, garrison_capacity=0, collision_size_x=0.20000000298023224, collision_size_y=0.20000000298023224, collision_size_z=2.0, train_sound=601, damage_sound=-1, dead_unit_id=1325, blood_unit_id=-1, sort_number=5, can_be_built_on=0, icon_id=165, hide_in_editor=0, old_portrait_pict=-1, enabled=0, disabled=0, placement_side_terrain=(-1, -1), placement_terrain=(-1, -1), clearance_size=(0.20000000298023224, 0.20000000298023224), hill_mode=0, fog_visibility=0, terrain_restriction=7, fly_mode=0, resource_capacity=25, resource_decay=25.0, blast_defense_level=3, combat_level=4, interation_mode=4, minimap_mode=1, interface_kind=4, multiple_attribute_mode=1.0, minimap_color=0, language_dll_help=105304, language_dll_hotkey_text=155304, hot_key=16107, recyclable=0, enable_auto_gather=0, create_doppelganger_on_death=0, resource_gather_group=0, occlusion_mode=1, obstruction_type=5, obstruction_class=2, trait=0, civilization=0, nothing=0, selection_effect=0, editor_selection_colour=0, outline_size_x=0.20000000298023224, outline_size_y=0.20000000298023224, outline_size_z=2.0, scenario_triggers_1=-2, scenario_triggers_2=0, resource_storages=(ResourceStorage(type=4, amount=-1.0, flag=2), ResourceStorage(type=11, amount=1.0, flag=2), ResourceStorage(type=19, amount=1.0, flag=1)), damage_graphics=[], selection_sound=435, dying_sound=-1, wwise_train_sound_id=-1823148159, wwise_damage_sound_id=0, wwise_selection_sound_id=349416654, wwise_dying_sound_id=0, old_attack_reaction=0, convert_terrain=0, name='Elite Amazon Archer', copy_id=2385, base_id=2385, speed=1.4500000476837158, dead_fish=DeadFish(walking_graphic=8329, running_graphic=-1, rotation_speed=0.0, old_size_class=0, tracking_unit=-1, tracking_unit_mode=0, tracking_unit_density=0.0, old_move_algorithm=0, turn_radius=0.0, turn_radius_speed=3.4028234663852886e+38, max_yaw_per_second_moving=3.4028234663852886e+38, stationary_yaw_revolution_time=0.0, max_yaw_per_second_stationary=3.4028234663852886e+38, min_collision_size_multiplier=1.0), bird=Bird(default_task_id=-1, search_radius=6.0, work_rate=1.0, drop_sites=[], task_swap_group=0, attack_sound=434, move_sound=434, wwise_attack_sound_id=-1015897558, wwise_move_sound_id=-378983899, run_pattern=0, tasks=[Task(task_type=1, id=0, is_default=0, action_type=7, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=1, combat_level_flag=1, gather_type=1, work_flag_2=0, target_diplomacy=5, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=1, is_default=0, action_type=3, class_id=20, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=2, is_default=0, action_type=109, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=0, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=3, is_default=0, action_type=13, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=4, is_default=0, action_type=3, class_id=3, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=5, is_default=0, action_type=3, class_id=13, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0)]), type_50=Type50(base_armor=10000, attacks=[AttackOrArmor(class_=27, amount=5), AttackOrArmor(class_=21, amount=0), AttackOrArmor(class_=1, amount=7), AttackOrArmor(class_=3, amount=8), AttackOrArmor(class_=17, amount=0), AttackOrArmor(class_=32, amount=1)], armours=[AttackOrArmor(class_=4, amount=0), AttackOrArmor(class_=15, amount=0), AttackOrArmor(class_=3, amount=1), AttackOrArmor(class_=31, amount=0)], defense_terrain_bonus=-1, bonus_damage_resistance=0.0, max_range=4.0, blast_width=0.0, reload_time=1.899999976158142, projectile_unit_id=511, accuracy_percent=90, break_off_combat=0, frame_delay=10, graphic_displacement=(0.0, 0.5, 1.5), blast_attack_level=3, min_range=0.0, accuracy_dispersion=0.33000001311302185, attack_graphic=8325, displayed_melee_armour=0, displayed_attack=8, displayed_range=4.0, displayed_reload_time=1.899999976158142, blast_damage=1.0), projectile=None, creatable=Creatable(resource_costs=(ResourceCost(type=0, amount=50, flag=1), ResourceCost(type=1, amount=50, flag=1), ResourceCost(type=4, amount=1, flag=0)), train_time=16, train_location_id=82, button_id=1, rear_attack_modifier=0.0, flank_attack_modifier=1.0, creatable_type=3, hero_mode=0, garrison_graphic=-1, spawning_graphic=12262, upgrade_graphic=12263, hero_glow_graphic=12218, max_charge=0.0, recharge_rate=0.0, charge_event=0, charge_type=0, min_conversion_time_mod=0.0, max_conversion_time_mod=0.0, conversion_chance_mod=0.0, total_projectiles=1.0, max_total_projectiles=1, projectile_spawning_area=(1.0, 1.0, 1.0), secondary_projectile_unit=-1, special_graphic=-1, special_ability=0, displayed_pierce_armor=1), building=None)),
         #civ.units.append(Unit(type=70, id=unit_id + 4, language_dll_name=90020, language_dll_creation=90021, class_=12, standing_graphic=(15662, -1), dying_graphic=15661, undead_graphic=-1, undead_mode=0, hit_points=90, line_of_sight=4.0, garrison_capacity=1, collision_size_x=0.25, collision_size_y=0.25, collision_size_z=2.0, train_sound=430, damage_sound=-1, dead_unit_id=2368, blood_unit_id=-1, sort_number=5, can_be_built_on=0, icon_id=681, hide_in_editor=0, old_portrait_pict=-1, enabled=0, disabled=0, placement_side_terrain=(-1, -1), placement_terrain=(-1, -1), clearance_size=(0.25, 0.25), hill_mode=0, fog_visibility=0, terrain_restriction=28, fly_mode=0, resource_capacity=25, resource_decay=25.0, blast_defense_level=3, combat_level=4, interation_mode=4, minimap_mode=1, interface_kind=4, multiple_attribute_mode=1.0, minimap_color=0, language_dll_help=90022, language_dll_hotkey_text=139999, hot_key=16107, recyclable=0, enable_auto_gather=0, create_doppelganger_on_death=0, resource_gather_group=0, occlusion_mode=1, obstruction_type=5, obstruction_class=2, trait=0, civilization=0, nothing=0, selection_effect=0, editor_selection_colour=0, outline_size_x=0.4000000059604645, outline_size_y=0.4000000059604645, outline_size_z=2.0, scenario_triggers_1=-2, scenario_triggers_2=0, resource_storages=(ResourceStorage(type=4, amount=-1.0, flag=2), ResourceStorage(type=11, amount=1.0, flag=2), ResourceStorage(type=19, amount=1.0, flag=1)), damage_graphics=[], selection_sound=430, dying_sound=-1, wwise_train_sound_id=215634376, wwise_damage_sound_id=0, wwise_selection_sound_id=-660807332, wwise_dying_sound_id=0, old_attack_reaction=0, convert_terrain=0, name='Camel Raider', copy_id=2386, base_id=2386, speed=1.5, dead_fish=DeadFish(walking_graphic=15664, running_graphic=-1, rotation_speed=0.0, old_size_class=0, tracking_unit=-1, tracking_unit_mode=0, tracking_unit_density=0.0, old_move_algorithm=0, turn_radius=0.0, turn_radius_speed=3.4028234663852886e+38, max_yaw_per_second_moving=3.4028234663852886e+38, stationary_yaw_revolution_time=0.0, max_yaw_per_second_stationary=3.4028234663852886e+38, min_collision_size_multiplier=0.5), bird=Bird(default_task_id=-1, search_radius=4.0, work_rate=1.0, drop_sites=[], task_swap_group=0, attack_sound=326, move_sound=326, wwise_attack_sound_id=1562378686, wwise_move_sound_id=1562378686, run_pattern=0, tasks=[Task(task_type=1, id=0, is_default=0, action_type=7, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=1, combat_level_flag=1, gather_type=1, work_flag_2=0, target_diplomacy=5, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=1, is_default=0, action_type=3, class_id=20, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=2, is_default=0, action_type=109, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=1, search_wait_time=3.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=0, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=3, is_default=0, action_type=13, class_id=-1, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=4, is_default=0, action_type=3, class_id=3, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=-1, resource_out=-1, unused_resource=-1, work_value_1=0.0, work_value_2=0.0, work_range=1.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=4, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=5, is_default=0, action_type=154, class_id=0, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=6, is_default=0, action_type=154, class_id=6, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=7, is_default=0, action_type=154, class_id=12, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=8, is_default=0, action_type=154, class_id=13, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=9, is_default=0, action_type=154, class_id=18, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=10, is_default=0, action_type=154, class_id=22, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=11, is_default=0, action_type=154, class_id=23, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=12, is_default=0, action_type=154, class_id=35, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=13, is_default=0, action_type=154, class_id=36, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=14, is_default=0, action_type=154, class_id=43, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=15, is_default=0, action_type=154, class_id=44, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=16, is_default=0, action_type=154, class_id=47, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=17, is_default=0, action_type=154, class_id=54, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=18, is_default=0, action_type=154, class_id=55, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=550, resource_out=3, unused_resource=-1, work_value_1=2.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=19, is_default=0, action_type=154, class_id=0, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=20, is_default=0, action_type=154, class_id=2, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=21, is_default=0, action_type=154, class_id=4, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=22, is_default=0, action_type=154, class_id=6, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=23, is_default=0, action_type=154, class_id=12, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=24, is_default=0, action_type=154, class_id=13, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=25, is_default=0, action_type=154, class_id=18, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=26, is_default=0, action_type=154, class_id=20, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=27, is_default=0, action_type=154, class_id=21, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=28, is_default=1, action_type=154, class_id=22, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=29, is_default=0, action_type=154, class_id=23, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=30, is_default=0, action_type=154, class_id=35, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=31, is_default=0, action_type=154, class_id=36, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=32, is_default=0, action_type=154, class_id=43, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=33, is_default=0, action_type=154, class_id=44, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=34, is_default=0, action_type=154, class_id=47, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=35, is_default=0, action_type=154, class_id=54, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0), Task(task_type=1, id=36, is_default=0, action_type=154, class_id=55, unit_id=-1, terrain_id=-1, resource_in=-1, resource_multiplier=551, resource_out=3, unused_resource=-1, work_value_1=3.0, work_value_2=0.0, work_range=0.0, auto_search_targets=0, search_wait_time=0.0, enable_targeting=0, combat_level_flag=0, gather_type=0, work_flag_2=0, target_diplomacy=1, carry_check=0, pick_for_construction=0, moving_graphic_id=-1, proceeding_graphic_id=-1, working_graphic_id=-1, carrying_graphic_id=-1, resource_gathering_sound_id=-1, resource_deposit_sound_id=-1, wwise_resource_gathering_sound_id=0, wwise_resource_deposit_sound_id=0)]), type_50=Type50(base_armor=10000, attacks=[AttackOrArmor(class_=4, amount=10), AttackOrArmor(class_=8, amount=17), AttackOrArmor(class_=16, amount=9), AttackOrArmor(class_=11, amount=0), AttackOrArmor(class_=30, amount=9), AttackOrArmor(class_=21, amount=0), AttackOrArmor(class_=34, amount=9), AttackOrArmor(class_=38, amount=0), AttackOrArmor(class_=39, amount=-3), AttackOrArmor(class_=35, amount=7)], armours=[AttackOrArmor(class_=4, amount=0), AttackOrArmor(class_=3, amount=1), AttackOrArmor(class_=30, amount=0), AttackOrArmor(class_=31, amount=0), AttackOrArmor(class_=39, amount=-3)], defense_terrain_bonus=-1, bonus_damage_resistance=0.0, max_range=0.0, blast_width=0.0, reload_time=2.0, projectile_unit_id=-1, accuracy_percent=100, break_off_combat=0, frame_delay=0, graphic_displacement=(0.0, 0.0, 0.0), blast_attack_level=0, min_range=0.0, accuracy_dispersion=0.0, attack_graphic=15660, displayed_melee_armour=0, displayed_attack=10, displayed_range=0.0, displayed_reload_time=2.0, blast_damage=1.0), projectile=None, creatable=Creatable(resource_costs=(ResourceCost(type=0, amount=55, flag=1), ResourceCost(type=3, amount=60, flag=1), ResourceCost(type=4, amount=1, flag=0)), train_time=30, train_location_id=82, button_id=1, rear_attack_modifier=0.0, flank_attack_modifier=1.25, creatable_type=1, hero_mode=0, garrison_graphic=-1, spawning_graphic=12262, upgrade_graphic=12263, hero_glow_graphic=12219, max_charge=0.0, recharge_rate=0.0, charge_event=0, charge_type=0, min_conversion_time_mod=0.0, max_conversion_time_mod=0.0, conversion_chance_mod=0.0, total_projectiles=1.0, max_total_projectiles=1, projectile_spawning_area=(1.0, 1.0, 1.0), secondary_projectile_unit=-1, special_graphic=15665, special_ability=0, displayed_pierce_armor=1), building=None)),
@@ -1391,24 +1609,31 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     MOD_STRINGS = rf'{local_mods_folder}/{mod_name}/resources/en/strings/key-value/key-value-modded-strings-utf8.txt'
     original_strings = rf'{local_mods_folder}/{mod_name}/resources/en/strings/key-value/key-value-strings-utf8.txt'
 
+    # Convert the lines with codes into a dictionary
+    line_dictionary = {}
     with open(original_strings, 'r') as original_file:
         original_strings_list = original_file.readlines()
+        for line in original_strings_list:
+            match = re.match(r'^(\d+)', line)
+            if match:
+                key = int(match.group(1))
+                line_dictionary[key] = line
 
     # Write modded strings based on filter conditions
     with open(MOD_STRINGS, 'w') as modded_file:
-        write_lines = False  # Flag to start writing when a target key is found
-
-        for line in original_strings_list:
-            if any(key in line for key in ['10271', '120150', '120177', '120181', '120185', 
-                                           '120187', '120189', '120192', '120193', '120195', 
-                                           '120196', '120197']):
-                write_lines = True  # Start writing
-
-            if write_lines and line.strip():  # Write only if the line is not empty
-                modded_file.write(line)
-
-            if write_lines and line.strip() == "":  # Stop at empty line
-                write_lines = False
+        # Write name strings
+        for i in range(len(DATA.civs)):
+            try:
+                modded_file.write(line_dictionary[10271 + i])
+            except:
+                pass
+            
+        # Write description strings
+        for i in range(len(DATA.civs)):
+            try:
+                modded_file.write(line_dictionary[120150 + i])
+            except:
+                pass
 
     # Write the architecture sets to a file
     with open(f'{MOD_FOLDER}/{mod_name}.pkl', 'wb') as file:
@@ -1445,7 +1670,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             file.write(line)
 
     # Save changes
-    with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+    with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Formatting Mod', total_steps=100)
     #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
 
     # Open the new mod
@@ -1467,42 +1692,42 @@ def main():
         pass
 
     # Main menu
-    print("\033[32m--- AOE2DE Civilization Creator ---\033[0m")
-    global MOD_FOLDER
-    if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
-        print(f"\033[33m0: Open {previous_mod_name}\033[0m")
-        print("\033[33m1: Open Mod...\033[0m")
-        print("\033[33m2: New Mod...\033[0m")
-    else:
-        print("\033[33m0: Open Mod...\033[0m")
-        print("\033[33m1: New Mod...\033[0m")
-    selection = input("Selection: ")
-    
-    if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
+    while True:
+        print(colour(Back.CYAN, Style.BRIGHT, '🌺🌺🌺 Talofa - Age of Empires II Civilisation Editor 🌺🌺🌺'))
+        global MOD_FOLDER
+        if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
+            print(colour(Fore.WHITE ,f'0️⃣  Open "{previous_mod_name}"'))
+        else:
+            print(colour(Fore.LIGHTBLACK_EX ,f'0️⃣  Open Previous Mod'))
+        print(colour(Fore.WHITE ,f'1️⃣  Open Mod...'))
+        print(colour(Fore.WHITE ,f'2️⃣  New Mod...'))
+        selection = input(colour(Fore.CYAN, 'Selection: '))
+
         if selection == '0': # Open last mod
-            open_mod(previous_mod_folder)
+            if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
+                open_mod(previous_mod_folder)
+                break
+            else:
+                print(colour(Fore.RED, 'ERROR: No previous mod found.\n'))
         elif selection == '1': # Open mod
             MOD_FOLDER = input("\nMod folder location: ")
             open_mod(MOD_FOLDER)
+            break
         elif selection == '2': # New mod
             new_mod('', '', '', False)
-    else:
-        if selection == '0': # Open mod
-            MOD_FOLDER = input("\nMod folder location: ")
-            open_mod(MOD_FOLDER)
-        elif selection == '1': # New mod
-            new_mod('', '', '', False)
+            break
+        else:
+            continue
 
     # Mod menu
     mod_name = MOD_FOLDER.split('/')[-1]
     while True:
         # Display selected mod menu
-        time.sleep(1)
-        print(f"\033[32m\n--- {mod_name} Menu ---\033[0m")
-        print("\033[33m0: Edit Civilization\033[0m")
-        print("\033[33m1: Revert Mod\033[0m")
-        print("\033[33m2: Open Mod Directory\033[0m")
-        mod_menu_selection = input("Selection: ")
+        print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 {mod_name} Menu 🌺🌺🌺'))
+        print(colour(Fore.WHITE, "0️⃣  Edit Civilization"))
+        print(colour(Fore.WHITE, "1️⃣  Revert Mod"))
+        print(colour(Fore.WHITE, "2️⃣  Open Mod Directory"))
+        mod_menu_selection = input(colour(Fore.CYAN, "Selection: "))
 
         # Open Mod Directory
         if mod_menu_selection == '2':
@@ -1537,33 +1762,31 @@ def main():
             with open(MOD_STRINGS, 'r') as file:
                 lines = file.readlines()
                 for i in range(len(DATA.civs) - 1):
-                    all_civs.append(rf'{i}: {lines[i][7:-2]}')
+                    all_civs.append(rf'{lines[i][7:-2]}')
 
                 while True:
+                    readline.set_completer(make_completer(all_civs))
+                    readline.parse_and_bind("tab: complete")
                     selection = input("\nEnter civilization ID or name: ").lower()
 
+                    # Convert word to index
+                    if selection in [opt.lower() for opt in all_civs]:
+                        selection = int([opt.lower() for opt in all_civs].index(selection))
+
+                    # Help
                     if selection == '?':
-                        for allciv in all_civs:
-                            print(allciv)
+                        for i, allciv in enumerate(all_civs):
+                            print(f"{i}: {allciv}")
                         continue
+                    elif int(selection) < len(DATA.civs):
+                        # Use the civilization ID
+                        selected_civ_index = int(selection)
+                        selected_civ_name = lines[selected_civ_index][7:-2]
+                        break
                     else:
-                        try:
-                            # Use the civilization ID
-                            selected_civ_index = int(selection)
-                            selected_civ_name = lines[selected_civ_index][7:-2]
-                            break
-                        except:
-                            # Use the civilization name
-                            for i, civ_line in enumerate(all_civs):
-                                if civ_line[3:].lower() == selection:
-                                    selected_civ_index = i
-                                    selected_civ_name = lines[selected_civ_index][7:-2]
-                                    break  # Exit the for loop
-                            else:
-                                # If no match is found, continue the while loop
-                                print("\033[31mERROR: Invalid civilization name or ID.\033[0m")
-                                continue
-                            break  # Exit the while loop if a match is found
+                        # If no match is found, continue the while loop
+                        print("\033[31mERROR: Invalid civilization ID.\033[0m")
+                        continue
 
             # Separate the description to be edited later
             with open(MOD_STRINGS, 'r') as file:
@@ -1622,16 +1845,16 @@ def main():
                                 current_language = sound_item.filename.split('_')[0]
 
                         # Print the civilization menu
-                        print(f"\033[32m\n--- Edit {selected_civ_name} ---\033[0m")
-                        print(f"\033[33m0: Name\033[0m -- {selected_civ_name}")
-                        print(f"\033[33m1: Title\033[0m -- {description_lines[0]}")
-                        print(f"\033[33m2: Bonuses\033[0m")
-                        print(f"\033[33m3: Unique Unit\033[0m -- {current_unique_unit}")
-                        print(f"\033[33m4: Unique Techs\033[0m -- {current_unique_techs}")
-                        print(f"\033[33m5: Architecture\033[0m -- {get_architecture_list(209)}")
-                        print(f"\033[33m6: Language\033[0m -- {current_language}")
-                        print(f"\033[33m7: Tech Tree\033[0m")
-                        selection = input("Selection: ")
+                        print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Edit {selected_civ_name} 🌺🌺🌺'))
+                        print(colour(Fore.WHITE, f"0️⃣  Name") + f" -- {colour(Fore.BLUE, selected_civ_name)}")
+                        print(colour(Fore.WHITE, f"1️⃣  Title") + f" -- {colour(Fore.BLUE, description_lines[0])}")
+                        print(colour(Fore.WHITE, f"2️⃣  Bonuses"))
+                        print(colour(Fore.WHITE, f"3️⃣  Unique Unit") + f" -- {colour(Fore.BLUE, current_unique_unit)}")
+                        print(colour(Fore.WHITE, f"4️⃣  Unique Techs") + f" -- {colour(Fore.BLUE, current_unique_techs)}")
+                        print(colour(Fore.WHITE, f"5️⃣  Architecture") + f" -- {colour(Fore.BLUE, get_architecture_list(209))}")
+                        print(colour(Fore.WHITE, f"6️⃣  Language") + f" -- {colour(Fore.BLUE, current_language)}")
+                        print(colour(Fore.WHITE, f"7️⃣  Tech Tree"))
+                        selection = input(colour(Fore.BLUE, "Selection: "))
 
                         # Exit
                         if selection == '':
@@ -2325,192 +2548,92 @@ def main():
                             # Import the tech tree
                             while True:
                                 # Tech tree main menu
-                                print("\033[32m\n--- Tech Tree Menu ---\033[0m")
-                                print("\033[33m0: Barracks\033[0m")
-                                print("\033[33m1: Archery Range\033[0m")
-                                print("\033[33m2: Stable\033[0m")
-                                print("\033[33m3: Blacksmith\033[0m")
-                                print("\033[33m4: Market\033[0m")
-                                print("\033[33m5: Dock\033[0m")
-                                print("\033[33m6: Siege Workshop\033[0m")
-                                print("\033[33m7: University\033[0m")
-                                print("\033[33m8: Monastery\033[0m")
-                                print("\033[33m9: Defensive\033[0m")
-                                print("\033[33m10: Castle\033[0m")
-                                print("\033[33m11: Economic\033[0m")
-                                selection = input("Selection: ")
+                                print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Tech Tree Menu 🌺🌺🌺'))
+                                print(colour(Fore.WHITE, "0️⃣  Barracks"))
+                                print(colour(Fore.WHITE, "1️⃣  Archery Range"))
+                                print(colour(Fore.WHITE, "2️⃣  Stable"))
+                                print(colour(Fore.WHITE, "3️⃣  Blacksmith"))
+                                print(colour(Fore.WHITE, "4️⃣  Market"))
+                                print(colour(Fore.WHITE, "5️⃣  Dock"))
+                                print(colour(Fore.WHITE, "6️⃣  Siege Workshop"))
+                                print(colour(Fore.WHITE, "7️⃣  University"))
+                                print(colour(Fore.WHITE, "8️⃣  Monastery"))
+                                print(colour(Fore.WHITE, "9️⃣  Castle and Defensive"))
+                                print(colour(Fore.WHITE, "🔟 Economic"))
+                                tech_tree_selection = input(colour(Fore.BLUE, "Selection: "))
 
                                 # Set the tree
-                                if selection == '0':
-                                    branch_title = 'Barracks'
-                                    tree = [
-                                        ['Barracks (B)'],
-                                        ['Militia (U)', 'Man-at-Arms (U)', 'Long Swordsman (U)', 'Legionary (X)', 'Two-Handed Swordsman (U)', 'Champion (U)'],
-                                        ['Supplies (T)', 'Gambesons (T)'],
-                                        ['Spearman (U)', 'Pikeman (U)', 'Halberdier (U)'],
-                                        ['Eagle Scout (U)', 'Eagle Warrior (U)', 'Elite Eagle Warrior (U)'],
-                                        ['Squires (U)'],
-                                        ['Arson (U)'],
-                                        ['Condottiero (X2)'],
-                                        ['Flemish Militia (X2)']
-                                    ]
-                                elif selection == '1':
-                                    branch_title = 'Archery Range'
-                                    tree = [
-                                        ['Archery Range (B)'],
-                                        ['Archer (U)', 'Crossbowman (U)', 'Arbalester (U)'],
-                                        ['Skirmisher (U)', 'Elite Skirmisher (U)', 'Imperial Skirmisher (X)'],
-                                        ['Slinger (X2)'], 
-                                        ['Hand Cannoneer (U2)'],
-                                        ['Cavalry Archer (U2)', 'Heavy Cavalry Archer (U2)'],
-                                        ['Elephant Archer (U2)', 'Elite Elephant Archer (U2)'],
-                                        ['Genitour (X)', 'Elite Genitour (X)'],
-                                        ['Thumb Ring (T)'],
-                                        ['Parthian Tactics (T)'],
-                                    ]
-                                elif selection == '2':
-                                    branch_title = 'Stable'
-                                    tree = [
-                                        ['Stable (B)'],
-                                        ['Scout Cavalry (U)', 'Light Cavalry (U)', 'Winged Hussar (X)', 'Hussar (U)'],
-                                        ['Shrivamsha Rider (X)', 'Elite Shrivamsha Rider (X)'],
-                                        ['Bloodlines (T)'],
-                                        ['Knight (U)', 'Cavalier (U)', 'Savar (X)', 'Paladin (U)'],
-                                        ['Steppe Lancer (U)', 'Elite Steppe Lancer (U)'],
-                                        ['Camel Scout (X)', 'Camel Rider (U)', 'Heavy Camel Rider (U)', 'Imperial Camel Rider (X)'],
-                                        ['Battle Elephant (U)', 'Elite Battle Elephant (U)'],
-                                        ['Husbandry (T)'],
-                                    ]
-                                elif selection == '3':
-                                    branch_title = 'Blacksmith'
-                                    tree = [
-                                        ['Blacksmith (B)'],
-                                        ['Padded Archer Armor (T)', 'Leather Archer Armor (T)', 'Ring Archer Armor (T)'],
-                                        ['Fletching (T)', 'Bodkin Arrow (T)', 'Bracer (T)'],
-                                        ['Forging (T)', 'Iron Casting (T)', 'Blast Furnace (T)'],
-                                        ['Scale Barding Armor (T)', 'Chain Barding Armor (T)', 'Plate Barding Armor (T)'],
-                                        ['Scale Mail Armor (T)', 'Chain Mail Armor (T)', 'Plate Mail Armor (T)'],
-                                    ]
-                                elif selection == '4':
-                                    branch_title = 'Market'
-                                    tree = [
-                                        ['Market (B)'],
-                                        ['Trade Cart (U)'],
-                                        ['Coinage (T)', 'Banking (T)'],
-                                        ['Caravan (T)'],
-                                        ['Guilds (T)'],
-                                    ]
-                                elif selection == '5':
-                                    branch_title = 'Dock'
-                                    tree = [
-                                        ['Dock (B)'],
-                                        ['Fishing Ship (U)'],
-                                        ['Transport Ship (U)'],
-                                        ['Fire Galley (U)', 'Fire Ship (U)', 'Fast Fire Ship (U)'],
-                                        ['Trade Cog (U)'],
-                                        ['Gillnets (T)'],
-                                        ['Cannon Galleon (U)', 'Elite Cannon Galleon (U)'],
-                                        ['Demolition Raft (U)', 'Demolition Ship (U)', 'Heavy Demolition Ship (U)'],
-                                        ['Galley (U)', 'War Galley (U)', 'Galleon (U)'],
-                                        ['Dromon (X)'],
-                                        ['Turtle Ship (X2)', 'Elite Turtle Ship (X2)'],
-                                        ['Longboat (X2)', 'Elite Longboat (X2)'],
-                                        ['Caravel (X2)', 'Elite Caravel (X2)'],
-                                        ['Thirisadai (X2)'],
-                                        ['Careening (T)', 'Dry Dock (T)'],
-                                        ['Shipwright (T)'],
-                                        ['Fish Trap (U)'],
-                                    ]
-                                elif selection == '6':
-                                    branch_title = 'Siege Workshop'
-                                    tree = [
-                                        ['Siege Workshop (B)'],
-                                        ['Battering Ram (U2)', 'Capped Ram (U2)', 'Siege Ram (U2)'],
-                                        ['Armored Elephant (U2)', 'Siege Elephant (U2)'],
-                                        ['Flaming Camel (X)'],
-                                        ['Mangonel (U)', 'Onager (U)', 'Siege Onager (U)'],
-                                        ['Scorpion (U)', 'Heavy Scorpion (U)'],
-                                        ['Siege Tower (U)'],
-                                        ['Bombard Cannon (U3)', 'Houfnice (X3)'],
-                                        ['Flamethrower (X3)']
-                                    ]
-                                elif selection == '7':
-                                    branch_title = 'University'
-                                    tree = [
-                                        ['University (B)'],
-                                        ['Masonry (T)', 'Architecture (T)'],
-                                        ['Fortified Wall (T)'],
-                                        ['Chemistry (T)', 'Bombard Tower (T)'],
-                                        ['Ballistics (T)'],
-                                        ['Siege Engineers (T)'],
-                                        ['Guard Tower (T)', 'Keep (T)'],
-                                        ['Heated Shot (T)'],
-                                        ['Arrowslits (T)'],
-                                        ['Murder Holes (T)'],
-                                        ['Treadmill Crane (T)'],
-                                    ]
-                                elif selection == '8':
-                                    branch_title = 'Monastery'
-                                    tree = [
-                                        ['Monastery (B2)'],
-                                        ['Fortified Church (B2)'],
-                                        ['Monk (U)'],
-                                        ['Missionary (X3)'],
-                                        ['Warrior Priest (X3)'],
-                                        ['Illumination (T)'],
-                                        ['Block Printing (T)'],
-                                        ['Devotion (T)', 'Faith (T)'],
-                                        ['Redemption (T)'],
-                                        ['Theocracy (T)'],
-                                        ['Atonement (T)'],
-                                        ['Herbal Medicine (T)'],
-                                        ['Heresy (T)'],
-                                        ['Sanctity (T)'],
-                                        ['Fervor (T)'],
-                                    ]
-                                elif selection == '9':
-                                    branch_title = 'Defensive'
-                                    tree = [
-                                        ['Outpost (B)'],
-                                        ['Watch Tower (B)', 'Guard Tower (B)', 'Keep (B)', 'Bombard Tower (B)'],
-                                        ['Palisade Wall (B)'],
-                                        ['Stone Wall (B)', 'Fortified Wall (B)'],
-                                    ]
-                                elif selection == '10':
-                                    branch_title = 'Castle'
-                                    tree = [
-                                        ['Castle (B)'],
-                                        ['Petard (U)'],
-                                        ['Trebuchet (U)'],
-                                        ['Hoardings (T)'],
-                                        ['Sappers (T)'],
-                                        ['Conscription (T)'],
-                                        ['Spies/Treason (T)'],
-                                    ]
-                                elif selection == '11':
-                                    branch_title = 'Economic'
-                                    tree = [
-                                        ['House (B)'],
-                                        ['Town Center (B)'],
-                                        ['Villager (U)'],
-                                        ['Town Watch (T)', 'Town Patrol (T)'],
-                                        ['Loom (T)'],
-                                        ['Wheelbarrow (T)', 'Hand Cart (T)'],
-                                        ['Mining Camp (B)'],
-                                        ['Gold Mining (T)', 'Gold Shaft Mining (T)'],
-                                        ['Stone Mining (T)', 'Stone Shaft Mining (T)'],
-                                        ['Lumber Camp (B2)'],
-                                        ['Mule Cart (B2)'],
-                                        ['Double-Bit Axe (T)', 'Bow Saw (T)', 'Two-Man Saw (T)'],
-                                        ['Mill (B3)'],
-                                        ['Folwark (B3)'],
-                                        ['Farm (B)'],
-                                        ['Horse Collar (T)', 'Heavy Plow (T)', 'Crop Rotation (T)'],
-                                    ]
-                                elif selection == '':
+                                building_ids = [12, 87, 101, 103, 84, 45, 49, 209, 104, 82, 109]
+                                try:
+                                    if isinstance(building_ids[int(tech_tree_selection)], list):
+                                        pass
+                                    else:
+                                        tree = [entry for entry in FOREST if entry.get("Building ID") == building_ids[int(tech_tree_selection)]]
                                     break
+                                except:
+                                    continue
 
-                                while True:
+                            while True:
+                                # Build mappings
+                                link_map = {unit.get("Link ID"): unit for unit in tree if unit.get("Link ID") is not None}
+                                node_map = {unit.get("Node ID"): unit for unit in tree if unit.get("Node ID") is not None}
+
+                                # Identify all end-of-line units
+                                end_units = [unit for unit in tree if unit.get("Link ID") == -1]
+
+                                # Track printed lines to avoid duplicates
+                                seen = set()
+                                print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Tech Tree Branch Menu 🌺🌺🌺'))
+                                for end_unit in end_units:
+                                    line = [end_unit]
+                                    current = end_unit
+
+                                    # Walk backward in the upgrade chain
+                                    while True:
+                                        next_unit = next(
+                                            (unit for unit in tree if unit.get("Link ID") == current.get("Node ID")), None
+                                        )
+                                        if next_unit:
+                                            line.append(next_unit)
+                                            current = next_unit
+                                        else:
+                                            break
+                                        
+                                    # Skip if already printed
+                                    if line[0].get("Node ID") in seen:
+                                        continue
+                                    
+                                    seen.update(unit.get("Node ID") for unit in line)
+
+                                    # Print it
+                                    CIV_OBJECTS
+                                    line_display = []
+
+                                    for unit in line:
+                                        node_id = unit.get("Node ID")
+
+                                        # Find matching civ unit entry
+                                        civ_unit = next((u for u in CIV_OBJECTS[selected_civ_index].units if u.get("Node ID") == node_id), None)
+
+                                        # Set the colour for the item
+                                        unit_colour = Fore.BLACK
+                                        if civ_unit and civ_unit.get("Node Status") == "ResearchedCompleted" or civ_unit and civ_unit.get("Node Status") == "ResearchRequired":
+                                            unit_colour = Fore.GREEN
+                                        elif civ_unit and civ_unit.get("Node Status") == "NotAvailable":
+                                            unit_colour = Fore.RED
+
+                                        line_display.append(colour(unit_colour, unit.get("Name")))
+
+                                    print(" → ".join(line_display))
+
+                                    # Get user input
+                                    branch_action = input(colour(Fore.BLUE, 'Tech tree branch action:'))
+
+                                    # Exit
+                                    if branch_action == '':
+                                        break
+
+                                '''while True:
                                     global TECH_TREE
                                     TECH_TREE = {}
                                     with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
@@ -2612,7 +2735,7 @@ def main():
                                         # Save the .dat file and tell the user the update is complete
                                         with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                         print(f'{selected_civ_name} Tech Tree updated.')
-                                        time.sleep(1)
+                                        time.sleep(1)'''
                 else:
                     print("Invalid selection. Try again.")
             except ValueError:
