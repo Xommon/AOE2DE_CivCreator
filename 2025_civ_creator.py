@@ -207,23 +207,67 @@ def get_unit_categories(name):
     else:
         unit_index = name
 
-    # Extract the description
+    # Grab the unit
+    unit_object = DATA.civs[1].units[unit_index]
+
+    # Create the empty categories list
+    categories = []
+
+    # Add categories from description
     try:
-        description_line = get_string(DATA.civs[1].units[unit_index].language_dll_name + 21000)
-        description_line = re.split(r'[\n.]', description_line)
+        description_categories = ["Foot Archer", "Skirmisher", "Mounted Archer", "Mounted", "Trade", "Infantry", "Cavalry", "Light Horseman", "Heavy Cavalry", "Warship", "Gunpowder", "Siege"]
 
-        # Get the categories from the line
-        categories =''.join(re.findall(r'\b[A-Z][a-z]*\b', description_line[1]))
+        # Separate the first sentence of the second line
+        description_line = get_string(unit_object.language_dll_name + 21000)
+        description_line = ''.join(description_line.split(rf'\n')[1]).split('.')
+        description_line = description_line[0]
 
-        # Add category for creation location
-        creation_locations = {87: 'archery range', 12: 'barracks', 101: 'stable', 49: 'siege workshop', 82: 'castle', 45: 'dock'}
-        if DATA.civs[1].units[unit_index].creatable.train_location_id in creation_locations:
-            categories.append(creation_locations[DATA.civs[1].units[unit_index].creatable.train_location_id])
-        #unit_line = get_unit_line(unit_index).lower()
+        # Get the categories from the description
+        for desc_cat in description_categories:
+            if desc_cat in description_line:
+                categories.append(desc_cat)
 
-        return categories
+                if desc_cat == 'Light Horseman':
+                    categories.append('Cavalry')
     except Exception as e:
-        return []
+        pass
+
+    # Add category for creation location
+    creation_locations = {87: 'Archery Range', 12: 'Barracks', 101: 'Stable', 49: 'Siege Workshop', 82: 'Castle', 45: 'Dock'}
+    try:
+        if unit_object.creatable.train_location_id in creation_locations:
+            categories.append(creation_locations[unit_object.creatable.train_location_id])
+    except:
+        pass
+
+    # Add category for lines
+    if get_unit_line(unit_index):
+        categories.append(get_unit_line(unit_index))
+
+    # Add category for ranged units
+    try:
+        if unit_object.type_50.max_range > 1:
+            categories.append('Ranged')
+    except:
+        pass
+
+    # Add category for elephant units
+    try:
+        if 'elephant' in get_unit_name(unit_index).lower():
+            categories.append('Elephant')
+
+        # Add category for camel units
+        if 'camel' in get_unit_name(unit_index).lower():
+            categories.append('Camel')
+
+        # Add category for siege units
+        if 'siege' in get_unit_name(unit_index).lower():
+            categories.append('Siege')
+    except:
+        pass
+
+    # Return the categories
+    return categories
         
 def get_tech_id(name):
     # Search with internal_name
@@ -315,7 +359,7 @@ def get_unit_line(unit_id, civ_index=None):
             break
 
     if final_unit:
-        return final_unit
+        return f'{final_unit.get('Name')}-'
     else:
         return None
 
@@ -330,121 +374,137 @@ def make_completer(options_list):
 def create_bonus(bonus_string_original, civ_id):
     # Bonus object
     class bonus_object:
-            def __init__(self, name=None, number=None, stat=None, age_stat=None):
-                self.name = name
-                self.number = number
-                self.stat = stat
-                self.age_stat = age_stat
+        def __init__(self, name=None, number=None, stat=None, age_stat=None):
+            self.name = name
+            self.number = number
+            self.stat = stat
+            self.age_stat = age_stat
+
+    # Create an empty list for bonus objects
+    bonus_items = []
+
+    # Lowercase the bonus string
+    bonus_string = bonus_string_original.lower()
 
     # Create the tech and effect, set the civilisation and names
     final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', repeatable=1)]
     final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', effect_commands=[])]
 
-    # Divide bonus at semicolons
-    bonus_strings = bonus_string_original.split(';')
+    # Split the bonus string into words
+    words = bonus_string.lower().split()
 
-    # For each bonus that was separated by the semicolon
-    for bonus_string in bonus_strings:
-        # Create an empty list for bonus objects
-        bonus_objects = []
+    # Unit categories
+    unit_categories = {
+            "foot archers": ['C0', 'U-7', 'U-6', 'U-1155'],
+            "skirmishers": ['U7', 'U6', 'U1155'],
+            "mounted archers": ['C36'],
+            "mounted": ['C36', 'C12', 'C23'],
+            "trade": ['C2', 'C19'],
+            "infantry": ['C6'],
+            "cavalry": ['C12'],
+            "light horseman": ['C12'],
+            "heavy cavalry": ['C12'],
+            "warships": ['C22'],
+            "gunpowder": ['C44', 'C23'],
+            "siege": ['C13']
+        }
 
-        # Split bonus words into a list
-        bonus_words = bonus_string.lower().split()
+    # Stat dictionary
+    stat_dictionary = {'hit points': 'S0', 'hp': 'S0', 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'movement speed': 'S5', 'pierce armor': 'S8.0768', 'armor vs. cavalry archers': 'S8.7168', 'armor vs. elephants': 'S8.128', 'armor vs. infantry': 'S8.0256', 'armor vs. cavalry': 'S8.2048', 'armor vs. archers': 'S8.384', 'armor vs. ships': 'S8.4096', 'armor vs. siege': 'S8.512', 'armor vs. gunpowder': 'S8.5888', 'armor vs. spearmen': 'S8.6912', 'armor vs. eagles': 'S8.7424', 'armor vs. camels': 'S8.768', 'armor': 'S8.1024', 'attack': 'S9', 'range': ['S12', 'S23'], 'minimum range': 'S20', 'train time': 'S101'}
 
-        # Find units/buildings
-        '''unit_categories = ['foot archers', 'infantry', 'cavalry']
-        bonus_units_buildings = []
-        bonus_units_buildings_names = []
-        for uc in unit_categories:
-            if uc in bonus_string_original.lower():
-                bonus_units_buildings_names.append(uc)
+    for i, word in enumerate(words):
+        # Search for unit categories
+        for category in unit_categories:
+            category_words = category.split()
 
-        # Convert words into unit ids
-        for bonus_ub_name in bonus_units_buildings_names:
-            for i, unit in enumerate(DATA.civs[1].units):
-                if bonus_ub_name in get_unit_categories(i):
-                    bonus_units_buildings.append(i)
+            # Check if current word matches the start of a category
+            if word == category_words[0]:
+                # Slice the next N words from the string to compare
+                following = words[i:i+len(category_words)]
 
-        print('bonus units:', bonus_units_buildings)'''
+                # Matching category
+                if following == category_words:
+                    bonus_items.append(unit_categories[category])
 
-        for i, word in enumerate(bonus_words):
-            ### Foot Archers have +20% attack in the Castle Age
-            ## [foot archers, 1.2, attack, castle]
+        # Search for numbers
+        if any(char.isdigit() for char in word):
+            # Split up multiple numbers
+            old_numbers = word.split('/')
 
-            ### Foot Archers have +20/30/40% hitpoints in the Feudal/Castle/Imperial Age
-            ## [foot archers, 1.2, hp, feudal] 50 * 1.2 = 60
-            ## [foot archers, 1.3, hp, castle] 60 * 1.083 = 65
-            ## [foot archers, 1.4, hp, imperial] 60 * 1.077 = 65
-
-            ### Infantry have +1 attack and Cavalry have +2 pierce armor
-            ## [infantry, 1, attack, -]
-            ## [cavalry, 2, pierce armour, -]
-
-            ### Skirmishers have +1/+2 range in the Castle/Imperial age
-            ## [skirmishers, 1, attack, castle]
-            ## [skirmishers, 1, attack, imperial]
-
-            # Find technologies
-            bonus_techs = []
-
-            # Find numbers
-            bonus_numbers = []
-            if any(char.isdigit() for char in word):
-                old_numbers = word
-                
+            # Format each of those numbers
+            temp_numbers = []
+            for number in old_numbers:
                 # Negative or positive
                 negative = '-' in old_numbers
-                old_numbers = old_numbers.strip('-').strip('+')
+                number = number.strip('-').strip('+')
 
                 # Percent or integer
                 percent = '%' in old_numbers
-                old_numbers = old_numbers.strip('%')
+                number = number.strip('%')
 
-                # Split all numbers
-                old_numbers = old_numbers.split('/')
-
-                # Format each of those numbers
-                for number in old_numbers:
-                    # Convert all numbers into integers that can be used
+                # Convert all numbers into integers that can be used
+                number = int(number)
+                if percent and not negative:
+                    number = float(number / 100 + 1)
+                elif percent and negative:
+                    number = float((100 - number) / 100)
+                else:
                     number = int(number)
-                    if percent and not negative:
-                        number = float(number / 100 + 1)
-                    elif percent and negative:
-                        number = float((100 - number) / 100)
-                    else:
-                        number = int(number)
-                        if negative:
-                            number *= -1
-                    # Add bonus number
-                    bonus_numbers.append(number)
+                    if negative:
+                        number *= -1
 
-            # Find stats
-            bonus_stats = []
+                # Add number to temp number list
+                temp_numbers.append(f'N{number}')
 
-            # Find ages
-            bonus_ages = []
-            if 'dark' in word or 'feudal' in word or 'castle' in word or 'imperial' in word:
-                old_ages = word.split('/')
-                for age in old_ages:
-                    if age == 'dark':
-                        bonus_ages.append(104)
-                    elif age == 'feudal':
-                        bonus_ages.append(101)
-                    elif age == 'castle':
-                        bonus_ages.append(102)
-                    elif age == 'feudal':
-                        bonus_ages.append(103)
+            # Add bonus number
+            bonus_items.append(temp_numbers)
 
-            # Create the bonus objects if they didn't exist already
-            #while len(bonus_objects) < len(bonus_numbers):
-            #    bonus_objects.append(bonus_object())
+        # Search for ages
+        if any(age in word for age in ('dark', 'feudal', 'castle', 'imperial')):
+            # Split up multiple ages
+            old_ages = word.split('/')
+
+            # Convert each of the ages into a tech ID
+            temp_ages = []
+            for age in old_ages:
+                if age == 'dark':
+                    temp_ages.append('A104')
+                elif age == 'feudal':
+                    temp_ages.append('A101')
+                elif age == 'castle':
+                    temp_ages.append('A102')
+                elif age == 'imperial':
+                    temp_ages.append('A103')
+
+            # Add the temp ages list
+            bonus_items.append(temp_ages)
+
+        # Search for resources
+        if word in ('food', 'wood', 'stone', 'gold'):
+            bonus_items.append(word)
+
+        # Search for stats
+        for key in stat_dictionary:
+            key_words = key.split()
+
+            # Check if the current word matches the start of a dictionary key
+            if word == key_words[0]:
+                # Slice the next N words to match the full key
+                following = words[i:i+len(key_words)]
+
+                # Add the confirmed match
+                if following == key_words:
+                    bonus_items.append([stat_dictionary[key]])
+
+    # Print the result
+    print(f'{bonus_string_original}: {bonus_items}')
 
     # Set up the list
-    bonus_effect_commands = []
-    bonus_string = bonus_string.lower()
+    #bonus_effect_commands = []
+    #bonus_string = bonus_string.lower()
 
     # Bonus unit lines bank
-    bonus_unit_lines = {
+    '''bonus_unit_lines = {
         # Categories
         'all units': [0.5, 6.5, 12.5, 13.5, 18.5, 43.5, 19.5, 22.5, 2.5, 36.5, 51.5, 44.5, 54.5, 55.5, 35.5],
         'military': [0.5, 35.5, 6.5, 36.5, 47.5, 12.5, 44.5, 23.5],
@@ -582,7 +642,7 @@ def create_bonus(bonus_string_original, civ_id):
         
     }
 
-    '''
+    
     # Extract units
     primary_units = []
     secondary_units = []
@@ -1845,6 +1905,10 @@ def main():
                                 current_language = sound_item.filename.split('_')[0]
 
                         # Print the civilization menu
+                        #print(f'{get_unit_name(1105)}: {get_unit_categories(1105)}')
+                        create_bonus('Foot Archers +1/+2 range in Castle/Imperial Age', selected_civ_index)
+                        create_bonus('Infantry and Cavalry have +1 attack', selected_civ_index)
+                        create_bonus('Cavalry have +20 HP and Foot Archers have +2 attack', selected_civ_index)
                         print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Edit {selected_civ_name} 🌺🌺🌺'))
                         print(colour(Fore.WHITE, f"0️⃣  Name") + f" -- {colour(Fore.BLUE, selected_civ_name)}")
                         print(colour(Fore.WHITE, f"1️⃣  Title") + f" -- {colour(Fore.BLUE, description_lines[0])}")
@@ -1885,13 +1949,14 @@ def main():
                             old_name = selected_civ_name
 
                             # Check to see if name already exists
+                            name_exists = False
                             for civ in DATA.civs:
                                 if civ.name.lower() == new_name.lower():
                                     print("\033[31mERROR: Civilization name already assigned to another civilization.\033[0m")
-                                    time.sleep(1)
+                                    name_exists = True
                                     break
 
-                            if new_name != '' and new_name != selected_civ_name:
+                            if new_name != '' and new_name != selected_civ_name and not name_exists:
                                 # Change name
                                 DATA.civs[edit_civ_index + 1].name = new_name
                                 with open(MOD_STRINGS, 'r+') as file:
@@ -1921,8 +1986,9 @@ def main():
                                         tech.name = ':'.join(name_list)
 
                                 # Update the name
+                                #with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                 print(f'Civilization name changed from {old_name} to {selected_civ_name}.')
-                            else:
+                            elif not name_exists:
                                 # Do not update the name
                                 print(f'Civilization name not changed for {selected_civ_name}.')
                             time.sleep(1)
@@ -2563,71 +2629,84 @@ def main():
                                 tech_tree_selection = input(colour(Fore.BLUE, "Selection: "))
 
                                 # Set the tree
-                                building_ids = [12, 87, 101, 103, 84, 45, 49, 209, 104, 82, 109]
+                                building_ids = [12, 87, 101, 103, 84, 45, 49, 209, [104, 1806], [72, 117, 82, 1251, 1665], [70, 109, 584, 562, 68, 1734, 1808, 1754, 1021]]
                                 try:
-                                    if isinstance(building_ids[int(tech_tree_selection)], list):
-                                        pass
+                                    selected = building_ids[int(tech_tree_selection)]
+
+                                    if isinstance(selected, list):
+                                        tree = []
+                                        for sub_id in selected:
+                                            tree.extend([entry for entry in FOREST if entry.get("Building ID") == sub_id])
                                     else:
-                                        tree = [entry for entry in FOREST if entry.get("Building ID") == building_ids[int(tech_tree_selection)]]
-                                    break
+                                        tree = [entry for entry in FOREST if entry.get("Building ID") == selected]
                                 except:
                                     continue
 
-                            while True:
-                                # Build mappings
-                                link_map = {unit.get("Link ID"): unit for unit in tree if unit.get("Link ID") is not None}
-                                node_map = {unit.get("Node ID"): unit for unit in tree if unit.get("Node ID") is not None}
+                                while True:
+                                    # Build mappings
+                                    link_map = {unit.get("Link ID"): unit for unit in tree if unit.get("Link ID") is not None}
+                                    node_map = {unit.get("Node ID"): unit for unit in tree if unit.get("Node ID") is not None}
 
-                                # Identify all end-of-line units
-                                end_units = [unit for unit in tree if unit.get("Link ID") == -1]
+                                    # Identify all end-of-line units
+                                    end_units = [unit for unit in tree if unit.get("Link ID") == -1]
 
-                                # Track printed lines to avoid duplicates
-                                seen = set()
-                                print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Tech Tree Branch Menu 🌺🌺🌺'))
-                                for end_unit in end_units:
-                                    line = [end_unit]
-                                    current = end_unit
+                                    # Track printed lines to avoid duplicates
+                                    seen = set()
+                                    print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Tech Tree Branch Menu 🌺🌺🌺'))
 
-                                    # Walk backward in the upgrade chain
-                                    while True:
-                                        next_unit = next(
-                                            (unit for unit in tree if unit.get("Link ID") == current.get("Node ID")), None
-                                        )
-                                        if next_unit:
-                                            line.append(next_unit)
-                                            current = next_unit
-                                        else:
-                                            break
+                                    # Add the host building
+                                    current_building_id = building_ids[int(tech_tree_selection)]
+
+                                    # Find the host building (first match with this Building ID and a Use Type of "Building" if needed)
+                                    host_building = next((entry for entry in FOREST if entry.get("Node ID") == current_building_id), None)
+                                    if host_building:
+                                        building_colour = Fore.GREEN if host_building.get("Node Status") == "ResearchedCompleted" or host_building.get('Node Status') == 'ResearchRequired' else Fore.RED
+                                        print(colour(building_colour, f"{host_building.get('Name')}"))
+
+                                    for end_unit in end_units:
+                                        line = [end_unit]
+                                        current = end_unit
+
+                                        # Walk backward in the upgrade chain
+                                        while True:
+                                            next_unit = next(
+                                                (unit for unit in tree if unit.get("Link ID") == current.get("Node ID")), None
+                                            )
+                                            if next_unit:
+                                                line.append(next_unit)
+                                                current = next_unit
+                                            else:
+                                                break
+                                            
+                                        # Skip if already printed
+                                        if line[0].get("Node ID") in seen:
+                                            continue
                                         
-                                    # Skip if already printed
-                                    if line[0].get("Node ID") in seen:
-                                        continue
-                                    
-                                    seen.update(unit.get("Node ID") for unit in line)
+                                        seen.update(unit.get("Node ID") for unit in line)
 
-                                    # Print it
-                                    CIV_OBJECTS
-                                    line_display = []
+                                        # Print it
+                                        CIV_OBJECTS
+                                        line_display = []
 
-                                    for unit in line:
-                                        node_id = unit.get("Node ID")
+                                        for unit in line:
+                                            node_id = unit.get("Node ID")
 
-                                        # Find matching civ unit entry
-                                        civ_unit = next((u for u in CIV_OBJECTS[selected_civ_index].units if u.get("Node ID") == node_id), None)
+                                            # Find matching civ unit entry
+                                            civ_unit = next((u for u in CIV_OBJECTS[selected_civ_index].units if u.get("Node ID") == node_id), None)
 
-                                        # Set the colour for the item
-                                        unit_colour = Fore.BLACK
-                                        if civ_unit and civ_unit.get("Node Status") == "ResearchedCompleted" or civ_unit and civ_unit.get("Node Status") == "ResearchRequired":
-                                            unit_colour = Fore.GREEN
-                                        elif civ_unit and civ_unit.get("Node Status") == "NotAvailable":
-                                            unit_colour = Fore.RED
+                                            # Set the colour for the item
+                                            unit_colour = Fore.BLACK
+                                            if civ_unit and civ_unit.get("Node Status") == "ResearchedCompleted" or civ_unit and civ_unit.get("Node Status") == "ResearchRequired":
+                                                unit_colour = Fore.GREEN
+                                            elif civ_unit and civ_unit.get("Node Status") == "NotAvailable":
+                                                unit_colour = Fore.RED
 
-                                        line_display.append(colour(unit_colour, unit.get("Name")))
+                                            line_display.append(colour(unit_colour, unit.get("Name")))
 
-                                    print(" → ".join(line_display))
+                                        print(" → ".join(line_display))
 
                                     # Get user input
-                                    branch_action = input(colour(Fore.BLUE, 'Tech tree branch action:'))
+                                    branch_action = input(colour(Fore.BLUE, 'Tech Tree Branch action: '))
 
                                     # Exit
                                     if branch_action == '':
