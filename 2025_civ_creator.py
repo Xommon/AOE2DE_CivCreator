@@ -429,20 +429,29 @@ def create_bonus(bonus_string_original, civ_id):
 
     # Split the bonus string into words
     words = bonus_string.lower().split()
+    #print(words)
 
     # Unit categories
     unit_categories = {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13']}
 
     # Stat dictionary
-    stat_dictionary = {'hit points': 'S0', 'hp': 'S0', 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'movement speed': 'S5', 'pierce armor': 'S8.0768', 'armor vs. cavalry archers': 'S8.7168', 'armor vs. elephants': 'S8.128', 'armor vs. infantry': 'S8.0256', 'armor vs. cavalry': 'S8.2048', 'armor vs. archers': 'S8.384', 'armor vs. ships': 'S8.4096', 'armor vs. siege': 'S8.512', 'armor vs. gunpowder': 'S8.5888', 'armor vs. spearmen': 'S8.6912', 'armor vs. eagles': 'S8.7424', 'armor vs. camels': 'S8.768', 'armor': 'S8.1024', 'attack': 'S9', 'range': ['S12', 'S23'], 'minimum range': 'S20', 'train time': 'S101'}
+    stat_dictionary = {'hit points': 'S0', 'hp': 'S0', 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': 'S5', 'pierce armor': 'S8.0768', 'armor vs. cavalry archers': 'S8.7168', 'armor vs. elephants': 'S8.128', 'armor vs. infantry': 'S8.0256', 'armor vs. cavalry': 'S8.2048', 'armor vs. archers': 'S8.384', 'armor vs. ships': 'S8.4096', 'armor vs. siege': 'S8.512', 'armor vs. gunpowder': 'S8.5888', 'armor vs. spearmen': 'S8.6912', 'armor vs. eagles': 'S8.7424', 'armor vs. camels': 'S8.768', 'armor': 'S8.1024', 'attack': 'S9', 'range': ['S1', 'S12', 'S23'], 'minimum range': 'S20', 'train': 'S101', 'work': 'S13'}
 
     # Resource dictionary
     resource_dictionary = {'food': [0, 103], 'wood': [1, 104], 'gold': [3, 105], 'stone': [2, 106]}
 
-    for i, word in enumerate(words):
+    # Declare exception
+    exception = ''
+
+    for i, word in enumerate(words[:]):
         # Skip useless words
-        if word in ['and', 'but', 'have', 'has']:
-            continue
+        #if word in ['and', 'but', 'have', 'has']:
+        #    continue
+
+        # Search for exception
+        #print(word)
+        if '(' in word:
+            exception = '-'
 
         # Search for unit categories
         for category in unit_categories:
@@ -457,39 +466,56 @@ def create_bonus(bonus_string_original, civ_id):
                 if following == category_words:
                     bonus_items.append(unit_categories[category])
 
-        # Search for individual unit names and unit lines
         y = 0
         while y < len(words):
             phrase = words[y]
-            clean_phrase = phrase.lower().removesuffix('-line').removesuffix('line').removesuffix('lines').removesuffix('-')
-            unit_ids = get_unit_line_ids(clean_phrase)
-
+            matched_units = []
+            tried_phrases = set()
+        
+            def normalize_variants(p):
+                variants = {p.lower().removesuffix('-line').removesuffix('-lines').removesuffix('-').removesuffix(')')}
+                if p.endswith('ies'):
+                    variants.add(p[:-3] + 'y')
+                if p.endswith('s') and not p.endswith('ss'):
+                    variants.add(p[:-1])
+                if 'men' in p:
+                    variants.add(p.replace('men', 'man'))
+                return variants
+        
             # Try expanding the phrase word by word
             for j in range(y + 1, len(words) + 1):
-                if unit_ids and all(isinstance(uid, int) for uid in unit_ids):
-                    bonus_items.append([f'U{uid}' for uid in unit_ids])
-
-                    # Remove matched words
+                for variant in normalize_variants(phrase):
+                    if variant not in tried_phrases:
+                        tried_phrases.add(variant)
+                        unit_ids = get_unit_line_ids(variant)
+                        if unit_ids and all(isinstance(uid, int) for uid in unit_ids):
+                            matched_units.append([f'U{exception}{uid}' for uid in unit_ids])
+        
+                if matched_units:
+                    bonus_items.append(matched_units)
                     del words[y:j]
-                    y -= 1  # step back so the loop continues correctly
+                    y -= 1
                     break
                 
                 if j < len(words):
                     phrase += f' {words[j]}'
-                    clean_phrase = phrase.lower().removesuffix('-line').removesuffix('line').removesuffix('lines').strip('- ')
-                    unit_ids = get_unit_line_ids(clean_phrase)
-
+        
             y += 1
+
+        # Reset exception
+        if ')' in word:
+            exception = '-'
 
         # Search for numbers
         if any(char.isdigit() for char in word):
             old_numbers = word.split('/')
 
+            # Set negative and percent
+            negative = '-' in word
+            percent = '%' in word
+
             temp_numbers = []
             for number in old_numbers:
-                negative = '-' in number
-                percent = '%' in number
-
                 number = number.strip('-+%')
                 number = int(number)
 
@@ -1744,7 +1770,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # Write the architecture sets to a file
     with open(f'{MOD_FOLDER}/{mod_name}.pkl', 'wb') as file:
         for civ in DATA.civs:
-            pickle.dump(civ.units, file)
+            if civ.name != 'Gaia' and civ.name != 'Spartans' and civ.name != 'Athenians' and civ.name != 'Achaemenids':
+                pickle.dump(civ.units, file)
 
     # Correct name mistakes for the Britons and the Franks
     DATA.civs[1].name = 'Britons'
@@ -1952,10 +1979,8 @@ def main():
 
                         # Print the civilization menu
                         #print(f'{get_unit_name(1105)}: {get_unit_categories(1105)}')
-                        #create_bonus('Foot Archers +1/+2 range in Castle/Imperial Age', selected_civ_index)
-                        #create_bonus('Infantry and Cavalry have +1 attack', selected_civ_index)
-                        #create_bonus('Cavalry have +20 HP and Foot Archers have +2 attack', selected_civ_index)
-                        create_bonus('Militia-line has +30 hit points but -1 attack', selected_civ_index)
+                        # TEST BONUS
+                        create_bonus(rf'Shepherds work +25% faster', selected_civ_index)
                         print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Edit {selected_civ_name} 🌺🌺🌺'))
                         print(colour(Fore.WHITE, f"0️⃣  Name") + f" -- {colour(Fore.BLUE, selected_civ_name)}")
                         print(colour(Fore.WHITE, f"1️⃣  Title") + f" -- {colour(Fore.BLUE, description_lines[0])}")
@@ -2512,33 +2537,31 @@ def main():
                         # Architecture
                         elif selection == '5':
                             # Gather base architectures
-                            base_architectures = [
-                                ["African", "Central Asian", "Central European", "East Asian", "Eastern European", "Mediterranean", "Middle Eastern", "Mesoamerican", "South Asian", "Southeast Asian", "Western European", "Southeast European"],
-                                [],
-                                []
-                            ]
+                            base_architectures = []
                             for civ in DATA.civs:
                                 if civ.name != 'Spartans' and civ.name != 'Athenians' and civ.name != 'Achaemenids' and civ.name != 'Gaia':
-                                    base_architectures[1].append(civ.name)
-                                    base_architectures[2].append(civ.name)
+                                    base_architectures.append(civ.name)
 
                             # Gather custom architectures
                             custom_arcs = [
                                 [],
                                 ['Poenari Castle'],
-                                ['Aachen Cathedral', 'Dome of the Rock', 'Dormition Cathedral', 'Gol Gumbaz', 'Minaret of Jam', 'Pyramid', 'Quimper Cathedral', 'Sankore Madrasah', 'Tower of London']
+                                ['Aachen Cathedral', 'Dome of the Rock', 'Dormition Cathedral', 'Gol Gumbaz', 'Minaret of Jam', 'Pyramid', 'Quimper Cathedral', 'Sankore Madrasah', 'Tower of London'],
+                                [],
                             ]
 
                             # User prompts
-                            architecture_types = ["General", "Castle", "Wonder"]
-                            architecture_changes = [-1, -1, -1]
-                            print('\n')
-                            for i in range(3):
+                            architecture_types = ["General", "Castle", "Wonder", 'Monk']
+                            architecture_changes = [-1] * len(architecture_types)
+                            
+                            for i in range(len(architecture_types)):
                                 # Assemble all architecture options
-                                all_architectures = base_architectures[i] + custom_arcs[i]
+                                all_architectures = base_architectures + custom_arcs[i]
 
                                 while True:
                                     # Get user input
+                                    readline.set_completer(make_completer(all_architectures))
+                                    readline.parse_and_bind("tab: complete")
                                     architecture_selection = input(f"Enter {architecture_types[i]} architecture for {selected_civ_name}: ").lower()
 
                                     # Help
@@ -2555,7 +2578,11 @@ def main():
 
                                     # Try to convert to an integer
                                     try:
-                                        architecture_selection = int(architecture_selection)
+                                        # Convert word to index
+                                        if architecture_selection in [opt.lower() for opt in all_architectures]:
+                                            architecture_selection = int([opt.lower() for opt in all_architectures].index(architecture_selection))
+                                        else:
+                                            architecture_selection = int(architecture_selection)
                                     except:
                                         print(f'\033[31mERROR: {architecture_types[i]} architecture index not valid.\n\033[0m')
                                         continue
@@ -2563,17 +2590,16 @@ def main():
                                     # Check against architecture options
                                     if architecture_selection > -1 and architecture_selection < len(all_architectures):
                                         architecture_changes[i] = architecture_selection
-
-                                        if i == 0:
-                                            # Convert int into the place of the architecture index in the file
-                                            architecture_indexes_in_file = [26, 34, 3, 5, 23, 14, 8, 15, 20, 28, 1, 7]
-                                            architecture_selection = architecture_indexes_in_file[architecture_selection]
                                         break
                                     else:
                                         # Print error
-                                        print(f'\033[31mERROR: {architecture_types[i]} architecture index not valid.\n\033[0m')
+                                        if i == 3:
+                                            print(f'\033[31mERROR: {architecture_types[i]} graphic index not valid.\n\033[0m')
+                                        else:
+                                            print(f'\033[31mERROR: {architecture_types[i]} architecture index not valid.\n\033[0m')
 
-                            for i in range(3):
+                            #print(architecture_changes)
+                            for i in range(len(architecture_types)):
                                 # Skip if unspecified
                                 if architecture_changes[i] == -1:
                                     continue
@@ -2585,26 +2611,29 @@ def main():
                                     all_units_to_change = [82, 1430]
                                 elif i == 2: # Wonder
                                     all_units_to_change = [276, 1445]
-
-                                for unit_id in all_units_to_change:
-                                    # Replace the unit or the graphics
-                                    if architecture_changes[i] < len(base_architectures[i]):
-                                        # Base units
-                                        if i == 0:
-                                            DATA.civs[selected_civ_index + 1].units[unit_id] = ARCHITECTURE_SETS[architecture_changes[i]][unit_id]
+                                elif i == 3: # Monk
+                                    all_units_to_change = [125, 286, 922, 1025, 1327]
+                                try:
+                                    for unit_id in all_units_to_change:
+                                        # Replace the unit or the graphics
+                                        if architecture_changes[i] < len(base_architectures) + 1:
+                                            # Base units
+                                            if i == 0 or i == 3:
+                                                DATA.civs[selected_civ_index + 1].units[unit_id] = ARCHITECTURE_SETS[architecture_changes[i]][unit_id]
+                                            else:
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].standing_graphic
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].dying_graphic
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].damage_graphics
                                         else:
-                                            DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].standing_graphic
-                                            DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].dying_graphic
-                                            DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].damage_graphics
-                                    else:
-                                        # Custom units
-                                        if i == 0:
-                                            DATA.civs[selected_civ_index + 1].units[unit_id] = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])]
-                                        else:
-                                            DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].standing_graphic
-                                            DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].dying_graphic
-                                            DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].damage_graphics
-
+                                            # Custom units
+                                            if i == 0 or i == 3:
+                                                DATA.civs[selected_civ_index + 1].units[unit_id] = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])]
+                                            else:
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].standing_graphic
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].dying_graphic
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].damage_graphics
+                                except Exception as e:
+                                    print(str(e))
                             # Save changes
                             with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                             print(f"Architecture changed for {selected_civ_name}.")
