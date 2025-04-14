@@ -178,27 +178,37 @@ def get_unit_name(unit_id):
             return 'NOT_FOUND^'
             
 def get_unit_id(name):
-    try:
-        for i, unit in enumerate(DATA.civs[1].units):
-            if unit.name.lower() == name.lower():
-                return i
-    except:
-        # As a backup, search for name in the strings JSON file
-        string_ids = []
-        with open(ORIGINAL_STRINGS, 'r') as file:
-            get_unit_id_lines = file.readlines()
-            for line in get_unit_id_lines:
-                if f'"{name.lower()}"' in line.lower():
-                    match = re.match(r'\d+', line)
-                    if match:
-                        string_ids.append(match.group())
+    names = [name]
+    # Try to depluralise the word
+    if name[:-1] == 's':
+        names.append(name[-1])
+    if name[:-3] == 'ies':
+        names.append(f'{name[-3]}y')
+    if name == 'men-at-arms':
+        names.append('man-at-arms')
 
-        for i, unit in enumerate(DATA.civs[1].units):
-            try:
-                if str(unit.language_dll_name) in string_ids:
+    for name_type in names:
+        try:
+            for i, unit in enumerate(DATA.civs[1].units):
+                if unit.name.lower() == name_type.lower():
                     return i
-            except:
-                pass
+        except:
+            # As a backup, search for name in the strings JSON file
+            string_ids = []
+            with open(ORIGINAL_STRINGS, 'r') as file:
+                get_unit_id_lines = file.readlines()
+                for line in get_unit_id_lines:
+                    if f'"{name_type.lower()}"' in line.lower():
+                        match = re.match(r'\d+', line)
+                        if match:
+                            string_ids.append(match.group())
+
+            for i, unit in enumerate(DATA.civs[1].units):
+                try:
+                    if str(unit.language_dll_name) in string_ids:
+                        return i
+                except:
+                    pass
 
 def get_unit_categories(name):
     # Switch name to id
@@ -336,7 +346,7 @@ def get_unit_line(unit_id, civ_index=None):
 
     # Convert name to ID if a string is passed
     if isinstance(unit_id, str):
-        unit_id = get_unit_id(unit_id)  # make sure this returns an int or -1
+        unit_id = get_unit_id(unit_id) 
 
     while unit_id != -1 and unit_id not in visited_ids:
         visited_ids.add(unit_id)
@@ -362,6 +372,33 @@ def get_unit_line(unit_id, civ_index=None):
         return f'{final_unit.get('Name')}-'
     else:
         return None
+    
+def get_unit_line_ids(name):
+    # Convert to unit index
+    if str(name).isdigit():
+        unit_index = int(name)
+    else:
+        unit_index = get_unit_id(name)
+
+    # Search for unit lines in the forest
+    node_ids = []
+    visited = set()
+
+    def dfs(current_id):
+        for unit in FOREST:
+            if unit.get("Link ID") == current_id:
+                next_id = unit.get("Node ID")
+                if next_id not in visited:
+                    node_ids.append(next_id)
+                    visited.add(next_id)
+                    dfs(next_id)
+
+    # Include the starting ID itself
+    node_ids.append(unit_index)
+    visited.add(unit_index)
+    dfs(unit_index)
+
+    return node_ids
 
 # Complete text
 def make_completer(options_list):
@@ -394,25 +431,19 @@ def create_bonus(bonus_string_original, civ_id):
     words = bonus_string.lower().split()
 
     # Unit categories
-    unit_categories = {
-            "foot archers": ['C0', 'U-7', 'U-6', 'U-1155'],
-            "skirmishers": ['U7', 'U6', 'U1155'],
-            "mounted archers": ['C36'],
-            "mounted": ['C36', 'C12', 'C23'],
-            "trade": ['C2', 'C19'],
-            "infantry": ['C6'],
-            "cavalry": ['C12'],
-            "light horseman": ['C12'],
-            "heavy cavalry": ['C12'],
-            "warships": ['C22'],
-            "gunpowder": ['C44', 'C23'],
-            "siege": ['C13']
-        }
+    unit_categories = {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13']}
 
     # Stat dictionary
     stat_dictionary = {'hit points': 'S0', 'hp': 'S0', 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'movement speed': 'S5', 'pierce armor': 'S8.0768', 'armor vs. cavalry archers': 'S8.7168', 'armor vs. elephants': 'S8.128', 'armor vs. infantry': 'S8.0256', 'armor vs. cavalry': 'S8.2048', 'armor vs. archers': 'S8.384', 'armor vs. ships': 'S8.4096', 'armor vs. siege': 'S8.512', 'armor vs. gunpowder': 'S8.5888', 'armor vs. spearmen': 'S8.6912', 'armor vs. eagles': 'S8.7424', 'armor vs. camels': 'S8.768', 'armor': 'S8.1024', 'attack': 'S9', 'range': ['S12', 'S23'], 'minimum range': 'S20', 'train time': 'S101'}
 
+    # Resource dictionary
+    resource_dictionary = {'food': [0, 103], 'wood': [1, 104], 'gold': [3, 105], 'stone': [2, 106]}
+
     for i, word in enumerate(words):
+        # Skip useless words
+        if word in ['and', 'but', 'have', 'has']:
+            continue
+
         # Search for unit categories
         for category in unit_categories:
             category_words = category.split()
@@ -426,37 +457,52 @@ def create_bonus(bonus_string_original, civ_id):
                 if following == category_words:
                     bonus_items.append(unit_categories[category])
 
+        # Search for individual unit names and unit lines
+        y = 0
+        while y < len(words):
+            phrase = words[y]
+            clean_phrase = phrase.lower().removesuffix('-line').removesuffix('line').removesuffix('lines').removesuffix('-')
+            unit_ids = get_unit_line_ids(clean_phrase)
+
+            # Try expanding the phrase word by word
+            for j in range(y + 1, len(words) + 1):
+                if unit_ids and all(isinstance(uid, int) for uid in unit_ids):
+                    bonus_items.append([f'U{uid}' for uid in unit_ids])
+
+                    # Remove matched words
+                    del words[y:j]
+                    y -= 1  # step back so the loop continues correctly
+                    break
+                
+                if j < len(words):
+                    phrase += f' {words[j]}'
+                    clean_phrase = phrase.lower().removesuffix('-line').removesuffix('line').removesuffix('lines').strip('- ')
+                    unit_ids = get_unit_line_ids(clean_phrase)
+
+            y += 1
+
         # Search for numbers
         if any(char.isdigit() for char in word):
-            # Split up multiple numbers
             old_numbers = word.split('/')
 
-            # Format each of those numbers
             temp_numbers = []
             for number in old_numbers:
-                # Negative or positive
-                negative = '-' in old_numbers
-                number = number.strip('-').strip('+')
+                negative = '-' in number
+                percent = '%' in number
 
-                # Percent or integer
-                percent = '%' in old_numbers
-                number = number.strip('%')
-
-                # Convert all numbers into integers that can be used
+                number = number.strip('-+%')
                 number = int(number)
+
                 if percent and not negative:
                     number = float(number / 100 + 1)
                 elif percent and negative:
                     number = float((100 - number) / 100)
                 else:
-                    number = int(number)
                     if negative:
                         number *= -1
 
-                # Add number to temp number list
                 temp_numbers.append(f'N{number}')
 
-            # Add bonus number
             bonus_items.append(temp_numbers)
 
         # Search for ages
@@ -480,8 +526,8 @@ def create_bonus(bonus_string_original, civ_id):
             bonus_items.append(temp_ages)
 
         # Search for resources
-        if word in ('food', 'wood', 'stone', 'gold'):
-            bonus_items.append(word)
+        if word in resource_dictionary:
+            bonus_items.append(f'R{resource_dictionary[word]}')
 
         # Search for stats
         for key in stat_dictionary:
@@ -1906,9 +1952,10 @@ def main():
 
                         # Print the civilization menu
                         #print(f'{get_unit_name(1105)}: {get_unit_categories(1105)}')
-                        create_bonus('Foot Archers +1/+2 range in Castle/Imperial Age', selected_civ_index)
-                        create_bonus('Infantry and Cavalry have +1 attack', selected_civ_index)
-                        create_bonus('Cavalry have +20 HP and Foot Archers have +2 attack', selected_civ_index)
+                        #create_bonus('Foot Archers +1/+2 range in Castle/Imperial Age', selected_civ_index)
+                        #create_bonus('Infantry and Cavalry have +1 attack', selected_civ_index)
+                        #create_bonus('Cavalry have +20 HP and Foot Archers have +2 attack', selected_civ_index)
+                        create_bonus('Militia-line has +30 hit points but -1 attack', selected_civ_index)
                         print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Edit {selected_civ_name} 🌺🌺🌺'))
                         print(colour(Fore.WHITE, f"0️⃣  Name") + f" -- {colour(Fore.BLUE, selected_civ_name)}")
                         print(colour(Fore.WHITE, f"1️⃣  Title") + f" -- {colour(Fore.BLUE, description_lines[0])}")
@@ -2817,7 +2864,8 @@ def main():
                                         time.sleep(1)'''
                 else:
                     print("Invalid selection. Try again.")
-            except ValueError:
+            except Exception as e:
+                print(str(e))
                 print("Please enter a valid number.")
 
 if __name__ == "__main__":
