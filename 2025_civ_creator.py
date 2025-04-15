@@ -429,7 +429,6 @@ def create_bonus(bonus_string_original, civ_id):
 
     # Split the bonus string into words
     words = bonus_string.lower().split()
-    #print(words)
 
     # Unit categories
     unit_categories = {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13']}
@@ -438,79 +437,64 @@ def create_bonus(bonus_string_original, civ_id):
     stat_dictionary = {'hit points': 'S0', 'hp': 'S0', 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': 'S5', 'pierce armor': 'S8.0768', 'armor vs. cavalry archers': 'S8.7168', 'armor vs. elephants': 'S8.128', 'armor vs. infantry': 'S8.0256', 'armor vs. cavalry': 'S8.2048', 'armor vs. archers': 'S8.384', 'armor vs. ships': 'S8.4096', 'armor vs. siege': 'S8.512', 'armor vs. gunpowder': 'S8.5888', 'armor vs. spearmen': 'S8.6912', 'armor vs. eagles': 'S8.7424', 'armor vs. camels': 'S8.768', 'armor': 'S8.1024', 'attack': 'S9', 'range': ['S1', 'S12', 'S23'], 'minimum range': 'S20', 'train': 'S101', 'work': 'S13'}
 
     # Resource dictionary
-    resource_dictionary = {'food': [0, 103], 'wood': [1, 104], 'gold': [3, 105], 'stone': [2, 106]}
+    resource_dictionary = {'food': ['R0', 'R103'], 'wood': ['R1', 'R104'], 'gold': ['R3', 'R105'], 'stone': ['R2', 'R106']}
 
     # Declare exception
     exception = ''
 
-    for i, word in enumerate(words[:]):
+    i = 0
+    while i < len(words):
+        word = words[i]
+
         # Skip useless words
-        #if word in ['and', 'but', 'have', 'has']:
-        #    continue
+        if word in ['and', 'but', 'have', 'has']:
+            i += 1
+            continue
 
         # Search for exception
-        #print(word)
         if '(' in word:
             exception = '-'
 
-        # Search for unit categories
+        matched = False
+
+        # === Unit Categories ===
         for category in unit_categories:
             category_words = category.split()
-
-            # Check if current word matches the start of a category
             if word == category_words[0]:
-                # Slice the next N words from the string to compare
                 following = words[i:i+len(category_words)]
-
-                # Matching category
                 if following == category_words:
                     bonus_items.append(unit_categories[category])
-
-        y = 0
-        while y < len(words):
-            phrase = words[y]
-            matched_units = []
-            tried_phrases = set()
-        
-            def normalize_variants(p):
-                variants = {p.lower().removesuffix('-line').removesuffix('-lines').removesuffix('-').removesuffix(')')}
-                if p.endswith('ies'):
-                    variants.add(p[:-3] + 'y')
-                if p.endswith('s') and not p.endswith('ss'):
-                    variants.add(p[:-1])
-                if 'men' in p:
-                    variants.add(p.replace('men', 'man'))
-                return variants
-        
-            # Try expanding the phrase word by word
-            for j in range(y + 1, len(words) + 1):
-                for variant in normalize_variants(phrase):
-                    if variant not in tried_phrases:
-                        tried_phrases.add(variant)
-                        unit_ids = get_unit_line_ids(variant)
-                        if unit_ids and all(isinstance(uid, int) for uid in unit_ids):
-                            matched_units.append([f'U{exception}{uid}' for uid in unit_ids])
-        
-                if matched_units:
-                    bonus_items.append(matched_units)
-                    del words[y:j]
-                    y -= 1
+                    i += len(category_words)
+                    matched = True
                     break
-                
-                if j < len(words):
-                    phrase += f' {words[j]}'
-        
-            y += 1
+        if matched:
+            continue
 
-        # Reset exception
-        if ')' in word:
-            exception = '-'
+        # === Individual Units ===
+        phrase = ''
+        matched = False
 
-        # Search for numbers
+        for j in range(i, len(words)):
+            try:
+                phrase = f"{phrase} {words[j]}".strip().lower()
+
+                # Filter unit list to ones that match the phrase exactly
+                matching_units = list(filter(lambda u: get_unit_name(u.id).lower() == phrase, DATA.civs[1].units))
+
+                if matching_units:
+                    bonus_items.append([f'U{u.id}' for u in matching_units])
+                    i = j + 1
+                    matched = True
+                    break
+            except:
+                pass
+            
+        if matched:
+            continue
+
+        # === Numbers ===
         if any(char.isdigit() for char in word):
             old_numbers = word.split('/')
-
-            # Set negative and percent
             negative = '-' in word
             percent = '%' in word
 
@@ -526,17 +510,15 @@ def create_bonus(bonus_string_original, civ_id):
                 else:
                     if negative:
                         number *= -1
-
                 temp_numbers.append(f'N{number}')
 
             bonus_items.append(temp_numbers)
+            i += 1
+            continue
 
-        # Search for ages
+        # === Ages ===
         if any(age in word for age in ('dark', 'feudal', 'castle', 'imperial')):
-            # Split up multiple ages
             old_ages = word.split('/')
-
-            # Convert each of the ages into a tech ID
             temp_ages = []
             for age in old_ages:
                 if age == 'dark':
@@ -547,26 +529,34 @@ def create_bonus(bonus_string_original, civ_id):
                     temp_ages.append('A102')
                 elif age == 'imperial':
                     temp_ages.append('A103')
-
-            # Add the temp ages list
             bonus_items.append(temp_ages)
+            i += 1
+            continue
 
-        # Search for resources
+        # === Resources ===
         if word in resource_dictionary:
-            bonus_items.append(f'R{resource_dictionary[word]}')
+            bonus_items.append(resource_dictionary[word])
+            i += 1
+            continue
 
-        # Search for stats
+        # === Stats ===
         for key in stat_dictionary:
             key_words = key.split()
-
-            # Check if the current word matches the start of a dictionary key
             if word == key_words[0]:
-                # Slice the next N words to match the full key
                 following = words[i:i+len(key_words)]
-
-                # Add the confirmed match
                 if following == key_words:
-                    bonus_items.append([stat_dictionary[key]])
+                    bonus_items.append(stat_dictionary[key])
+                    i += len(key_words)
+                    matched = True
+                    break
+        if matched:
+            continue
+
+        # Reset exception
+        if ')' in word:
+            exception = '-'
+
+        i += 1
 
     # Print the result
     print(f'{bonus_string_original}: {bonus_items}')
@@ -1803,15 +1793,82 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 except:
                     pass
 
+    # Enable the pasture for Mongols, Berbers, Huns, and Cumans
+    DATA.techs[1008].civ = -1
+    for effect in [effect_ for effect_ in DATA.effects if "tech tree" in effect_.name.lower()]:
+        name = effect.name.lower()
+        if any(group in name for group in ['mongols', 'berbers', 'huns', 'cumans']):
+            # Disable farms and farm upgrades
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 216))
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 12))
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 13))
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 14))
+        else:
+            # Disable pasture
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1008))
+            
     # Write the architecture sets to a file
     with open(f'{MOD_FOLDER}/{mod_name}.pkl', 'wb') as file:
         for civ in DATA.civs:
             if civ.name != 'Gaia' and civ.name != 'Spartans' and civ.name != 'Athenians' and civ.name != 'Achaemenids':
                 pickle.dump(civ.units, file)
 
-    # Correct name mistakes for the Britons and the Franks
+    # Remove the Dragon Ship upgrade for the Chinese
+    DATA.techs[1010].effect_id = -1
+    for i, ec in enumerate(DATA.effects[257].effect_commands):
+        if ec.type == 102 and ec.d == 246:
+            DATA.effects[257].effect_commands.pop(i)
+            break
+
+    # Create the Canoe, War Canoe, and Elite War Canoe units, techs, and effects
+    '''base_unit = DATA.civs[1].units[778]
+    for civ in DATA.civs:
+        # Canoe
+        civ.units.append(base_unit)
+        civ.units[-1].creatable.train_location_id = 45
+        civ.units[-1].creatable.button_id = 4
+
+        # War Canoe
+        civ.units.append(base_unit)
+        civ.units[-1].creatable.train_location_id = 45
+        civ.units[-1].creatable.button_id = 4
+        civ.units[-1].standing_graphic = civ.units[1302].standing_graphic
+        civ.units[-1].dying_graphic = civ.units[1302].dying_graphic
+        civ.units[-1].undead_graphic = civ.units[1302].undead_graphic
+        civ.units[-1].dead_fish.walking_graphic = civ.units[1302].dead_fish.walking_graphic
+        civ.units[-1].dead_fish.running_graphic = civ.units[1302].dead_fish.running_graphic
+        civ.units[-1].icon_id = civ.units[1302].icon_id
+
+        # Elite War Canoe
+        civ.units.append(base_unit)
+        civ.units[-1].creatable.train_location_id = 45
+        civ.units[-1].creatable.button_id = 4
+        civ.units[-1].standing_graphic = civ.units[1302].standing_graphic
+        civ.units[-1].dying_graphic = civ.units[1302].dying_graphic
+        civ.units[-1].undead_graphic = civ.units[1302].undead_graphic
+        civ.units[-1].dead_fish.walking_graphic = civ.units[1302].dead_fish.walking_graphic
+        civ.units[-1].dead_fish.running_graphic = civ.units[1302].dead_fish.running_graphic
+        civ.units[-1].icon_id = civ.units[1302].icon_id
+
+    # Set civilisations to canoe docks by disabling all other warships
+    for effect_id in [447, 489, 3]:
+        for tech_id in [232, 235, 631, 233, 173, 374]:
+            DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(type=102, a=-1, b=-1, c=-1, d=tech_id))
+
+        # Swap galley-line for canoe-line
+        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(type=3, a=539 , b=len(DATA.civs[1].units)-3, c=-1, d=-1))
+        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(type=3, a=21 , b=len(DATA.civs[1].units)-2, c=-1, d=-1))
+        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(type=3, a=442 , b=len(DATA.civs[1].units)-1, c=-1, d=-1))'''
+
+    # Correct name mistakes
     DATA.civs[1].name = 'Britons'
     DATA.civs[2].name = 'Franks'
+    DATA.civs[16].name = 'Maya'
+    DATA.effects[449].name = 'Maya Tech Tree'
+    DATA.effects[489].name = 'Maya Team Bonus'
+    DATA.civs[21].name = 'Inca'
+    DATA.effects[3].name = 'Inca Tech Tree'
+    DATA.effects[4].name = 'Inca Team Bonus'
 
     # Rename existing civ bonuses
     preexisting_bonuses = [381, 382, 403, 383]
@@ -1840,7 +1897,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
     # Save changes
     with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Formatting Mod', total_steps=100)
-    #DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
 
     # Open the new mod
     if revert:
@@ -1930,26 +1986,41 @@ def main():
             all_civs = []
             with open(MOD_STRINGS, 'r') as file:
                 lines = file.readlines()
-                for i in range(len(DATA.civs) - 1):
-                    all_civs.append(rf'{lines[i][7:-2]}')
+                for civ in DATA.civs:
+                    if civ.name != 'Gaia' and civ.name != 'Athenians' and civ.name != 'Spartans' and civ.name != 'Achaemenids':
+                        all_civs.append(civ.name)
 
                 while True:
-                    readline.set_completer(make_completer(all_civs))
-                    readline.parse_and_bind("tab: complete")
-                    selection = input("\nEnter civilization ID or name: ").lower()
+                    while True:
+                        readline.set_completer(make_completer(all_civs))
+                        readline.parse_and_bind("tab: complete")
+                        selection = input("\nEnter civilization ID or name: ").lower()
 
-                    # Convert word to index
-                    if selection in [opt.lower() for opt in all_civs]:
-                        selection = int([opt.lower() for opt in all_civs].index(selection))
+                        # Convert word to index
+                        if selection in [opt.lower() for opt in all_civs]:
+                            selection = int([opt.lower() for opt in all_civs].index(selection))
+                            break
 
-                    # Help
-                    if selection == '?':
-                        for i, allciv in enumerate(all_civs):
-                            print(f"{i}: {allciv}")
-                        continue
-                    elif int(selection) < len(DATA.civs):
+                        # Help
+                        elif selection == '?':
+                            for i, allciv in enumerate(all_civs):
+                                print(f"{i}: {allciv}")
+                            continue
+
+                        # Check to break loop
+                        elif int(selection) < len(DATA.civs) - 4:
+                            break
+                        elif selection == '':
+                            continue
+                        else:
+                            print(colour(Fore.RED, 'ERROR: Invalid entry.'))
+                            continue
+                        
+                    if int(selection) < len(DATA.civs):
                         # Use the civilization ID
                         selected_civ_index = int(selection)
+                        if selected_civ_index > 44:
+                            selected_civ_index += 3
                         selected_civ_name = lines[selected_civ_index][7:-2]
                         break
                     else:
@@ -1972,7 +2043,9 @@ def main():
             # Edit civilisation
             try:
                 edit_civ_index = int(selection)
-                if 0 <= edit_civ_index < len(DATA.civs):
+                if int(selection) > 44:
+                    edit_civ_index += 3
+                if 0 <= edit_civ_index < len(DATA.civs) - 1:
                     # Edit civilisation menu
                     while True:
                         # Get current unique unit
@@ -1997,7 +2070,7 @@ def main():
                         # Get current architecture
                         def get_architecture_list(unit_id):
                             # Get the graphic of the unit
-                            unit_id = int(DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic[0])
+                            unit_id = int(DATA.civs[edit_civ_index + 1].units[unit_id].standing_graphic[0])
 
                             # Determine which architecture set is currently being used
                             # KEY: (university: 209, castle: 82, wonder: 276)
@@ -2014,9 +2087,10 @@ def main():
                                 current_language = sound_item.filename.split('_')[0]
 
                         # Print the civilization menu
-                        #print(f'{get_unit_name(1105)}: {get_unit_categories(1105)}')
                         # TEST BONUS
-                        create_bonus(rf'Shepherds work +25% faster', selected_civ_index)
+                        #create_bonus(rf'Shepherds work +25% faster', selected_civ_index)
+                        #create_bonus(rf'Town centers cost -50% wood starting in Castle Age', selected_civ_index)
+                        #create_bonus(rf'Foot Archers +1/+2 range in Castle/Imperial Age', selected_civ_index)
                         print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Edit {selected_civ_name} 🌺🌺🌺'))
                         print(colour(Fore.WHITE, f"0️⃣  Name") + f" -- {colour(Fore.BLUE, selected_civ_name)}")
                         print(colour(Fore.WHITE, f"1️⃣  Title") + f" -- {colour(Fore.BLUE, description_lines[0])}")
@@ -2584,10 +2658,11 @@ def main():
                                 ['Poenari Castle'],
                                 ['Aachen Cathedral', 'Dome of the Rock', 'Dormition Cathedral', 'Gol Gumbaz', 'Minaret of Jam', 'Pyramid', 'Quimper Cathedral', 'Sankore Madrasah', 'Tower of London'],
                                 [],
+                                [],
                             ]
 
                             # User prompts
-                            architecture_types = ["General", "Castle", "Wonder", 'Monk', 'Monastery']
+                            architecture_types = ["General", "Castle", "Wonder", 'Monk', 'Monastery'] # Add types to here
                             architecture_changes = [-1] * len(architecture_types)
                             
                             for i in range(len(architecture_types)):
