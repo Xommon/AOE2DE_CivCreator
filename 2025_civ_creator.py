@@ -439,7 +439,7 @@ def create_bonus(bonus_string_original, civ_id):
     # Declare exception
     exception = ''
 
-    # Precompute at the start of the function (or cache globally if reused)
+    # Precompute at the start of the function
     unit_name_map = {}
     for unit in DATA.civs[1].units:
         try:
@@ -552,8 +552,21 @@ def create_bonus(bonus_string_original, civ_id):
             continue
 
         # === Resources ===
-        if word in resource_dictionary:
-            bonus_items.append(resource_dictionary[word])
+        if word == 'cost' or word == 'costs':
+            resources_added = 0
+            for word_ in words[i+1:]:
+                try:
+                    bonus_items.append(resource_dictionary[word_])
+                    resources_added += 1
+                except:
+                    pass
+            
+            # Add all resources if no resource is specified
+            if resources_added == 0:
+                for val in resource_dictionary.values():
+                    if val not in bonus_items:
+                        bonus_items.append(val)
+            
             i += 1
             continue
 
@@ -1955,7 +1968,14 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     DATA.effects[4].name = 'Inca Team Bonus'
 
     # Rename existing civ bonuses
-    preexisting_bonuses = [381, 382, 403, 383]
+    for i, tech in enumerate(DATA.techs):
+        if tech.name.startswith(('C-Bonus,', 'C-Bonus')):
+            tech.name = tech.name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()}:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()}:')
+
+        # Try to rename the effect as well
+        DATA.effects[tech.effect_id].name = DATA.effects[tech.effect_id].name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()}:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()}:')
+
+    '''preexisting_bonuses = [381, 382, 403, 383]
     new_existing_bonus_names = [
         r'BRITONS: Town Centers cost -50% wood starting in the Castle Age',
         r'BRITONS: Foot archers (except skirmishers) +1 range in Castle Age',
@@ -1964,7 +1984,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         ]
     for i, tech_id in enumerate(preexisting_bonuses):
         DATA.techs[tech_id].name = new_existing_bonus_names[i]
-        DATA.effects[DATA.techs[tech_id].effect_id].name = new_existing_bonus_names[i]
+        DATA.effects[DATA.techs[tech_id].effect_id].name = new_existing_bonus_names[i]'''
 
     # Fix the Tech Tree JSON names
     with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
@@ -2031,6 +2051,13 @@ def main():
     # Mod menu
     mod_name = MOD_FOLDER.split('/')[-1]
     while True:
+        # TEST BONUS
+        create_bonus(rf'Mule Carts cost -25%', 0)
+        #create_bonus(rf'Mule Cart technologies are +40% more effective', 0)
+        #create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', 0)
+        #create_bonus(rf'First Fortified Church receives a free Relic', 0)
+        #create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
+
         # Display selected mod menu
         print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 {mod_name} Menu 🌺🌺🌺'))
         print(colour(Fore.WHITE, "0️⃣  Edit Civilization"))
@@ -2171,13 +2198,6 @@ def main():
                                 current_language = sound_item.filename.split('_')[0]
 
                         # Print the civilization menu
-                        # TEST BONUS
-                        create_bonus(rf'Mule Carts cost -25%', selected_civ_index)
-                        create_bonus(rf'Mule Cart technologies are +40% more effective', selected_civ_index)
-                        create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', selected_civ_index)
-                        create_bonus(rf'First Fortified Church receives a free Relic', selected_civ_index)
-                        create_bonus(rf'Galley-line and Dromons fire an additional projectile', selected_civ_index)
-
                         print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Edit {selected_civ_name} 🌺🌺🌺'))
                         print(colour(Fore.WHITE, f"0️⃣  Name") + f" -- {colour(Fore.BLUE, selected_civ_name)}")
                         print(colour(Fore.WHITE, f"1️⃣  Title") + f" -- {colour(Fore.BLUE, description_lines[0])}")
