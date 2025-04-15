@@ -407,7 +407,7 @@ def make_completer(options_list):
         return matches[state] if state < len(matches) else None
     return completer
 
-# Bonuses
+# Create bonuses
 def create_bonus(bonus_string_original, civ_id):
     # Bonus object
     class bonus_object:
@@ -430,17 +430,23 @@ def create_bonus(bonus_string_original, civ_id):
     # Split the bonus string into words
     words = bonus_string.lower().split()
 
-    # Unit categories
-    unit_categories = {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13']}
-
     # Stat dictionary
-    stat_dictionary = {'hit points': 'S0', 'hp': 'S0', 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': 'S5', 'pierce armor': 'S8.0768', 'armor vs. cavalry archers': 'S8.7168', 'armor vs. elephants': 'S8.128', 'armor vs. infantry': 'S8.0256', 'armor vs. cavalry': 'S8.2048', 'armor vs. archers': 'S8.384', 'armor vs. ships': 'S8.4096', 'armor vs. siege': 'S8.512', 'armor vs. gunpowder': 'S8.5888', 'armor vs. spearmen': 'S8.6912', 'armor vs. eagles': 'S8.7424', 'armor vs. camels': 'S8.768', 'armor': 'S8.1024', 'attack': 'S9', 'range': ['S1', 'S12', 'S23'], 'minimum range': 'S20', 'train': 'S101', 'work': 'S13'}
+    stat_dictionary = {'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13']}
 
     # Resource dictionary
     resource_dictionary = {'food': ['R0', 'R103'], 'wood': ['R1', 'R104'], 'gold': ['R3', 'R105'], 'stone': ['R2', 'R106']}
 
     # Declare exception
     exception = ''
+
+    # Precompute at the start of the function (or cache globally if reused)
+    unit_name_map = {}
+    for unit in DATA.civs[1].units:
+        try:
+            name = get_unit_name(unit.id).lower()
+            unit_name_map.setdefault(name, []).append(f"U{unit.id}")
+        except:
+            continue
 
     i = 0
     while i < len(words):
@@ -458,38 +464,50 @@ def create_bonus(bonus_string_original, civ_id):
         matched = False
 
         # === Unit Categories ===
-        for category in unit_categories:
-            category_words = category.split()
-            if word == category_words[0]:
-                following = words[i:i+len(category_words)]
-                if following == category_words:
-                    bonus_items.append(unit_categories[category])
-                    i += len(category_words)
-                    matched = True
-                    break
-        if matched:
-            continue
+        phrase = ''
+        best_match = ''
+
+        # Expand word by word from index i
+        for j in range(i, len(words)):
+            phrase = f"{phrase} {words[j]}".strip()
+            if phrase in UNIT_CATEGORIES:
+                best_match = phrase
+
+        # If a match was found, add its values
+        if best_match:
+            bonus_items.append(UNIT_CATEGORIES[best_match])
+            i += len(best_match.split())
+            continue  # Continue to next word after processing best match
 
         # === Individual Units ===
-        phrase = ''
-        matched = False
+        def normalise_variants(p):
+            variants = {p}
+            if p.endswith('ies'):
+                variants.add(p[:-3] + 'y')
+            if p.endswith('s') and not p.endswith('ss'):
+                variants.add(p[:-1])
+            if 'men' in p:
+                variants.add(p.replace('men', 'man'))
+            return variants
+
+        best_unit_match = []
+        best_unit_match_length = 0
 
         for j in range(i, len(words)):
-            try:
-                phrase = f"{phrase} {words[j]}".strip().lower()
+            phrase = ' '.join(words[i:j+1]).strip().lower()
+            variants = normalise_variants(phrase)
 
-                # Filter unit list to ones that match the phrase exactly
-                matching_units = list(filter(lambda u: get_unit_name(u.id).lower() == phrase, DATA.civs[1].units))
-
-                if matching_units:
-                    bonus_items.append([f'U{u.id}' for u in matching_units])
-                    i = j + 1
-                    matched = True
-                    break
-            except:
-                pass
+            for variant in variants:
+                if variant in unit_name_map:
+                    best_unit_match = unit_name_map[variant]
+                    best_unit_match_length = j - i + 1
+                    break  # take the first good match for performance
+            if best_unit_match:
+                break  # stop expanding once a match is found
             
-        if matched:
+        if best_unit_match:
+            bonus_items.append(best_unit_match)
+            i += best_unit_match_length
             continue
 
         # === Numbers ===
@@ -1364,6 +1382,72 @@ def open_mod(mod_folder):
             except EOFError:
                 break
 
+    # Define the base unit categories
+    global UNIT_CATEGORIES
+    UNIT_CATEGORIES = {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13'], 'villagers': ['C4'], 'camel units': ['U282', 'U556'], 'mule carts': ['U1808']}
+
+    # Add additional units
+    for unit in DATA.civs[1].units:
+        try:
+            unit_buildings = {
+                87: 'archery range units', 12: 'barracks units', 101: 'stable units',
+                104: 'monastery units', 49: 'siege workshop units', 45: 'dock units', 82: 'castle units'
+            }
+
+            if unit.creatable.train_location_id in unit_buildings:
+                key = unit_buildings[unit.creatable.train_location_id]
+                UNIT_CATEGORIES.setdefault(key, []).append(f'U{unit.id}')
+
+            # Unit lines
+            unit_line = get_unit_line(unit.id).lower()
+            if unit_line and unit.creatable.train_location_id != 82:
+                UNIT_CATEGORIES.setdefault(unit_line, []).append(f'U{unit.id}')
+
+            # Elephants and Camels
+            name = get_unit_name(unit.id).lower()
+            if 'elephant' in name:
+                UNIT_CATEGORIES.setdefault('elephant units', []).append(f'U{unit.id}')
+            if 'camel' in name:
+                UNIT_CATEGORIES.setdefault('camel units', []).append(f'U{unit.id}')
+        except:
+            pass
+
+    # Remove entries with one or fewer items
+    UNIT_CATEGORIES = {k: v for k, v in UNIT_CATEGORIES.items() if len(v) > 1}
+
+    # Convert 2 item lists
+    for key in list(UNIT_CATEGORIES.keys()):
+        if len(UNIT_CATEGORIES[key]) == 2 and key.endswith('-'):
+            new_key = key[:-1] + 's'
+            UNIT_CATEGORIES[new_key] = UNIT_CATEGORIES.pop(key)
+
+    # Define the base technologies
+    global TECH_CATEGORIES
+    TECH_CATEGORIES = {}
+
+    # Load tech categories
+    for tech in DATA.techs:
+        try:
+            tech_buildings = {
+                87: 'archery range technologies', 12: 'barracks technologies', 101: 'stable technologies',
+                104: 'monastery technologies', 49: 'siege workshop technologies', 45: 'dock technologies', 82: 'castle technologies',
+                103: 'blacksmith technologies', 209: 'university technologies', 109: 'town center technologies',
+                584: 'mining camp technologies', 562: 'lumber camp technologies', 68: 'mill technologies', 84: 'market technologies'
+            }
+
+            if tech.research_location in tech_buildings:
+                key = tech_buildings[tech.research_location]
+                TECH_CATEGORIES.setdefault(key, []).append(f'T{DATA.techs.index(tech)}')
+        except:
+            pass
+
+    # Add combined technology lists
+    TECH_CATEGORIES.setdefault('mule cart technologies', []).extend(TECH_CATEGORIES['mining camp technologies'] + TECH_CATEGORIES['lumber camp technologies'])
+    TECH_CATEGORIES.setdefault('economic technologies', []).extend(TECH_CATEGORIES['mining camp technologies'] + TECH_CATEGORIES['lumber camp technologies'] + TECH_CATEGORIES['mill technologies'] + ['T22', 'T213', 'T85'])
+
+    # DEBUG: Print dictionary
+    #for key, value in TECH_CATEGORIES.items(): print(f"{key}: {value}")
+
     # Tell the user that the mod was loaded
     print('Mod loaded!')
 
@@ -1806,7 +1890,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         else:
             # Disable pasture
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1008))
-            
+
     # Write the architecture sets to a file
     with open(f'{MOD_FOLDER}/{mod_name}.pkl', 'wb') as file:
         for civ in DATA.civs:
@@ -2088,9 +2172,12 @@ def main():
 
                         # Print the civilization menu
                         # TEST BONUS
-                        #create_bonus(rf'Shepherds work +25% faster', selected_civ_index)
-                        #create_bonus(rf'Town centers cost -50% wood starting in Castle Age', selected_civ_index)
-                        #create_bonus(rf'Foot Archers +1/+2 range in Castle/Imperial Age', selected_civ_index)
+                        create_bonus(rf'Mule Carts cost -25%', selected_civ_index)
+                        create_bonus(rf'Mule Cart technologies are +40% more effective', selected_civ_index)
+                        create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', selected_civ_index)
+                        create_bonus(rf'First Fortified Church receives a free Relic', selected_civ_index)
+                        create_bonus(rf'Galley-line and Dromons fire an additional projectile', selected_civ_index)
+
                         print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Edit {selected_civ_name} 🌺🌺🌺'))
                         print(colour(Fore.WHITE, f"0️⃣  Name") + f" -- {colour(Fore.BLUE, selected_civ_name)}")
                         print(colour(Fore.WHITE, f"1️⃣  Title") + f" -- {colour(Fore.BLUE, description_lines[0])}")
