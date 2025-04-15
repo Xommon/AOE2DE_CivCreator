@@ -1767,6 +1767,42 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             except:
                 pass
 
+    # Change the Monastery and Monk graphics for the Vikings and Lithuanians
+    graphic_replacements = [1712, 1712, 1712, 1712, 1526, 1940, 1941, 1941, 1941, 1941]
+    unit_ids = [30, 31, 32, 104, 1421, 125, 286, 922, 1025, 1327]
+
+    for civ_id in [11, 35]:
+        for unit_id, replacement_id in zip(unit_ids, graphic_replacements):
+            target_unit = DATA.civs[civ_id].units[unit_id]
+            source_unit = DATA.civs[civ_id].units[replacement_id]
+
+            # Change icon
+            if unit_id >= 125 and unit_id <= 1327:
+                target_unit.icon_id = source_unit.icon_id
+
+            attributes = [
+                ("standing_graphic",),
+                ("dying_graphic",),
+                ("undead_graphic",),
+                ("damage_graphics",),
+                ("type_50", "attack_graphic"),
+                ("dead_fish", "walking_graphic"),
+                ("dead_fish", "running_graphic")
+            ]
+
+            for attr_path in attributes:
+                try:
+                    src = source_unit
+                    tgt = target_unit
+
+                    for attr in attr_path[:-1]:
+                        src = getattr(src, attr)
+                        tgt = getattr(tgt, attr)
+
+                    setattr(tgt, attr_path[-1], getattr(src, attr_path[-1]))
+                except:
+                    pass
+
     # Write the architecture sets to a file
     with open(f'{MOD_FOLDER}/{mod_name}.pkl', 'wb') as file:
         for civ in DATA.civs:
@@ -2551,7 +2587,7 @@ def main():
                             ]
 
                             # User prompts
-                            architecture_types = ["General", "Castle", "Wonder", 'Monk']
+                            architecture_types = ["General", "Castle", "Wonder", 'Monk', 'Monastery']
                             architecture_changes = [-1] * len(architecture_types)
                             
                             for i in range(len(architecture_types)):
@@ -2613,6 +2649,8 @@ def main():
                                     all_units_to_change = [276, 1445]
                                 elif i == 3: # Monk
                                     all_units_to_change = [125, 286, 922, 1025, 1327]
+                                elif i == 4: # Monastery
+                                    all_units_to_change = [30, 31, 32, 104, 1421]
                                 try:
                                     for unit_id in all_units_to_change:
                                         # Replace the unit or the graphics
