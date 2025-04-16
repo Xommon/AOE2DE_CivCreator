@@ -431,7 +431,7 @@ def create_bonus(bonus_string_original, civ_id):
     words = bonus_string.lower().split()
 
     # Stat dictionary
-    stat_dictionary = {'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13']}
+    stat_dictionary = {'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13']}
 
     # Resource dictionary
     resource_dictionary = {'food': ['R0', 'R103'], 'wood': ['R1', 'R104'], 'gold': ['R3', 'R105'], 'stone': ['R2', 'R106']}
@@ -552,23 +552,30 @@ def create_bonus(bonus_string_original, civ_id):
             continue
 
         # === Resources ===
-        if word == 'cost' or word == 'costs':
-            resources_added = 0
-            for word_ in words[i+1:]:
-                try:
-                    bonus_items.append(resource_dictionary[word_])
-                    resources_added += 1
-                except:
-                    pass
-            
-            # Add all resources if no resource is specified
-            if resources_added == 0:
-                for val in resource_dictionary.values():
-                    if val not in bonus_items:
-                        bonus_items.append(val)
-            
-            i += 1
-            continue
+        try:
+            bonus_items.append(resource_dictionary[word])
+        except:
+            if word == 'cost' or word == 'costs':
+                resources_added = 0
+                for word_ in words[i+1:]:
+                    try:
+                        # If another cost is announced, break up searching for resources
+                        if word_ == 'cost' or word_ == 'costs':
+                            break
+
+                        bonus_items.append(resource_dictionary[word_])
+                        resources_added += 1
+                    except:
+                        pass
+                    
+                # Add all resources if no resource is specified
+                if resources_added == 0:
+                    for val in resource_dictionary.values():
+                        if val not in bonus_items:
+                            bonus_items.append(val)
+
+                i += 1
+                continue
 
         # === Stats ===
         for key in stat_dictionary:
@@ -1397,7 +1404,11 @@ def open_mod(mod_folder):
 
     # Define the base unit categories
     global UNIT_CATEGORIES
-    UNIT_CATEGORIES = {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13'], 'villagers': ['C4'], 'camel units': ['U282', 'U556'], 'mule carts': ['U1808']}
+    UNIT_CATEGORIES = {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13'], 'villagers': ['C4'], 'camel units': ['U282', 'U556'], 'mule carts': ['U1808'], 'military units': ['C0', 'C55', 'C35', 'C6', 'C54', 'C13', 'C51', 'C36', 'C12']}
+
+    # Define the base technologies
+    global TECH_CATEGORIES
+    TECH_CATEGORIES = {}
 
     # Add additional units
     for unit in DATA.civs[1].units:
@@ -1413,8 +1424,26 @@ def open_mod(mod_folder):
 
             # Unit lines
             unit_line = get_unit_line(unit.id).lower()
+            base_unit_id = get_unit_id(get_unit_line(unit.id)[:-1])
             if unit_line and unit.creatable.train_location_id != 82:
                 UNIT_CATEGORIES.setdefault(unit_line, []).append(f'U{unit.id}')
+                UNIT_CATEGORIES.setdefault(unit_line + 'line', []).append(f'U{unit.id}')
+
+                # Add the unit-line upgrades
+                if any(unit_line[:-1].lower() == tech.name.lower() for tech in DATA.techs):
+                    print(unit_line + ' found!')
+                ##upgrade_techs = [i for i, tech in enumerate(DATA.techs) if tech.name.lower() == unit_line[:-1]]
+                '''if len(upgrade_techs) > 0:
+                    TECH_CATEGORIES.setdefault(unit_line + 'line upgrades', [])
+                    building_trainbutton_ids = [-1, 0]
+                    for ut in upgrade_techs:
+                        building_trainbutton_ids = [DATA.techs[ut].research_location, DATA.techs[ut].button_id]
+
+                        # Get all the techs with the same research location and button id
+                        if building_trainbutton_ids[0] != -1 and building_trainbutton_ids[1] != 0:
+                            print('success:', unit_line)
+                            matching_techs = [i for i, tech in enumerate(DATA.techs) if tech.research_location == building_trainbutton_ids[0] and tech.button_id == building_trainbutton_ids[1]]
+                            TECH_CATEGORIES[unit_line + 'line upgrades'].append(f"T{i}" for i in matching_techs)'''
 
             # Elephants and Camels
             name = get_unit_name(unit.id).lower()
@@ -1425,18 +1454,11 @@ def open_mod(mod_folder):
         except:
             pass
 
-    # Remove entries with one or fewer items
-    UNIT_CATEGORIES = {k: v for k, v in UNIT_CATEGORIES.items() if len(v) > 1}
-
     # Convert 2 item lists
     for key in list(UNIT_CATEGORIES.keys()):
         if len(UNIT_CATEGORIES[key]) == 2 and key.endswith('-'):
             new_key = key[:-1] + 's'
             UNIT_CATEGORIES[new_key] = UNIT_CATEGORIES.pop(key)
-
-    # Define the base technologies
-    global TECH_CATEGORIES
-    TECH_CATEGORIES = {}
 
     # Load tech categories
     for tech in DATA.techs:
@@ -1458,8 +1480,14 @@ def open_mod(mod_folder):
     TECH_CATEGORIES.setdefault('mule cart technologies', []).extend(TECH_CATEGORIES['mining camp technologies'] + TECH_CATEGORIES['lumber camp technologies'])
     TECH_CATEGORIES.setdefault('economic technologies', []).extend(TECH_CATEGORIES['mining camp technologies'] + TECH_CATEGORIES['lumber camp technologies'] + TECH_CATEGORIES['mill technologies'] + ['T22', 'T213', 'T85'])
 
+    # Combine the dictionaries
+    UNIT_CATEGORIES = UNIT_CATEGORIES | TECH_CATEGORIES
+
+    # Remove entries with one or fewer items
+    UNIT_CATEGORIES = {k: v for k, v in UNIT_CATEGORIES.items() if len(v) > 1}
+
     # DEBUG: Print dictionary
-    #for key, value in TECH_CATEGORIES.items(): print(f"{key}: {value}")
+    #for key, value in UNIT_CATEGORIES.items(): print(f"{key}: {value}")
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
@@ -2052,11 +2080,16 @@ def main():
     mod_name = MOD_FOLDER.split('/')[-1]
     while True:
         # TEST BONUS
-        create_bonus(rf'Mule Carts cost -25%', 0)
+        #create_bonus(rf'Mule Carts cost -25%', 0)
         #create_bonus(rf'Mule Cart technologies are +40% more effective', 0)
         #create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', 0)
         #create_bonus(rf'First Fortified Church receives a free Relic', 0)
         #create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
+        #create_bonus(rf'Start with +50 gold', 0)
+        #create_bonus("Villagers carry +3", 0)
+        #create_bonus("Military Units train +15% faster", 0)
+        #create_bonus("Monks gain +5 HP for each researched Monastery technology", 0)
+
 
         # Display selected mod menu
         print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 {mod_name} Menu 🌺🌺🌺'))
@@ -2790,15 +2823,14 @@ def main():
                                         print('Leave blank to leave the architecture type unchanged.\n')
                                         #print('Type \'default\' to switch back to the Civilization\'s original architecture.')
                                         continue
-                                    elif architecture_selection == '':
-                                        architecture_changes[i] = -1
-                                        break
 
                                     # Try to convert to an integer
                                     try:
                                         # Convert word to index
                                         if architecture_selection in [opt.lower() for opt in all_architectures]:
                                             architecture_selection = int([opt.lower() for opt in all_architectures].index(architecture_selection))
+                                        elif architecture_selection == '':
+                                            architecture_selection = -1
                                         else:
                                             architecture_selection = int(architecture_selection)
                                     except:
@@ -2806,7 +2838,7 @@ def main():
                                         continue
 
                                     # Check against architecture options
-                                    if architecture_selection > -1 and architecture_selection < len(all_architectures):
+                                    if architecture_selection >= -1 and architecture_selection < len(all_architectures):
                                         architecture_changes[i] = architecture_selection
                                         break
                                     else:
@@ -2823,20 +2855,13 @@ def main():
                                     continue
 
                                 # Specify which unit IDs need to change
-                                if i == 0: # General
-                                    all_units_to_change = range(0, len(DATA.civs[1].units))
-                                elif i == 1: # Castle
-                                    all_units_to_change = [82, 1430]
-                                elif i == 2: # Wonder
-                                    all_units_to_change = [276, 1445]
-                                elif i == 3: # Monk
-                                    all_units_to_change = [125, 286, 922, 1025, 1327]
-                                elif i == 4: # Monastery
-                                    all_units_to_change = [30, 31, 32, 104, 1421]
+                                unit_bank = {0: range(0, len(DATA.civs[1].units)), 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [13, 1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
+                                all_units_to_change = unit_bank[i]
+                                
                                 try:
-                                    for unit_id in all_units_to_change:
+                                    for y, unit_id in enumerate(all_units_to_change):
                                         # Replace the unit or the graphics
-                                        if architecture_changes[i] < len(base_architectures) + 1:
+                                        if architecture_changes[i] < len(base_architectures):
                                             # Base units
                                             if i == 0 or i == 3:
                                                 DATA.civs[selected_civ_index + 1].units[unit_id] = ARCHITECTURE_SETS[architecture_changes[i]][unit_id]
@@ -2846,17 +2871,30 @@ def main():
                                                 DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].damage_graphics
                                         else:
                                             # Custom units
-                                            if i == 0 or i == 3:
-                                                DATA.civs[selected_civ_index + 1].units[unit_id] = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])]
-                                            else:
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].standing_graphic
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].dying_graphic
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = DATA.civs[1].units[get_unit_id(all_architectures[architecture_changes[i]])].damage_graphics
+                                            try:
+                                                # Find the custom unit
+                                                if y == 0:
+                                                    # Built unit
+                                                    custom_unit_id = get_unit_id(custom_arcs[i][architecture_changes[i] - len(base_architectures)])
+                                                elif y == 1:
+                                                    # Rubble unit
+                                                    custom_rubbles = {'Poenari Castle': 1488, 'Aachen Cathedral': 1517, 'Dome of the Rock': 1482, 'Dormition Cathedral': 1493, 'Gol Gumbaz': 1487, 'Minaret of Jam': 1530, 'Pyramid': 1515, 'Quimper Cathedral': 1489, 'Sankore Madrasah': 1491, 'Tower of London': 1492}
+                                                    custom_unit_id = custom_rubbles[custom_arcs[i][architecture_changes[i] - len(base_architectures)]]
+
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = DATA.civs[1].units[custom_unit_id].standing_graphic
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = DATA.civs[1].units[custom_unit_id].dying_graphic
+                                                DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = DATA.civs[1].units[custom_unit_id].damage_graphics
+                                            except Exception as e:
+                                                print(str(e))
                                 except Exception as e:
                                     print(str(e))
+
                             # Save changes
-                            with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
-                            print(f"Architecture changed for {selected_civ_name}.")
+                            if architecture_changes != [-1] * len(architecture_types):
+                                with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                print(f"Architecture changed for {selected_civ_name}.")
+                            else:
+                                print(f"Architecture was not changed for {selected_civ_name}.")
                             time.sleep(1)
 
                         # Language
