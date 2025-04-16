@@ -1424,26 +1424,23 @@ def open_mod(mod_folder):
 
             # Unit lines
             unit_line = get_unit_line(unit.id).lower()
-            base_unit_id = get_unit_id(get_unit_line(unit.id)[:-1])
             if unit_line and unit.creatable.train_location_id != 82:
                 UNIT_CATEGORIES.setdefault(unit_line, []).append(f'U{unit.id}')
                 UNIT_CATEGORIES.setdefault(unit_line + 'line', []).append(f'U{unit.id}')
 
-                # Add the unit-line upgrades
-                if any(unit_line[:-1].lower() == tech.name.lower() for tech in DATA.techs):
-                    print(unit_line + ' found!')
-                ##upgrade_techs = [i for i, tech in enumerate(DATA.techs) if tech.name.lower() == unit_line[:-1]]
-                '''if len(upgrade_techs) > 0:
-                    TECH_CATEGORIES.setdefault(unit_line + 'line upgrades', [])
-                    building_trainbutton_ids = [-1, 0]
-                    for ut in upgrade_techs:
-                        building_trainbutton_ids = [DATA.techs[ut].research_location, DATA.techs[ut].button_id]
+            # Add the unit-line upgrades
+            unit_line_ids = get_unit_line_ids(unit_line[:-1])
+            tech_ids = {
+                unit.get("Trigger Tech ID")
+                for unit in FOREST
+                if unit.get("Node ID") in unit_line_ids and unit.get("Trigger Tech ID") is not None
+            }
 
-                        # Get all the techs with the same research location and button id
-                        if building_trainbutton_ids[0] != -1 and building_trainbutton_ids[1] != 0:
-                            print('success:', unit_line)
-                            matching_techs = [i for i, tech in enumerate(DATA.techs) if tech.research_location == building_trainbutton_ids[0] and tech.button_id == building_trainbutton_ids[1]]
-                            TECH_CATEGORIES[unit_line + 'line upgrades'].append(f"T{i}" for i in matching_techs)'''
+            # Clean the list of blanks
+            tech_ids = [f'T{x}' for x in tech_ids if x != -1]
+
+            if tech_ids:
+                TECH_CATEGORIES.setdefault(f"{unit_line}line upgrades", []).extend(tech_ids)
 
             # Elephants and Camels
             name = get_unit_name(unit.id).lower()
@@ -1483,11 +1480,15 @@ def open_mod(mod_folder):
     # Combine the dictionaries
     UNIT_CATEGORIES = UNIT_CATEGORIES | TECH_CATEGORIES
 
+    # Remove duplicated items
+    UNIT_CATEGORIES = {k: list(dict.fromkeys(v)) for k, v in UNIT_CATEGORIES.items()}
+
     # Remove entries with one or fewer items
-    UNIT_CATEGORIES = {k: v for k, v in UNIT_CATEGORIES.items() if len(v) > 1}
+    UNIT_CATEGORIES = {k: v for k, v in UNIT_CATEGORIES.items() if isinstance(v, list) and len(v) > 1}
 
     # DEBUG: Print dictionary
-    #for key, value in UNIT_CATEGORIES.items(): print(f"{key}: {value}")
+    #for key, value in UNIT_CATEGORIES.items():
+    #    print(f'{key}: {value}')
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
@@ -2080,7 +2081,7 @@ def main():
     mod_name = MOD_FOLDER.split('/')[-1]
     while True:
         # TEST BONUS
-        #create_bonus(rf'Mule Carts cost -25%', 0)
+        create_bonus(rf'Mule Carts cost -25%', 0)
         #create_bonus(rf'Mule Cart technologies are +40% more effective', 0)
         #create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', 0)
         #create_bonus(rf'First Fortified Church receives a free Relic', 0)
@@ -2089,7 +2090,6 @@ def main():
         #create_bonus("Villagers carry +3", 0)
         #create_bonus("Military Units train +15% faster", 0)
         #create_bonus("Monks gain +5 HP for each researched Monastery technology", 0)
-
 
         # Display selected mod menu
         print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 {mod_name} Menu 🌺🌺🌺'))
