@@ -33,6 +33,7 @@ import sys
 from colorama import Fore, Style, Back, init
 from collections import defaultdict
 import readline
+import copy
 
 class Civ:
     def __init__(self, civ_id, buildings, units):
@@ -1754,7 +1755,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             pass
 
     # Add new strings for unit names
-    ORIGINAL_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-strings-utf8.txt'
+    '''ORIGINAL_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-strings-utf8.txt'
     with open(ORIGINAL_STRINGS, 'r+') as file:
         lines = file.readlines()
         for line in lines:
@@ -1804,7 +1805,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             
         file.seek(0)         # Go back to start of file
         file.writelines(lines)
-        file.truncate()      # Remove any extra content after the new end
+        file.truncate()      # Remove any extra content after the new end'''
 
     # Genie elements
     AttackOrArmor = genieutils.unit.AttackOrArmor
@@ -1868,7 +1869,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 line_dictionary[key] = line
 
     # Write modded strings based on filter conditions
-    with open(MOD_STRINGS, 'w') as modded_file:
+    with open(MOD_STRINGS, 'w+') as modded_file:
         # Write name strings
         for i in range(len(DATA.civs)):
             try:
@@ -1882,6 +1883,23 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 modded_file.write(line_dictionary[120150 + i])
             except:
                 pass
+
+    # Remove the Caravansarai text for the Persians/Hindustanis
+    with open(MOD_STRINGS, 'r+') as modded_file:
+        modded_strings = modded_file.readlines()
+        modded_file.seek(0)  # rewind to start
+        for line in modded_strings:
+            line = line.replace('• Can build Caravanserai in Imperial Age', '')
+            modded_file.write(line)
+        modded_file.truncate()
+
+    # Make the Caravansarai potentially available to all civs
+    DATA.techs[518].civ = -1
+    DATA.techs[552].effect_id = -1
+    DATA.techs[552].name = 'Caravansarai (DISABLED)'
+    for effect in [effect for effect in DATA.effects if 'tech tree' in effect.name.lower()]:
+        if 'persians' not in effect.name.lower() and 'hindustanis' not in effect.name.lower():
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 518))
 
     # Change the Monastery and Monk graphics for the Vikings and Lithuanians
     graphic_replacements = [1712, 1712, 1712, 1712, 1526, 1940, 1941, 1941, 1941, 1941]
@@ -1902,6 +1920,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 ("undead_graphic",),
                 ("damage_graphics",),
                 ("type_50", "attack_graphic"),
+                ("type_50", "attack_graphic_2"),
                 ("dead_fish", "walking_graphic"),
                 ("dead_fish", "running_graphic")
             ]
@@ -1947,44 +1966,78 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             break
 
     # Create the Canoe, War Canoe, and Elite War Canoe units, techs, and effects
-    '''base_unit = DATA.civs[1].units[778]
+    base_unit = DATA.civs[1].units[778]
     for civ in DATA.civs:
         # Canoe
-        civ.units.append(base_unit)
-        civ.units[-1].creatable.train_location_id = 45
-        civ.units[-1].creatable.button_id = 4
+        canoe = copy.deepcopy(base_unit)
+        canoe.creatable.train_location_id = 45
+        canoe.creatable.button_id = 4
+        civ.units.append(canoe)
 
         # War Canoe
-        civ.units.append(base_unit)
-        civ.units[-1].creatable.train_location_id = 45
-        civ.units[-1].creatable.button_id = 4
-        civ.units[-1].standing_graphic = civ.units[1302].standing_graphic
-        civ.units[-1].dying_graphic = civ.units[1302].dying_graphic
-        civ.units[-1].undead_graphic = civ.units[1302].undead_graphic
-        civ.units[-1].dead_fish.walking_graphic = civ.units[1302].dead_fish.walking_graphic
-        civ.units[-1].dead_fish.running_graphic = civ.units[1302].dead_fish.running_graphic
-        civ.units[-1].icon_id = civ.units[1302].icon_id
+        war_canoe = copy.deepcopy(base_unit)
+        change_string(90000, 'War Canoe')
+        change_string(91000, 'Create War Canoe')
+        war_canoe.language_dll_name = 90000
+        war_canoe.language_dll_creation = 91000
+        war_canoe.name = 'War Canoe'
+        war_canoe.creatable.train_location_id = 45
+        war_canoe.creatable.button_id = 4
+        war_canoe.standing_graphic = civ.units[1302].standing_graphic
+        war_canoe.dying_graphic = civ.units[1302].dying_graphic
+        war_canoe.undead_graphic = civ.units[1302].undead_graphic
+        war_canoe.dead_fish.walking_graphic = civ.units[1302].dead_fish.walking_graphic
+        war_canoe.dead_fish.running_graphic = civ.units[1302].dead_fish.running_graphic
+        war_canoe.type_50.attack_graphic = civ.units[1302].type_50.attack_graphic
+        war_canoe.type_50.attack_graphic_2 = civ.units[1302].type_50.attack_graphic_2
+        war_canoe.icon_id = civ.units[1302].icon_id
+        war_canoe.type_50.max_range = 7
+        war_canoe.type_50.displayed_range = 7
+        war_canoe.type_50.attacks[2].amount = 8
+        war_canoe.type_50.displayed_attack = 8
+        war_canoe.hit_points = 90
+        civ.units.append(war_canoe)
 
         # Elite War Canoe
-        civ.units.append(base_unit)
-        civ.units[-1].creatable.train_location_id = 45
-        civ.units[-1].creatable.button_id = 4
-        civ.units[-1].standing_graphic = civ.units[1302].standing_graphic
-        civ.units[-1].dying_graphic = civ.units[1302].dying_graphic
-        civ.units[-1].undead_graphic = civ.units[1302].undead_graphic
-        civ.units[-1].dead_fish.walking_graphic = civ.units[1302].dead_fish.walking_graphic
-        civ.units[-1].dead_fish.running_graphic = civ.units[1302].dead_fish.running_graphic
-        civ.units[-1].icon_id = civ.units[1302].icon_id
+        elite_war_canoe = copy.deepcopy(base_unit)
+        change_string(92000, 'Elite War Canoe')
+        change_string(93000, 'Create Elite War Canoe')
+        elite_war_canoe.language_dll_name = 92000
+        elite_war_canoe.language_dll_creation = 93000
+        elite_war_canoe.name = 'Elite War Canoe'
+        elite_war_canoe.creatable.train_location_id = 45
+        elite_war_canoe.creatable.button_id = 4
+        elite_war_canoe.standing_graphic = civ.units[1302].standing_graphic
+        elite_war_canoe.dying_graphic = civ.units[1302].dying_graphic
+        elite_war_canoe.undead_graphic = civ.units[1302].undead_graphic
+        elite_war_canoe.dead_fish.walking_graphic = civ.units[1302].dead_fish.walking_graphic
+        elite_war_canoe.dead_fish.running_graphic = civ.units[1302].dead_fish.running_graphic
+        war_canoe.type_50.attack_graphic = civ.units[1302].type_50.attack_graphic
+        war_canoe.type_50.attack_graphic_2 = civ.units[1302].type_50.attack_graphic_2
+        elite_war_canoe.icon_id = civ.units[1302].icon_id
+        elite_war_canoe.type_50.max_range = 9
+        elite_war_canoe.type_50.displayed_range = 9
+        elite_war_canoe.type_50.attacks[2].amount = 9
+        elite_war_canoe.type_50.displayed_attack = 9
+        elite_war_canoe.creatable.total_projectiles = 3
+        elite_war_canoe.hit_points = 110
+        civ.units.append(elite_war_canoe)
 
     # Set civilisations to canoe docks by disabling all other warships
     for effect_id in [447, 489, 3]:
-        for tech_id in [232, 235, 631, 233, 173, 374]:
-            DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(type=102, a=-1, b=-1, c=-1, d=tech_id))
+        # Disable the warships
+        for tech_id in [604, 243, 246, 605, 244, 37, 376]:
+            DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
 
         # Swap galley-line for canoe-line
-        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(type=3, a=539 , b=len(DATA.civs[1].units)-3, c=-1, d=-1))
-        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(type=3, a=21 , b=len(DATA.civs[1].units)-2, c=-1, d=-1))
-        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(type=3, a=442 , b=len(DATA.civs[1].units)-1, c=-1, d=-1))'''
+        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 539 , len(DATA.civs[1].units)-3, -1, -1))
+        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 21 , len(DATA.civs[1].units)-2, -1, -1))
+        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 442 , len(DATA.civs[1].units)-1, -1, -1))
+
+    # Allow the Aztecs to train the Elite War Canoe
+    for i, ec in enumerate(DATA.effects[447].effect_commands):
+        if ec.type == 102 and ec.d == 35:
+            DATA.effects[447].effect_commands.pop(i)
 
     # Correct name mistakes
     DATA.civs[1].name = 'Britons'
