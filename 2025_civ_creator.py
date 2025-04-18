@@ -34,6 +34,7 @@ from colorama import Fore, Style, Back, init
 from collections import defaultdict
 import readline
 import copy
+from datetime import datetime
 
 class Civ:
     def __init__(self, civ_id, buildings, units):
@@ -432,7 +433,7 @@ def create_bonus(bonus_string_original, civ_id):
     words = bonus_string.lower().split()
 
     # Stat dictionary
-    stat_dictionary = {'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13']}
+    stat_dictionary = {'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13'], 'heal': ['S13']}
 
     # Resource dictionary
     resource_dictionary = {'food': ['R0', 'R103'], 'wood': ['R1', 'R104'], 'gold': ['R3', 'R105'], 'stone': ['R2', 'R106']}
@@ -598,7 +599,7 @@ def create_bonus(bonus_string_original, civ_id):
         i += 1
 
     # Print the result
-    print(f'{bonus_string_original}: {bonus_items}')
+    print(f'{colour(Fore.BLUE, (bonus_string_original + ':'))} {bonus_items}')
 
     # Set up the list
     #bonus_effect_commands = []
@@ -1405,7 +1406,7 @@ def open_mod(mod_folder):
 
     # Define the base unit categories
     global UNIT_CATEGORIES
-    UNIT_CATEGORIES = {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13'], 'villagers': ['C4'], 'camel units': ['U282', 'U556'], 'mule carts': ['U1808'], 'military units': ['C0', 'C55', 'C35', 'C6', 'C54', 'C13', 'C51', 'C36', 'C12']}
+    UNIT_CATEGORIES = {}
 
     # Define the base technologies
     global TECH_CATEGORIES
@@ -1486,6 +1487,9 @@ def open_mod(mod_folder):
 
     # Remove entries with one or fewer items
     UNIT_CATEGORIES = {k: v for k, v in UNIT_CATEGORIES.items() if isinstance(v, list) and len(v) > 1}
+
+    # Add manual items
+    UNIT_CATEGORIES = UNIT_CATEGORIES | {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13'], 'villagers': ['C4'], 'camel units': ['U282', 'U556'], 'mule carts': ['U1808'], 'military units': ['C0', 'C55', 'C35', 'C6', 'C54', 'C13', 'C51', 'C36', 'C12']}
 
     # DEBUG: Print dictionary
     #for key, value in UNIT_CATEGORIES.items():
@@ -1889,7 +1893,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         modded_strings = modded_file.readlines()
         modded_file.seek(0)  # rewind to start
         for line in modded_strings:
-            line = line.replace('• Can build Caravanserai in Imperial Age', '')
+            line = line.replace(r'• Can build Caravanserai in Imperial Age\n', '')
             modded_file.write(line)
         modded_file.truncate()
 
@@ -2102,9 +2106,13 @@ def main():
     except:
         pass
 
+    # Switch emoji based on the month
+    emoji_bank = {1: '⛄', 2: '💝', 3: '🍀', 4: '🌷', 5: '👒', 6: '🌺', 7: '🌴', 8: '🌻', 9: '🌾', 10: '🎃', 11: '🍂', 12: '🌲'}
+    title_emoji = emoji_bank[datetime.now().month] * 3
+
     # Main menu
     while True:
-        print(colour(Back.CYAN, Style.BRIGHT, '🌺🌺🌺 Talofa - Age of Empires II Civilisation Editor 🌺🌺🌺'))
+        print(colour(Back.BLUE, Style.BRIGHT, f'{title_emoji} Talofa - Age of Empires II Civilization Editor {title_emoji}'))
         global MOD_FOLDER
         if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
             print(colour(Fore.WHITE ,f'0️⃣  Open "{previous_mod_name}"'))
@@ -2135,17 +2143,18 @@ def main():
     while True:
         # TEST BONUS
         create_bonus(rf'Mule Carts cost -25%', 0)
-        #create_bonus(rf'Mule Cart technologies are +40% more effective', 0)
-        #create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', 0)
-        #create_bonus(rf'First Fortified Church receives a free Relic', 0)
-        #create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
-        #create_bonus(rf'Start with +50 gold', 0)
-        #create_bonus("Villagers carry +3", 0)
-        #create_bonus("Military Units train +15% faster", 0)
-        #create_bonus("Monks gain +5 HP for each researched Monastery technology", 0)
+        create_bonus(rf'Mule Cart technologies are +40% more effective', 0)
+        create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', 0)
+        create_bonus(rf'First Fortified Church receives a free Relic', 0)
+        create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
+
+        create_bonus(rf'Demolition Ships +20% blast radius; Galley-line and Dromons +1 range', 0)
+        create_bonus(rf'Infantry (except Spearman-line) +30 HP; Warrior Priests heal +100% faster', 0)
+        create_bonus(rf'Infantry +2 line of sight', 0)
+
 
         # Display selected mod menu
-        print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 {mod_name} Menu 🌺🌺🌺'))
+        print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} {mod_name} Menu {title_emoji}'))
         print(colour(Fore.WHITE, "0️⃣  Edit Civilization"))
         print(colour(Fore.WHITE, "1️⃣  Revert Mod"))
         print(colour(Fore.WHITE, "2️⃣  Open Mod Directory"))
@@ -2284,7 +2293,7 @@ def main():
                                 current_language = sound_item.filename.split('_')[0]
 
                         # Print the civilization menu
-                        print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Edit {selected_civ_name} 🌺🌺🌺'))
+                        print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Edit {selected_civ_name} {title_emoji}'))
                         print(colour(Fore.WHITE, f"0️⃣  Name") + f" -- {colour(Fore.BLUE, selected_civ_name)}")
                         print(colour(Fore.WHITE, f"1️⃣  Title") + f" -- {colour(Fore.BLUE, description_lines[0])}")
                         print(colour(Fore.WHITE, f"2️⃣  Bonuses"))
@@ -3001,7 +3010,7 @@ def main():
                             # Import the tech tree
                             while True:
                                 # Tech tree main menu
-                                print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Tech Tree Menu 🌺🌺🌺'))
+                                print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Tech Tree Menu {title_emoji}'))
                                 print(colour(Fore.WHITE, "0️⃣  Barracks"))
                                 print(colour(Fore.WHITE, "1️⃣  Archery Range"))
                                 print(colour(Fore.WHITE, "2️⃣  Stable"))
@@ -3039,7 +3048,7 @@ def main():
 
                                     # Track printed lines to avoid duplicates
                                     seen = set()
-                                    print(colour(Back.CYAN, Style.BRIGHT, f'\n🌺🌺🌺 Tech Tree Branch Menu 🌺🌺🌺'))
+                                    print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Tech Tree Branch Menu {title_emoji}'))
 
                                     # Add the host building
                                     current_building_id = building_ids[int(tech_tree_selection)]
