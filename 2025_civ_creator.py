@@ -1594,6 +1594,17 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'w', encoding='utf-8') as file:
         file.write(cleaned)
 
+    # Update the civilizations.json file
+    with open(rf'{MOD_FOLDER}/resources/_common/dat/civilizations.json', 'r+') as file:
+        # Edit the names
+        raw = file.read()
+        cleaned = raw.replace(r'"MAGYAR"', r'"MAGYARS"').replace(r'"INDIANS"', r'"HINDUSTANIS"')
+
+        # Write to file
+        file.seek(0)
+        file.write(cleaned)
+        file.truncate()
+
     # Copy over custom sounds
     sounds_source_folder = os.path.join(os.path.dirname(__file__), 'sounds')  # Path to the original 'sounds' folder
     sounds_destination_folder = os.path.join(MOD_FOLDER, 'resources/_common/drs/sounds')  # Path to the new 'sounds' folder in the mod folder
@@ -1759,8 +1770,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             pass
 
     # Add new strings for unit names
-    '''ORIGINAL_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-strings-utf8.txt'
-    with open(ORIGINAL_STRINGS, 'r+') as file:
+    ORIGINAL_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-strings-utf8.txt'
+    '''with open(ORIGINAL_STRINGS, 'r+') as file:
         lines = file.readlines()
         for line in lines:
             if '400042' in line:
@@ -2142,15 +2153,15 @@ def main():
     mod_name = MOD_FOLDER.split('/')[-1]
     while True:
         # TEST BONUS
-        create_bonus(rf'Mule Carts cost -25%', 0)
-        create_bonus(rf'Mule Cart technologies are +40% more effective', 0)
-        create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', 0)
-        create_bonus(rf'First Fortified Church receives a free Relic', 0)
-        create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
+        #create_bonus(rf'Mule Carts cost -25%', 0)
+        #create_bonus(rf'Mule Cart technologies are +40% more effective', 0)
+        #create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', 0)
+        #create_bonus(rf'First Fortified Church receives a free Relic', 0)
+        #create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
 
-        create_bonus(rf'Demolition Ships +20% blast radius; Galley-line and Dromons +1 range', 0)
-        create_bonus(rf'Infantry (except Spearman-line) +30 HP; Warrior Priests heal +100% faster', 0)
-        create_bonus(rf'Infantry +2 line of sight', 0)
+        #create_bonus(rf'Demolition Ships +20% blast radius; Galley-line and Dromons +1 range', 0)
+        #create_bonus(rf'Infantry (except Spearman-line) +30 HP; Warrior Priests heal +100% faster', 0)
+        #create_bonus(rf'Infantry +2 line of sight', 0)
 
 
         # Display selected mod menu
