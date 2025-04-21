@@ -35,6 +35,7 @@ from collections import defaultdict
 import readline
 import copy
 from datetime import datetime
+import ollama
 
 class Civ:
     def __init__(self, civ_id, buildings, units):
@@ -212,7 +213,7 @@ def get_unit_id(name):
                 except:
                     pass
 
-def get_unit_categories(name):
+'''def get_unit_categories(name):
     # Switch name to id
     if int(name) != name:
         unit_index = get_unit_id(name)
@@ -279,7 +280,7 @@ def get_unit_categories(name):
         pass
 
     # Return the categories
-    return categories
+    return categories'''
         
 def get_tech_id(name):
     # Search with internal_name
@@ -342,38 +343,49 @@ def change_string(index, new_string):
         mod_file.writelines(mod_lines)
         mod_file.truncate()  # Ensure remaining old content is removed
 
-def get_unit_line(unit_id, civ_index=None):
-    final_unit = None
+def get_unit_line(unit_id):
+    # Convert name to ID if needed
+    if isinstance(unit_id, str):
+        unit_id = get_unit_id(unit_id)
+
+    # Step 1: Walk down to the base unit
+    base_unit = None
+    current_id = unit_id
     visited_ids = set()
 
-    # Convert name to ID if a string is passed
-    if isinstance(unit_id, str):
-        unit_id = get_unit_id(unit_id) 
-
-    while unit_id != -1 and unit_id not in visited_ids:
-        visited_ids.add(unit_id)
-        found = False
-
-        # Choose civ to search in
-        civs_to_search = [CIV_OBJECTS[civ_index]] if civ_index is not None else CIV_OBJECTS
-
-        for civ in civs_to_search:
-            for unit in civ.units:
-                if unit.get("Node ID") == unit_id:
-                    final_unit = unit
-                    unit_id = unit.get("Link ID", -1)
-                    found = True
-                    break
-            if found:
-                break
-
-        if not found:
+    while True:
+        unit = next((u for u in FOREST if u.get("Node ID") == current_id), None)
+        if not unit or current_id in visited_ids:
             break
 
-    if final_unit:
-        return f'{final_unit.get('Name')}-'
-    else:
-        return None
+        visited_ids.add(current_id)
+        link_id = unit.get("Link ID", -1)
+        if link_id == -1:
+            base_unit = unit
+            break
+        else:
+            current_id = link_id
+
+    if not base_unit:
+        return []
+
+    # Start the result list with the base unit's Node ID
+    unit_line = [base_unit.get("Node ID")]
+
+    # Step 2: Walk up from the base unit
+    queue = [base_unit.get("Node ID")]
+    while queue:
+        current = queue.pop(0)
+        for unit in FOREST:
+            if unit.get("Link ID") == current:
+                trigger_tech_id = unit.get("Trigger Tech ID", -1)
+                if trigger_tech_id != -1:
+                    node_id = unit.get("Node ID")
+                    if node_id not in unit_line:
+                        unit_line.append(node_id)
+                        queue.append(node_id)
+
+    return unit_line
     
 def get_unit_line_ids(name):
     # Convert to unit index
@@ -382,23 +394,16 @@ def get_unit_line_ids(name):
     else:
         unit_index = get_unit_id(name)
 
-    # Search for unit lines in the forest
+    base_id = DATA.civs[1].units[unit_index].base_id
     node_ids = []
-    visited = set()
 
-    def dfs(current_id):
-        for unit in FOREST:
-            if unit.get("Link ID") == current_id:
-                next_id = unit.get("Node ID")
-                if next_id not in visited:
-                    node_ids.append(next_id)
-                    visited.add(next_id)
-                    dfs(next_id)
+    for unit in DATA.civs[1].units:
+        if unit.base_id == base_id:
+            trigger_tech_id = unit.get("Trigger Tech ID", -1)
+            link_id = unit.get("Link ID", -1)
 
-    # Include the starting ID itself
-    node_ids.append(unit_index)
-    visited.add(unit_index)
-    dfs(unit_index)
+            if trigger_tech_id != -1 or link_id == -1:
+                node_ids.append(unit.id)
 
     return node_ids
 
@@ -410,6 +415,8 @@ def make_completer(options_list):
     return completer
 
 # Create bonuses
+import requests
+
 def create_bonus(bonus_string_original, civ_id):
     # Bonus object
     class bonus_object:
@@ -433,10 +440,16 @@ def create_bonus(bonus_string_original, civ_id):
     words = bonus_string.lower().split()
 
     # Stat dictionary
-    stat_dictionary = {'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13'], 'heal': ['S13']}
+    stat_dictionary = {'an additional projectile': ['N1', 'S107', 'S102'], 'blast radius': 'S22', 'additional projectiles': ['S107', 'S102'], 'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13'], 'heal': ['S13']}
 
     # Resource dictionary
     resource_dictionary = {'food': ['R0', 'R103'], 'wood': ['R1', 'R104'], 'gold': ['R3', 'R105'], 'stone': ['R2', 'R106']}
+
+    # Trigger dictionary
+    trigger_directionary = {'more effective': 'Xmore effective',
+                            'available one age earlier': 'Xone age earlier',
+                            'free relic': 'Xfree relic',
+                            }
 
     # Declare exception
     exception = ''
@@ -449,6 +462,12 @@ def create_bonus(bonus_string_original, civ_id):
             unit_name_map.setdefault(name, []).append(f"U{unit.id}")
         except:
             continue
+
+    # Add extra words to clarify meaning
+    for i, word in enumerate(words):
+        if str(word).endswith('-'):
+            if 'upgrade' in bonus_string or 'upgrades' in bonus_string:
+                words[i] = word + 'line upgrades'
 
     i = 0
     while i < len(words):
@@ -464,6 +483,17 @@ def create_bonus(bonus_string_original, civ_id):
             exception = '-'
 
         matched = False
+
+        # === Trigger Phrases ===
+        phrase = ''
+        best_match = ''
+        for j in range(i, len(words)):
+            phrase = f"{phrase} {words[j]}".strip()
+            if phrase in trigger_directionary:
+                best_match = phrase
+
+        if best_match:
+            bonus_items.append(trigger_directionary[best_match])
 
         # === Unit Categories ===
         phrase = ''
@@ -1425,18 +1455,18 @@ def open_mod(mod_folder):
                 UNIT_CATEGORIES.setdefault(key, []).append(f'U{unit.id}')
 
             # Unit lines
-            unit_line = get_unit_line(unit.id).lower()
-            if unit_line and unit.creatable.train_location_id != 82:
-                UNIT_CATEGORIES.setdefault(unit_line, []).append(f'U{unit.id}')
-                UNIT_CATEGORIES.setdefault(unit_line + 'line', []).append(f'U{unit.id}')
+            unit_line = get_unit_line(unit.id)
+            if unit.id in unit_line and unit.creatable.train_location_id != 82:
+                UNIT_CATEGORIES.setdefault(get_unit_name(unit_line[0]) + '-line', []).append(f'U{unit.id}')
+                UNIT_CATEGORIES.setdefault(get_unit_name(unit_line[0]) + '-', []).append(f'U{unit.id}')
 
             # Add the unit-line upgrades
-            unit_line_ids = get_unit_line_ids(unit_line[:-1])
+            '''unit_line_ids = get_unit_line_ids(unit_line[:-1])
             tech_ids = {
                 unit.get("Trigger Tech ID")
                 for unit in FOREST
                 if unit.get("Node ID") in unit_line_ids and unit.get("Trigger Tech ID") is not None
-            }
+            }'''
 
             # Clean the list of blanks
             tech_ids = [f'T{x}' for x in tech_ids if x != -1]
@@ -1489,14 +1519,15 @@ def open_mod(mod_folder):
     UNIT_CATEGORIES = {k: v for k, v in UNIT_CATEGORIES.items() if isinstance(v, list) and len(v) > 1}
 
     # Add manual items
-    UNIT_CATEGORIES = UNIT_CATEGORIES | {"foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13'], 'villagers': ['C4'], 'camel units': ['U282', 'U556'], 'mule carts': ['U1808'], 'military units': ['C0', 'C55', 'C35', 'C6', 'C54', 'C13', 'C51', 'C36', 'C12']}
+    UNIT_CATEGORIES = UNIT_CATEGORIES | {'demolition ships': [1104, 527, 528], 'fortified church': 'U1806', "foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13'], 'villagers': ['C4'], 'camel units': ['U282', 'U556'], 'mule carts': ['U1808'], 'military units': ['C0', 'C55', 'C35', 'C6', 'C54', 'C13', 'C51', 'C36', 'C12']}
 
     # DEBUG: Print dictionary
-    #for key, value in UNIT_CATEGORIES.items():
-    #    print(f'{key}: {value}')
+    for key, value in UNIT_CATEGORIES.items():
+        print(f'{key}: {value}')
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
+    #print(get_unit_line(473))
 
     # DEBUG: Print attributes of the unit
     #unit = DATA.civs[1].units[8].creatable.train_location_id
@@ -2117,6 +2148,8 @@ def main():
     except:
         pass
 
+    
+
     # Switch emoji based on the month
     emoji_bank = {1: '⛄', 2: '💝', 3: '🍀', 4: '🌷', 5: '👒', 6: '🌺', 7: '🌴', 8: '🌻', 9: '🌾', 10: '🎃', 11: '🍂', 12: '🌲'}
     title_emoji = emoji_bank[datetime.now().month] * 3
@@ -2153,15 +2186,14 @@ def main():
     mod_name = MOD_FOLDER.split('/')[-1]
     while True:
         # TEST BONUS
-        #create_bonus(rf'Mule Carts cost -25%', 0)
         #create_bonus(rf'Mule Cart technologies are +40% more effective', 0)
         #create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', 0)
-        #create_bonus(rf'First Fortified Church receives a free Relic', 0)
-        #create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
+        create_bonus(rf'First Fortified Church receives a free Relic', 0)
+        create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
 
-        #create_bonus(rf'Demolition Ships +20% blast radius; Galley-line and Dromons +1 range', 0)
-        #create_bonus(rf'Infantry (except Spearman-line) +30 HP; Warrior Priests heal +100% faster', 0)
-        #create_bonus(rf'Infantry +2 line of sight', 0)
+        create_bonus(rf'Demolition Ships +20% blast radius; Galley-line and Dromons +1 range', 0)
+        create_bonus(rf'Infantry (except Spearman-line) +30 HP; Warrior Priests heal +100% faster', 0)
+        create_bonus(rf'Infantry +2 line of sight', 0)
 
 
         # Display selected mod menu
@@ -3050,6 +3082,9 @@ def main():
                                     continue
 
                                 while True:
+                                    # Tech tree unit bank
+                                    tech_tree_unit_bank = []
+
                                     # Build mappings
                                     link_map = {unit.get("Link ID"): unit for unit in tree if unit.get("Link ID") is not None}
                                     node_map = {unit.get("Node ID"): unit for unit in tree if unit.get("Node ID") is not None}
@@ -3118,6 +3153,8 @@ def main():
                                     # Exit
                                     if branch_action == '':
                                         break
+                                    else:
+                                        pass
 
                                 '''while True:
                                     global TECH_TREE
