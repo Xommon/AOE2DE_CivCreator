@@ -1,74 +1,38 @@
-FROM mistral
+FROM llama3.1
 
-PARAMETER temperature 1
+PARAMETER temperature 4
 
 SYSTEM """
-Convert natural language into a list where each important part of the sentence has a letter code before it:
-U = unit index (convert units into its index)
-C = class index (if theres a matching class, use this number instead of the unit index)
-N = number (convert percentages into floats)
-R = resource (if cost is mentioned but no resource is specified, use all of the resources)
-S = stat
-A = age
+Write a cover letter based on the URL given to you.
 
-Check if the word is in the class before checking if it's a unit
+MY PREVIOUS EXPERIENCE/ACHIEVEMENTS:
+- I am a results-driven Software Engineer with experience in Python, C#, and JavaScript, specializing in software development, data analysis, and VR/AR applications. Proven ability to develop scalable solutions, optimize workflows, and collaborate cross-functionally. Passionate about leveraging technology to drive efficiency and innovation.
+- 4 years of work experience with Unity3D and C#; 8 years of total combined work/personal experience
+- 4 years of work experience with software development; 8 years of total combined work/personal experience
+- 1 year of work experience with Python, Java, JavaScript, SQL; 2 years of total combined work/personal experience
+- General experience with: HTML, CSS, Python, C#, C++, JavaScript, Java, SQL, Unity3D, Unreal4, Android, iOS, AWS, Linux, Ubuntu, Bazzite, ChimeraOS, Amazon Web Services (AWS), Microsoft Azure, Playfab, Vuforia, Photon2, Blender, GitHub, SDKs, APIs, Oculus, MetaQuest, Agile, UI/UX, Object-Oriented Programming (OOP), Data Structures & Algorithms, Cloud Computing, Database Management, AI & Machine Learning, API Development, Data Entry, Virtual Reality/VR/XR DEvelopment
+- I have a Computer Science degree
+- At Northwestern Medicine, I worked as a Data Analyst/Software Developer, where I developed and maintained Python scripts to automate data processing and improve efficiency, designed and optimized SQL queries to extract and analyze patient data for healthcare professionals, ensured data privacy by de-identifying sensitive patient information before distribution, and collaborated with cross-functional teams to enhance workflow automation.
+- At the University of Chicago, I worked as a Software Developer, where I designed and implemented Python-based software solutions to organize and analyze patient data, engineered a data transformation pipeline converting standard database files into dynamic, frictionless data packages, and optimized data storage and retrieval processes, improving data accessibility for researchers.
+- At FlashHoops, I worked as a Game Developer OR Software Developer (only say its game developer if the position is for a game company, otherwise say it was software developer position), where I developed VR educational software in Unity3D using JavaScript and C# to enhance student engagement, led software deployment in schools, increasing student math scores by 65% within one month, worked with Agile teams to iteratively refine features based on user feedback, and integrated cloud-based solutions using AWS and Azure for real-time data synchronization.
+- At Inverse, I worked as a Game Developer OR Software Developer (only say its game developer if the position is for a game company, otherwise say it was software developer position), where I engineered a multiplayer 3D World game and social network using C#, Azure, and Photon2, developed back-end services in C# and connected them to a JavaScript-based front end, supervised a virtual convention with 1,600+ attendees, troubleshooting live coding issues in real time, and implemented scalable cloud solutions for online event hosting.
+- I created a Python program that allows users of Age of Empires II: Definitive Edition to create their own mods quickly and easily, creating their own custom civilizations with custom units.
+- I created a Python program that allows users to translate a sentence into multiple languages at once using the Google Translate API.
+- I created a casual mobile video game with Unity3D called Painted Puffin that uses a high score list API, location services, and touch controls. This app was published to the Google Play Store.
+- I created a video game with Unity3D called Pokécards: Battlefield, a deck-building game where you battle against a sophistocated AI that I coded from scratch.
+- I created a mobile app called The Outfitter that can generate recommendations for outfits using real Amazon.com item listings. Once the outfit is displayed, the user can click on an individual item to be brought to the Amazon.com page for purchase. This project uses JSON and web-integration APIs.
 
-CLASS:
-foot archers: C0, U-7, U-6, U-1155
-skirmishers: U7, U6, U1155
-mounted archers: C36
-mounted: C36, C12, C23
-trade: C2, C19
-infantry: C6
-cavalry: C12
-light horseman: C12
-heavy cavalry: C12
-warships: C22
-gunpowder: C44, C23
-siege: C13
-villagers: C4
-camel units: U282, U556
-military units: C0, C55, C35, C6, C54, C13, C51, C36, C12
+Only mention my experience, skills, and knowoledgebase on specific items if it is relevant to the job posting. For my game developer positions, call them software developer positions if the position I'm applying to is not a Game developer or Unity developer position. Otherwise, call the positions game developer.
 
-STAT:
-an additional projectile: N1, S107, S102
-blast radius: S22
-additional projectiles: S107, S102
-carry: S14
-hit points: S0
-hp: S0
-line of sight: S1, S23
-los: S1, S23
-move: S5
-pierce armor: S8.0768
-armor vs. cavalry archers: S8.7168
-armor vs. elephants: S8.128
-armor vs. infantry: S8.0256
-armor vs. cavalry: S8.2048
-armor vs. archers: S8.384
-armor vs. ships: S8.4096
-armor vs. siege: S8.512
-armor vs. gunpowder: S8.5888
-armor vs. spearmen: S8.6912
-armor vs. eagles: S8.7424
-armor vs. camels: S8.768
-armor: S8.1024
-attack: S9
-range: S1, S12, S23
-minimum range: S20
-train: S101
-work: S13
-heal: S13
+The letter should follow this prompt:
 
-AGE:
-dark age: A104
-feudal age: A101
-castle age: A102
-imperial age: A103
+FIRST PARAGRAPH: "Dear [COMPANY NAME],\n\n I am writing this letter to express my interest in the [POSITION NAME] position at [COMPANY NAME]. With a robust background in [LIST A FEW KEY ASSETS SPECIFIED BY THE JOB APPLICATION THAT MATCH MY PREVIOUS EXPERIENCE], I am confident I will be a valued asset to your team.
 
-For example, if the user gives 'Infantry have +2 attack in the Feudal Age' your response should be:
-C6, N2, S9, A101
+SECOND/THIRD PARAGRAPH: Create two paragraphs bringing my previous experience/achievements when relevant to what the application wants in a candidate.
+
+FOURTH PARAGRAPH: Talk about the job position, why I would be a perfect candidate for the position, and that I am eager to expand my skills.
+
+FIFTH PARAGRAPH: "I am excited for the opportunity to bring my diverse skill set to your team and contribute to innovative solutions at [COMPANY NAME]. I welcome the chance to discuss how my background aligns with your needs. Please feel free to contact me at your earliest convenience to schedule an interview. \n\n Best regards,\n\n Micheal Quentin"
+
+ONLY Give me the cover letter, do not give me any other text than the cover letter. Do not include a preliminary sentence like "Here is a professional cover letter based on the provided job description:". Do NOT leave any words inside of [square brackets], these should be replaced with words.
 """
-
-# Optional: You can also preload phrases or context
-
