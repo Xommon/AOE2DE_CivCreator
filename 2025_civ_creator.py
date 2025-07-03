@@ -418,14 +418,6 @@ def make_completer(options_list):
 import requests
 
 def create_bonus(bonus_string_original, civ_id):
-    # Bonus object
-    class bonus_object:
-        def __init__(self, name=None, number=None, stat=None, age_stat=None):
-            self.name = name
-            self.number = number
-            self.stat = stat
-            self.age_stat = age_stat
-
     # Create an empty list for bonus objects
     bonus_items = []
 
@@ -628,702 +620,147 @@ def create_bonus(bonus_string_original, civ_id):
 
         i += 1
 
-    # Print the result
-    print(f'{colour(Fore.BLUE, (bonus_string_original + ':'))} {bonus_items}')
+    # DEBUG: Print bonus items
+    #print(f'{colour(Fore.BLUE, (bonus_string_original + ':'))} {bonus_items}')
+
+    # Create bonus lines
+    class Bonus_Line:
+        def __init__(self, category, unit, number, resource, stat, age, special):
+            self.category = category
+            self.unit = unit
+            self.number = number
+            self.resource = resource
+            self.stat = stat
+            self.age = age
+            self.special = special
+
+    # Initialize an empty list to hold the final bonus lines
+    bonus_lines = []
+    pending_numbers = []
+    pending_resources = []
+    pending_stats = []
+    pending_ages = []
+    pending_specials = []
+
+    current_units = []
+    current_categories = []
+
+    i = 0
+    while i < len(bonus_items):
+        item = bonus_items[i]
+
+        if isinstance(item, list):
+            for v in item:
+                if v.startswith("U"):
+                    # Flush all current combinations with previous anchors
+                    if current_units or current_categories:
+                        for num in pending_numbers or [None]:
+                            for res in pending_resources or [None]:
+                                for stat in pending_stats or [None]:
+                                    for age in pending_ages or [None]:
+                                        for spec in pending_specials or [None]:
+                                            for unit in current_units or [None]:
+                                                for cat in current_categories or [None]:
+                                                    bonus_lines.append(
+                                                        Bonus_Line(
+                                                            category=cat if cat is not None else -1,
+                                                            unit=unit if unit is not None else -1,
+                                                            number=num,
+                                                            resource=res,
+                                                            stat=stat,
+                                                            age=age,
+                                                            special=spec
+                                                        )
+                                                    )
+                    # Reset pending and set new anchor
+                    current_units = [int(v[1:])]
+                    current_categories = []
+                    pending_numbers = []
+                    pending_resources = []
+                    pending_stats = []
+                    pending_ages = []
+                    pending_specials = []
+                elif v.startswith("C"):
+                    if current_units or current_categories:
+                        for num in pending_numbers or [None]:
+                            for res in pending_resources or [None]:
+                                for stat in pending_stats or [None]:
+                                    for age in pending_ages or [None]:
+                                        for spec in pending_specials or [None]:
+                                            for unit in current_units or [None]:
+                                                for cat in current_categories or [None]:
+                                                    bonus_lines.append(
+                                                        Bonus_Line(
+                                                            category=cat if cat is not None else -1,
+                                                            unit=unit if unit is not None else -1,
+                                                            number=num,
+                                                            resource=res,
+                                                            stat=stat,
+                                                            age=age,
+                                                            special=spec
+                                                        )
+                                                    )
+                    current_categories = [int(v[1:])]
+                    current_units = []
+                    pending_numbers = []
+                    pending_resources = []
+                    pending_stats = []
+                    pending_ages = []
+                    pending_specials = []
+                elif v.startswith("N"):
+                    val = v[1:]
+                    if '.' in val:
+                        pending_numbers.append(float(val))
+                    else:
+                        pending_numbers.append(int(val))
+                elif v.startswith("R"):
+                    pending_resources.append(int(v[1:]))
+                elif v.startswith("S"):
+                    pending_stats.append(int(v[1:]))
+                elif v.startswith("A"):
+                    pending_ages.append(int(v[1:]))
+                elif v.startswith("X"):
+                    pending_specials.append(v[1:])
+        i += 1
+
+    # Finally, flush any remaining pending combos if there's a unit/category
+    if current_units or current_categories:
+        for num in pending_numbers or [None]:
+            for res in pending_resources or [None]:
+                for stat in pending_stats or [None]:
+                    for age in pending_ages or [None]:
+                        for spec in pending_specials or [None]:
+                            for unit in current_units or [None]:
+                                for cat in current_categories or [None]:
+                                    bonus_lines.append(
+                                        Bonus_Line(
+                                            category=cat if cat is not None else -1,
+                                            unit=unit if unit is not None else -1,
+                                            number=num,
+                                            resource=res,
+                                            stat=stat,
+                                            age=age,
+                                            special=spec
+                                        )
+                                    )
+
+    # DEBUG: Print Bonus Lines
+    #for line in bonus_lines:
+    #    print(f"Bonus_Line(category={line.category}, unit={line.unit}, number={line.number}, resource={line.resource}, stat={line.stat}, age={line.age})")
+
+    # Convert each bonus line into an effect command and/or a tech
+    for bonus_line in bonus_lines:
+        if isinstance(bonus_line.number, int):
+            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(4, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
+        elif isinstance(bonus_line.number, float):
+            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(5, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
+
+    print(final_effects[0].effect_commands)
 
     # Set up the list
     #bonus_effect_commands = []
     #bonus_string = bonus_string.lower()
 
-    # Bonus unit lines bank
-    '''bonus_unit_lines = {
-        # Categories
-        'all units': [0.5, 6.5, 12.5, 13.5, 18.5, 43.5, 19.5, 22.5, 2.5, 36.5, 51.5, 44.5, 54.5, 55.5, 35.5],
-        'military': [0.5, 35.5, 6.5, 36.5, 47.5, 12.5, 44.5, 23.5],
-        'infantry': [6.5],
-        #'villager': [4.5],
-        #'monk': [18.5, 43.5],
-        'all archers': [0.5],
-        'cavalry': [12.5, 23.5, 47.5, 36.5],
-        'cavalry archers': [36.5],
-        'ships': [2.5, 21.5, 22.5, 20.5, 53.5],
-        'boats': [2.5, 21.5, 22.5, 20.5, 53.5],
-        'stable': [12.5, 47.5],
-        'tower': [52.5],
-        'building': [3.5],
-
-        # Unit lines
-        'foot archers' : [4, 24, 492, 7, 6, 1155, 185, 8, 530, 73, 559, 763, 765, 866, 868, 1129, 1131, 1800, 1802, 850, -1, 493, -1],
-        'archers' : [4, 24, 492],
-        'archer-line' : [4, 24, 492],
-        'archer line' : [4, 24, 492],
-        'skirmishers' : [7, 6, 1155],
-        'skirmishers-line' : [7, 6, 1155],
-        'skirmishers line' : [7, 6, 1155],
-        'slingers' : [185],
-        'elephant archers' : [873, 875],
-        'elephant archer-line' : [873, 875],
-        'elephant archer line' : [873, 875],
-        'militia' : [74, 75, 76, 473, 567],
-        'militia-line' : [74, 75, 76, 473, 567],
-        'militia line' : [74, 75, 76, 473, 567],
-        'spearmen' : [93, 358, 359, 1786, 1787, 1788],
-        'spearmen-line' : [93, 358, 359, 1786, 1787, 1788],
-        'spearmen line' : [93, 358, 359, 1786, 1787, 1788],
-        'eagles' : [751, 753, 752],
-        'eagle-line' : [751, 753, 752],
-        'eagle line' : [751, 753, 752],
-        'eagle units' : [751, 753, 752],
-        'flemish militia' : [1699, 1663, 1697],
-        'war elephants' : [239, 558],
-        'war elephant-line' : [239, 558],
-        'war elephant line' : [239, 558],
-        'elephants' : [873, 875, 239, 558, 1120, 1122, 1132, 1134, 1744, 1746],
-        'elephant units' : [873, 875, 239, 558, 1120, 1122, 1132, 1134, 1744, 1746],
-        'ballista elephants' : [1120, 1122],
-        'battle elephants' : [1132, 1134],
-        'battle elephant-line' : [1132, 1134],
-        'battle elephant line' : [1132, 1134],
-        'armored elephants' : [1744, 1746],
-        'armored elephant-line' : [1744, 1746],
-        'armored elephant line' : [1744, 1746],
-        'armoured elephants' : [1744, 1746],
-        'armoured elephant-line' : [1744, 1746],
-        'armoured elephant line' : [1744, 1746],
-        'gunpowder units' : [5, 36, 420, 46, 691, 771, 773, 557, 1001, 1003, 831, 832, 1709, 1704, 1706],
-        'hand cannoneers' : [5],
-        'demolition ships' : [1104, 527, 528],
-        'demolition ship-line' : [1104, 527, 528],
-        'demolition ship line' : [1104, 527, 528],
-        'demolition-line' : [1104, 527, 528],
-        'demolition line' : [1104, 527, 528],
-        'fire ships' : [1103, 529, 532],
-        'fire ship line' : [1103, 529, 532],
-        'fire ship-line' : [1103, 529, 532],
-        'fire line' : [1103, 529, 532],
-        'fire-line' : [1103, 529, 532],
-        'demo-line' : [1104, 527, 528],
-        'demo line' : [1104, 527, 528],
-        'galley-line' : [539, 21, 442],
-        'galley line' : [539, 21, 442],
-        'gallies' : [539, 21, 442],
-        'dromons' : [1795],
-        'cannon galleons' : [420, 691],
-        'cannon galleon line' : [420, 691],
-        'cannon galleon-line' : [420, 691],
-        'warrior priest' : [1811, 1831],
-        'monk' : [1811, 1826, 1827],
-        'non-unique barracks units' : [74, 75, 76, 473, 567, 93, 358, 359, 1786, 1787, 1788, 751, 753, 752],
-        'scouts' : [448, 546, 441, 1707],
-        'scout-line' : [448, 546, 441, 1707],
-        'scout line' : [448, 546, 441, 1707],
-        'steppe lancers' : [1370, 1372],
-        'rathas' : [1738, 1740, 1759, 1761],
-        'trade units' : [17, 128, 204],
-        'canoes' : [],
-        'canoe-line' : [],
-        'canoe line' : [],
-        'camels' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
-        'camel units' : [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263],
-        'villagers' : [83, 293, 590, 592, 123, 218, 122, 216, 56, 57, 120, 124, 354, 118, 212, 156, 220, 222, 214, 259, 579, 581],
-        'shepherds' : [590, 592],
-        'lumberjacks' : [123, 218],
-        'hunters' : [122, 216],
-        'fishermen' : [56, 57],
-        'foragers' : [120, 354],
-        'builders' : [118, 212],
-        'repairers' : [156, 222],
-        'farmers' : [214, 259],
-        'trebuchets' : [331, 42],
-
-        # Buildings
-        'buildings' : [30, 31, 32, 104, 71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617, 82, 103, 105, 18, 19, 209, 210, 84, 116, 137, 10, 14, 87, 49, 150, 12, 20, 132, 498, 86, 101, 153, 45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189, 598, 79, 234, 235, 236, 72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804, 117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192, 1251, 1665, 70, 191, 192, 463, 464, 465, 584, 585, 586, 587, 1808, 562, 563, 564, 565, 1646, 1711, 1720, 1734, 68, 129, 130, 131, 50],
-        'town centers' : [71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617],
-        'town centres' : [71, 141, 142, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617],
-        'castles' : [82],
-        'blacksmiths' : [103, 105, 18, 19],
-        'universities' : [209, 210],
-        'archery ranges' : [10, 14, 87],
-        'siege workshops' : [49, 150],
-        'barracks' : [12, 20, 132, 498],
-        'stables' : [86, 101, 153],
-        'docks' : [45, 47, 51, 133, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173, 1189],
-        'outposts' : [598],
-        'watch towers' : [79],
-        'guard towers' : [234],
-        'keeps' : [235],
-        'monasteries' : [30, 31, 32, 104],
-        'bombard towers' : [236],
-        'towers' : [79, 234, 235, 236],
-        'palisade walls' : [72, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802, 803, 804], # Including gates
-        'walls' : [117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491,659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192], # Including gates
-        'stone walls' : [117, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491,659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192], # Including gates
-        'kreposts' : [1251],
-        'donjons' : [1665],
-        'houses' : [70, 191, 192, 463, 464, 465],
-        'mining camps' : [584, 585, 586, 587],
-        'mule carts' : [1808],
-        'lumber camps' : [562, 563, 564, 565],
-        'markets' : [84, 116, 137, 1646],
-        'folwarks' : [1711, 1720, 1734],
-        'mills' : [68, 129, 130, 131],
-        'farms' : [50],
-        }
-    bonus_buildng_lines = {
-    # Buildings
-        
-    }
-
-    
-    # Extract units
-    primary_units = []
-    secondary_units = []
-    def get_bonus_units():
-        nonlocal primary_units, secondary_units
-        excluded_units = []
-
-        # Get the indexes of the parentheses
-        parentheses_positions = [bonus_string.find('('), bonus_string.find(')')]
-
-        # Check unit lines first
-        for unit_line in bonus_unit_lines:
-            # Get the index of the word
-            unit_line_index = bonus_string.find(unit_line)
-
-            if unit_line in bonus_string:
-                # Check for redundancies and false flags
-                if unit_line == 'archers' and bonus_string.find('cavalry archers') == unit_line_index - 8:
-                    continue
-                elif unit_line == 'cavalry' and bonus_string.find('cavalry archers') == unit_line_index:
-                    continue
-                
-                # Skip mentions of armour against a specific unit
-                elif bonus_string.find('against') == unit_line_index - len(unit_line) - 1:
-                    print(f'skipping {unit_line}')
-                    continue
-
-                # Add primary unit
-                if unit_line_index < parentheses_positions[0] or parentheses_positions == [-1, -1]:
-                    primary_units.extend(bonus_unit_lines[unit_line])
-
-                # Add secondary unit
-                elif unit_line_index > parentheses_positions[1]:
-                    secondary_units.extend(bonus_unit_lines[unit_line])
-
-        # Check for individual units
-        for i, unit in enumerate(DATA.civs[1].units):
-            try:
-                # Get the index of the word
-                unit_index = bonus_string.find(unit.name.lower())
-
-                # Singularise the unit name
-                current_unit_names = [get_unit_name(i).lower()]
-                if current_unit_names[0].endswith('ies'):
-                    current_unit_names.append(f'{current_unit_names[0][-3]}y')
-                elif current_unit_names[0].endswith('s'):
-                    current_unit_names.append(f'{current_unit_names[0][-1]}')
-                elif current_unit_names[0] == 'villager' or current_unit_names[0] == 'villagers':
-                    current_unit_names.append('villager (male)')
-
-                for name in current_unit_names:
-                    if name in bonus_string and name != '':
-                        # Add primary unit
-                        if unit_index < parentheses_positions[0] or parentheses_positions == [-1, -1]:
-                            primary_units.append(i)
-
-                        # Add secondary unit
-                        elif unit_index > parentheses_positions[1]:
-                            secondary_units.append(i)
-            except:
-                pass
-
-        # Add exception units
-        for i, unit in enumerate(DATA.civs[1].units):
-            try:
-                if get_unit_name(i).lower() in bonus_string and get_unit_name(i) != '':
-                    unit_line_index = bonus_string.find(get_unit_name(i).lower())
-
-                    if unit_line_index > parentheses_positions[0] and unit_line_index < parentheses_positions[1]:
-                        excluded_units.append(i)
-            except:
-                pass
-
-        #print('excluded units:', excluded_units)
-
-        # Remove duplicates
-        primary_units = list(set(primary_units))
-
-        # Remove excluded units
-        primary_units[:] = [x for x in primary_units if x not in excluded_units]
-
-    # Extract all buildings
-    bonus_buildings = []
-    def get_bonus_buildings():
-        # Set up buildings
-        for i, building in enumerate(bonus_buildng_lines):
-            if building in bonus_string:
-                bonus_buildings.extend(bonus_buildng_lines[building])
-
-    # Extract all technologies
-    bonus_techs = []
-    def get_bonus_techs():
-        for i, tech in enumerate(DATA.techs):
-            if tech.name.lower() in bonus_string and tech.name != '':
-                bonus_techs.append(i)
-
-    # Extract the number
-    bonus_number = [0, '+'] # Set default number to 0 and addition
-    def get_bonus_number():
-        for i, word in enumerate(bonus_string.split(' ')):
-            try:
-                bonus_number[0] = int(word.strip('%'))
-
-                # Change the percent into a usable number and set type of number
-                if '%' in word:
-                    bonus_number[0] = bonus_number[0] / 100
-                    bonus_number[1] = '*'
-                else:
-                    bonus_number[1] = '+'
-
-                # Look for 'more'/'less'
-                if (bonus_string.split(' ')[i + 1] == 'more' or bonus_string.split(' ')[i + 1] == 'faster') and bonus_number[1] == '*':
-                    bonus_number[0] = abs(bonus_number[0]) + 1
-                elif bonus_string.split(' ')[i + 1] == 'less' and bonus_number[1] == '+':
-                    bonus_number[0] = abs(bonus_number[0]) * -1
-                elif (bonus_string.split(' ')[i + 1] == 'less' or bonus_string.split(' ')[i + 1] == 'slower') and bonus_number[1] == '*':
-                    bonus_number[0] = 1 - bonus_number[0]
-
-                break
-            except:
-                continue
-
-    # Extract the tech resources
-    bonus_tech_resource = []
-    def get_bonus_tech_resource():
-        for word in bonus_string.split(' '):
-            if word == 'food':
-                bonus_tech_resource.append(0)
-            elif word == 'wood':
-                bonus_tech_resource.append(1)
-            elif word == 'stone':
-                bonus_tech_resource.append(2)
-            elif word == 'gold':
-                bonus_tech_resource.append(3)
-        
-        # Add all resources if none were found
-        if len(bonus_tech_resource) == 0:
-            bonus_tech_resource.append(0)
-            bonus_tech_resource.append(1)
-            bonus_tech_resource.append(2)
-            bonus_tech_resource.append(3)
-
-    # Extract the unit resource
-    bonus_unit_resource = []
-    def get_bonus_unit_resource():
-        for word in bonus_string.split(' '):
-            if word == 'food':
-                bonus_tech_resource.append(103)
-            elif word == 'wood':
-                bonus_tech_resource.append(104)
-            elif word == 'gold':
-                bonus_tech_resource.append(105)
-            elif word == 'stone':
-                bonus_tech_resource.append(106)
-        
-        # Add all resources if none were found
-        if len(bonus_unit_resource) == 0:
-            bonus_unit_resource.append(100)
-
-    # Extract the age
-    #total_ages = 0
-    def get_bonus_age():
-        if 'feudal' in bonus_string:
-            new_tuple = list(bonus_technology[0].required_techs)
-            new_tuple[0] = 101
-            bonus_technology[0].required_techs = new_tuple
-            bonus_technology[0].required_tech_count = 1
-            #total_ages += 1
-        if 'castle' in bonus_string:
-            new_tuple = list(bonus_technology[0].required_techs)
-            new_tuple[0] = 102
-            bonus_technology[0].required_techs = new_tuple
-            bonus_technology[0].required_tech_count = 1
-            #total_ages += 1
-        if 'imperial' in bonus_string:
-            new_tuple = list(bonus_technology[0].required_techs)
-            new_tuple[0] = 103
-            bonus_technology[0].required_techs = new_tuple
-            bonus_technology[0].required_tech_count = 1
-            #total_ages += 1
-
-    # Extract the stats
-    bonus_stats = []
-    def get_bonus_stats():
-        if 'hp' in bonus_string:
-            bonus_stats.append(0)
-        elif 'los' in bonus_string or 'line of sight' in bonus_string:
-            bonus_stats.append(1)
-            bonus_stats.append(23)
-        elif 'movement' in bonus_string or 'move' in bonus_string:
-            bonus_stats.append(5)
-        elif 'armor' in bonus_string or 'armour' in bonus_string:
-            armour_number = 8
-
-            # Get the specific kind of armour change
-            if 'pierce' in bonus_string:
-                armour_number += 0.0768
-            elif 'against cavalry archers' in bonus_string:
-                armour_number += 0.7168
-            elif 'against elephants' in bonus_string:
-                armour_number += 0.1280
-            elif 'against infantry' in bonus_string:
-                armour_number += 0.0256
-            elif 'against cavalry' in bonus_string:
-                armour_number += 0.2048
-            elif 'against archers' in bonus_string:
-                armour_number += 0.3840
-            elif 'against ships' in bonus_string or 'against warships' in bonus_string:
-                armour_number += 0.4096
-            elif 'against siege' in bonus_string:
-                armour_number += 0.5120
-            elif 'against gunpowder' in bonus_string:
-                armour_number += 0.5888
-            elif 'against spearmen' in bonus_string:
-                armour_number += 0.6912
-            elif 'against eagles' in bonus_string or 'against eagle' in bonus_string:
-                armour_number += 0.7424
-            elif 'against camel' in bonus_string:
-                armour_number += 0.7680
-
-                # Add Mamelukes to the category of camels
-                bonus_stats.append(8.8960 + bonus_number[0] / 10000)
-            else:
-                armour_number += 0.1024
-
-            # Add the number value to the armour
-            armour_number += bonus_number[0] / 10000
-
-            # Add the complex armour to the list
-            bonus_stats.append(armour_number)
-        elif 'attack' in bonus_string:
-            bonus_stats.append(9)
-        elif 'range' in bonus_string:
-            bonus_stats.append(12)
-            bonus_stats.append(23)
-        elif 'minimum range' in bonus_string or 'min range' in bonus_string:
-            bonus_stats.append(20)
-        elif 'train' in bonus_string or 'built' in bonus_string:
-            bonus_stats.append(101)
-
-        # Remove duplicates
-        #bonus_stats = list(dict.fromkeys(bonus_stats))
-
-    ## BONUS PROMPTS ##
-
-    # First [Fortified Church/Monastery] receives a free Relic
-    if 'first fortified church receives a free relic' in bonus_string or 'first monastery receives a free relic' in bonus_string:
-        # Create effect commands
-        bonus_effect_commands.append(genieutils.effect.EffectCommand(1, 234, 0, -1, 1))
-        bonus_effect_commands.append(genieutils.effect.EffectCommand(1, 283, 0, -1, 1))
-        bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 285, 104, 1, 0))
-        bonus_effect_commands.append(genieutils.effect.EffectCommand(1, 283, 0, -1, 0))
-    
-    # [Unit] [#/%] blast radius
-    elif 'blast radius' in bonus_string:
-        # Get items
-        get_bonus_units()
-        get_bonus_number()
-
-        # Break if no items were found
-        if len(primary_units) == 0 or bonus_number[0] == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: [Unit] [%] blast radius\033[0m")
-            return [], []
-        
-        # Get effect ID
-        if bonus_number[1] == '+':
-            effect_id = 4
-        elif bonus_number[1] == '*':
-            effect_id = 5
-
-        # Create effect commands
-        for unit_id in primary_units:
-            # Check for unit category
-            if int(unit_id) != unit_id:
-                unit_category_id = int(unit_id)
-                unit_id_post = -1
-            else:
-                unit_category_id = -1
-                unit_id_post = unit_id
-
-            # Add blast damage
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, 22, bonus_number[0]))
-
-    # [Technology] free
-    elif 'free' in bonus_string:
-        # Get items
-        get_bonus_techs()
-
-        # Break if no items were found
-        if len(bonus_techs) == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: [Technology] free\033[0m")
-            return [], []
-
-        # Create effect commands
-        for tech_id in bonus_techs:
-            # Remove cost
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 0, 0, 0))
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 1, 0, 0))
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 2, 0, 0))
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(101, tech_id, 3, 0, 0))
-
-            # Remove time
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(103, tech_id, 0, 0, 0))
-
-    # [Unit/Building] cost [%] ++ [Resource] ++ starting in the [Age]
-    elif 'cost' in bonus_string:
-        # Get items
-        get_bonus_units()
-        get_bonus_buildings()
-        get_bonus_number()
-        get_bonus_unit_resource()
-        get_bonus_age()
-
-        # Break if no items were found
-        if len(bonus_unit_lines) == 0 or bonus_number[0] == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: [Unit/Building] cost [%] ++ [Resource] ++ starting in the [Age]\033[0m")
-            return [], []
-
-        # Get effect ID
-        if bonus_number[1] == '+':
-            effect_id = 4
-        elif bonus_number[1] == '*':
-            effect_id = 5
-
-        # Create effect commands
-        for unit_id in primary_units:
-            # Check for unit category
-            if int(unit_id) != unit_id:
-                unit_category_id = int(unit_id)
-                unit_id_post = -1
-            else:
-                unit_category_id = -1
-                unit_id_post = unit_id
-
-            # Change cost
-            for resource in bonus_unit_resource:
-                bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, resource, bonus_number[0]))
-
-    # [Villager/Building] work [%] faster
-    elif 'work' in bonus_string or 'works' in bonus_string:
-        # Get items
-        get_bonus_units()
-        get_bonus_buildings()
-        get_bonus_number()
-
-        # Break if no items were found
-        if bonus_number[0] == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: [Villager/Building] work [%] faster\033[0m")
-            return [], []
-
-        # Get effect ID
-        if bonus_number[1] == '+':
-            effect_id = 4
-        elif bonus_number[1] == '*':
-            effect_id = 5
-
-        # Create effect commands
-        for unit_id in (primary_units + bonus_buildings):
-            # Check for unit category
-            if int(unit_id) != unit_id:
-                unit_category_id = int(unit_id)
-                unit_id_post = -1
-            else:
-                unit_category_id = -1
-                unit_id_post = unit_id
-
-            # Change work rate
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, 13, bonus_number[0]))
-
-    # [Villager] carry [#/%] more
-    elif 'carry' in bonus_string or 'carries' in bonus_string:
-        # Get items
-        get_bonus_units()
-        get_bonus_number()
-
-        # Break if no items were found
-        if bonus_number[0] == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: [Villager] carry [#/%] more\033[0m")
-            return [], []
-
-        # Get effect ID
-        if bonus_number[1] == '+':
-            effect_id = 4
-        elif bonus_number[1] == '*':
-            effect_id = 5
-
-        # Create effect commands
-        for unit_id in primary_units:
-            # Change work rate
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id, -1, 14, bonus_number[0]))
-
-    # Start with [#] [Resource]
-    elif 'start with' in bonus_string or 'starts with' in bonus_string:
-        # Get items
-        get_bonus_tech_resource()
-        get_bonus_number()
-
-        # Break if no items were found
-        if bonus_number[0] == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: Start with [#] [Resource]\033[0m")
-            return [], []
-
-        # Get effect ID
-        if bonus_number[1] == '+':
-            effect_id = 1
-        elif bonus_number[1] == '*':
-            effect_id = 6
-
-        # Create effect commands
-        for resource_id in bonus_tech_resource:
-            # Change work rate
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, 91 + resource_id, 1, -1, bonus_number[0]))
-
-    # Relics generate [%] gold
-    elif 'relics generate' in bonus_string or 'relic generates' in bonus_string:
-        # Get items
-        get_bonus_number()
-
-        # Break if no items were found
-        if bonus_number[0] == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: Relics generate [%] gold\033[0m")
-            return [], []
-
-        # Get effect ID
-        if bonus_number[1] == '+':
-            effect_id = 1
-        elif bonus_number[1] == '*':
-            effect_id = 6
-
-        # Create effect commands
-        bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, 191, 0, -1, bonus_number[0]))
-
-    # [Unit/Building] receive [%] less bonus damage
-    elif 'receive' in bonus_string and 'bonus damage' in bonus_string:
-        # Get items
-        get_bonus_units()
-        get_bonus_buildings()
-        get_bonus_number()
-
-        # Break if no items were found
-        if bonus_number[0] == 0 or len(primary_units) == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: [Unit] receive [%] less bonus damage\033[0m")
-            return [], []
-
-        # Create effect commands
-        for i, unit_id in enumerate(primary_units + bonus_buildings):
-            # Check for unit category
-            if int(unit_id) != unit_id:
-                unit_category_id = int(unit_id)
-                unit_id_post = -1
-            else:
-                unit_category_id = -1
-                unit_id_post = unit_id
-
-            bonus_effect_commands.append(genieutils.effect.EffectCommand(0, unit_id_post, unit_category_id, 24, 1 - bonus_number[0]))
-
-    # Town Centers spawn [#] villagers when the next Age is reached INACTIVE
-    elif 'spawn' in bonus_string and 'villagers when the next age is reached' in bonus_string:
-        # Get items
-        get_bonus_number()
-
-        # Break if no items were found
-        if bonus_number[0] == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: Town Centers spawn [#] villagers when the next age is reached\033[0m")
-            return [], []
-        
-        # Create a tech for each age
-        bonus_technology.append(bonus_technology[0])
-        bonus_technology.append(bonus_technology[0])
-        bonus_technology[0].required_techs = 101
-        bonus_technology[0].required_tech_count = 1
-        bonus_technology[1].required_techs = 102
-        bonus_technology[1].required_tech_count = 1
-        bonus_technology[2].required_techs = 103
-        bonus_technology[2].required_tech_count = 1
-
-        # Create effect commands
-        bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 83, 109, 2, 0))
-
-    # Town Centers spawn [#] villagers when reaching the [Age] INACTIVE
-    elif 'spawn' in bonus_string and 'villagers when reaching the' in bonus_string:
-        # Get items
-        get_bonus_number()
-        get_bonus_age()
-
-        # Break if no items were found
-        if bonus_number[0] == 0:
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            print("\033[31mTry using the format: Town Centers spawn [#] villagers when reaching the [Age]\033[0m")
-            return [], []
-
-        # Create effect commands
-        bonus_effect_commands.append(genieutils.effect.EffectCommand(7, 83, 109, bonus_number[0], 0))
-
-    # [Unit] have [#/%][Stat] ++ in the [Age]
-    else:
-        try:
-            # Get items
-            get_bonus_units()
-            get_bonus_buildings()
-            get_bonus_number()
-            get_bonus_stats()
-            get_bonus_age()
-
-            # Break if no items were found
-            if len(bonus_unit_lines) == 0 or bonus_number[0] == 0 or bonus_stats == []:
-                print("\033[31mERROR: Invalid bonus description.\033[0m")
-                print("\033[31mTry using the format: [Unit] have [#/%][Stat] ++ in the [Age]\033[0m")
-                return [], []
-
-            # Get effect ID
-            if bonus_number[1] == '+':
-                effect_id = 4
-            elif bonus_number[1] == '*':
-                effect_id = 5
-
-            # Create effect commands
-            for unit_id in (primary_units + bonus_buildings):
-                # Check for unit category
-                if int(unit_id) != unit_id:
-                    unit_category_id = int(unit_id)
-                    unit_id_post = -1
-                else:
-                    unit_category_id = -1
-                    unit_id_post = unit_id
-
-                # Change stat
-                for stat in bonus_stats:
-                    # Get advanced armour information
-                    if int(stat) == 8:
-                        armour = int(str(stat)[2:6])
-                        bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, int(stat), armour))
-                    else:
-                        bonus_effect_commands.append(genieutils.effect.EffectCommand(effect_id, unit_id_post, unit_category_id, stat, bonus_number[0]))
-        except Exception as e:
-            # Error out
-            print(e)
-            print("\033[31mERROR: Invalid bonus description.\033[0m")
-            return [], []'''
-        
     # Add the effect commands to the bonus
     #bonus_effect.effect_commands = bonus_effect_commands
 
@@ -1522,8 +959,8 @@ def open_mod(mod_folder):
     UNIT_CATEGORIES = UNIT_CATEGORIES | {'demolition ships': [1104, 527, 528], 'fortified church': 'U1806', "foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13'], 'villagers': ['C4'], 'camel units': ['U282', 'U556'], 'mule carts': ['U1808'], 'military units': ['C0', 'C55', 'C35', 'C6', 'C54', 'C13', 'C51', 'C36', 'C12']}
 
     # DEBUG: Print dictionary
-    for key, value in UNIT_CATEGORIES.items():
-        print(f'{key}: {value}')
+    #for key, value in UNIT_CATEGORIES.items():
+    #    print(f'{key}: {value}')
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
@@ -1986,6 +1423,9 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
     # Enable the pasture for Mongols, Berbers, Huns, and Cumans
     DATA.techs[1008].civ = -1
+    DATA.techs[1014].civ = -1
+    DATA.techs[1013].civ = -1
+    DATA.techs[1012].civ = -1
     for effect in [effect_ for effect_ in DATA.effects if "tech tree" in effect_.name.lower()]:
         name = effect.name.lower()
         if any(group in name for group in ['mongols', 'berbers', 'huns', 'cumans']):
@@ -1997,6 +1437,9 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         else:
             # Disable pasture
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1008))
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1012))
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1013))
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1014))
 
     # Write the architecture sets to a file
     with open(f'{MOD_FOLDER}/{mod_name}.pkl', 'wb') as file:
@@ -2188,11 +1631,10 @@ def main():
         # TEST BONUS
         #create_bonus(rf'Mule Cart technologies are +40% more effective', 0)
         #create_bonus(rf'Spearman- and Militia-line upgrades (except Man-at-Arms) available one age earlier', 0)
-        create_bonus(rf'First Fortified Church receives a free Relic', 0)
-        create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
-
-        create_bonus(rf'Demolition Ships +20% blast radius; Galley-line and Dromons +1 range', 0)
-        create_bonus(rf'Infantry (except Spearman-line) +30 HP; Warrior Priests heal +100% faster', 0)
+        #create_bonus(rf'First Fortified Church receives a free Relic', 0)
+        #create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
+        #create_bonus(rf'Demolition Ships +20% blast radius; Galley-line and Dromons +1 range', 0)
+        #create_bonus(rf'Infantry (except Spearman-line) +30 HP; Warrior Priests heal +100% faster', 0)
         create_bonus(rf'Infantry +2 line of sight', 0)
 
 
@@ -3013,7 +2455,7 @@ def main():
                                     all_languages.append('Franks')
                                 else:
                                     all_languages.append(civ.name)
-                            all_languages.append('Greek')
+                            all_languages.extend(['Greek', 'Somalis'])
 
                             # Change language
                             while True:

@@ -577,7 +577,7 @@ def open_project(path = None):
         MAIN_WINDOW.architecture_dropdown.insertSeparator(MAIN_WINDOW.architecture_dropdown.count())
         MAIN_WINDOW.language_dropdown.insertSeparator(MAIN_WINDOW.language_dropdown.count())
         #MAIN_WINDOW.language_dropdown.addItems(["Aromanian", "Cantonese", "Catalan", "Javanese", "Lakota", "Mohawk", "Somali", "Thai", "Tibetan", "Zapotec", "Zulu"])
-        MAIN_WINDOW.language_dropdown.addItems(['Greek'])
+        MAIN_WINDOW.language_dropdown.addItems(['Greek', 'Somalis'])
         #MAIN_WINDOW.update_civs(civilisation_objects)
         #MAIN_WINDOW.changed_civilisation_dropdown()
 

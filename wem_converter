@@ -1,0 +1,71 @@
+import os
+import shutil
+import subprocess
+
+# wine AudiokineticLauncher-2025.1.0.5135.exe
+
+# === CONFIGURATION ===
+WWISE_PROJECT_PATH = r"C:\Path\To\YourProject.wproj"
+WWISE_CLI_PATH = r"C:\Program Files (x86)\Audiokinetic\Wwise 2023.1.0\Authoring\x64\Release\bin\WwiseCLI.exe"
+WWISE_PLATFORM = "Windows"
+WWISE_LANGUAGE = "SFX"
+GENERATED_SOUNDBANK_DIR = r"C:\Path\To\YourProject\GeneratedSoundBanks\Windows\SFX"
+ORIGINALS_AUDIO_DIR = r"C:\Path\To\YourProject\Originals\SFX"
+
+# === PROMPT FOR FILE PATHS ===
+input_str = input(
+    "Enter the full paths to one or more .mp3/.wav/.ogg files, separated by commas:\n"
+).strip()
+
+file_paths = [path.strip() for path in input_str.split(",") if path.strip()]
+
+if not file_paths:
+    print("Error: No files specified.")
+    exit()
+
+# === COPY FILES TO Wwise Originals ===
+for file_path in file_paths:
+    print(f"\nProcessing: {file_path}")
+    if not os.path.isfile(file_path):
+        print("Error: File does not exist.")
+        continue
+
+    file_name = os.path.basename(file_path)
+    dest_path = os.path.join(ORIGINALS_AUDIO_DIR, file_name)
+    shutil.copy(file_path, dest_path)
+    print(f"Copied {file_name} to Wwise Originals folder.")
+
+# === RUN Wwise CLI ONCE FOR ALL FILES ===
+print("\nGenerating SoundBank with WwiseCLI...")
+result = subprocess.run([
+    WWISE_CLI_PATH,
+    WWISE_PROJECT_PATH,
+    "-GenerateSoundBank",
+    "-Platform", WWISE_PLATFORM,
+    "-Language", WWISE_LANGUAGE,
+])
+
+if result.returncode != 0:
+    print("Error: WwiseCLI failed to generate the SoundBank.")
+    exit()
+
+# === FIND AND MOVE GENERATED .wem FILES ===
+for file_path in file_paths:
+    file_name = os.path.basename(file_path)
+    base_name, _ = os.path.splitext(file_name)
+
+    wem_file = None
+    for f in os.listdir(GENERATED_SOUNDBANK_DIR):
+        if f.lower().startswith(base_name.lower()) and f.lower().endswith(".wem"):
+            wem_file = os.path.join(GENERATED_SOUNDBANK_DIR, f)
+            break
+
+    if not wem_file or not os.path.exists(wem_file):
+        print(f"Error: .wem file for {file_name} not generated.")
+        continue
+
+    final_wem_path = os.path.join(os.path.dirname(file_path), base_name + ".wem")
+    shutil.move(wem_file, final_wem_path)
+    print(f"✅ {base_name}.wem saved to:\n{final_wem_path}")
+
+print("\nAll done!")
