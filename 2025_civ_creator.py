@@ -2001,7 +2001,7 @@ def main():
                                             remove_bonus_selection = int(bonus_selection)
                                             if remove_bonus_selection != '':
                                                 for tech in DATA.techs:
-                                                    if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
+                                                    if tech.name.lower() == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}'.lower():
                                                         tech.effect_id = -1
 
                                                 # Remove from the description
