@@ -432,7 +432,7 @@ def create_bonus(bonus_string_original, civ_id):
     words = bonus_string.lower().split()
 
     # Stat dictionary
-    stat_dictionary = {'an additional projectile': ['N1', 'S107', 'S102'], 'blast radius': 'S22', 'additional projectiles': ['S107', 'S102'], 'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13'], 'heal': ['S13']}
+    stat_dictionary = {'an additional projectile': ['N1', 'S107', 'S102'], 'blast radius': 'S22', 'additional projectiles': ['S107', 'S102'], 'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9.1026', 'S9.770'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13'], 'heal': ['S13']}
 
     # Resource dictionary
     resource_dictionary = {'food': ['R0', 'R103'], 'wood': ['R1', 'R104'], 'gold': ['R3', 'R105'], 'stone': ['R2', 'R106']}
@@ -625,22 +625,24 @@ def create_bonus(bonus_string_original, civ_id):
 
     # Create bonus lines
     class Bonus_Line:
-        def __init__(self, category, unit, number, resource, stat, age, special):
+        def __init__(self, category, unit, number, resource, stat, substat, age, special):
             self.category = category
             self.unit = unit
             self.number = number
             self.resource = resource
             self.stat = stat
+            self.substat = substat
             self.age = age
             self.special = special
 
-    # Initialize an empty list to hold the final bonus lines
+    # Initialize
     bonus_lines = []
     pending_numbers = []
     pending_resources = []
     pending_stats = []
-    pending_ages = []
+    pending_substats = []
     pending_specials = []
+    pending_ages = []
 
     current_units = []
     current_categories = []
@@ -652,93 +654,80 @@ def create_bonus(bonus_string_original, civ_id):
         if isinstance(item, list):
             for v in item:
                 if v.startswith("U"):
-                    # Flush all current combinations with previous anchors
-                    if current_units or current_categories:
-                        for num in pending_numbers or [None]:
-                            for res in pending_resources or [None]:
-                                for stat in pending_stats or [None]:
-                                    for age in pending_ages or [None]:
-                                        for spec in pending_specials or [None]:
-                                            for unit in current_units or [None]:
-                                                for cat in current_categories or [None]:
-                                                    bonus_lines.append(
-                                                        Bonus_Line(
-                                                            category=cat if cat is not None else -1,
-                                                            unit=unit if unit is not None else -1,
-                                                            number=num,
-                                                            resource=res,
-                                                            stat=stat,
-                                                            age=age,
-                                                            special=spec
-                                                        )
-                                                    )
-                    # Reset pending and set new anchor
-                    current_units = [int(v[1:])]
-                    current_categories = []
-                    pending_numbers = []
-                    pending_resources = []
-                    pending_stats = []
-                    pending_ages = []
-                    pending_specials = []
+                    current_units.append(int(v[1:]))
+
                 elif v.startswith("C"):
-                    if current_units or current_categories:
-                        for num in pending_numbers or [None]:
-                            for res in pending_resources or [None]:
-                                for stat in pending_stats or [None]:
-                                    for age in pending_ages or [None]:
-                                        for spec in pending_specials or [None]:
-                                            for unit in current_units or [None]:
-                                                for cat in current_categories or [None]:
-                                                    bonus_lines.append(
-                                                        Bonus_Line(
-                                                            category=cat if cat is not None else -1,
-                                                            unit=unit if unit is not None else -1,
-                                                            number=num,
-                                                            resource=res,
-                                                            stat=stat,
-                                                            age=age,
-                                                            special=spec
-                                                        )
-                                                    )
-                    current_categories = [int(v[1:])]
-                    current_units = []
-                    pending_numbers = []
-                    pending_resources = []
-                    pending_stats = []
-                    pending_ages = []
-                    pending_specials = []
+                    current_categories.append(int(v[1:]))
+
                 elif v.startswith("N"):
                     val = v[1:]
                     if '.' in val:
                         pending_numbers.append(float(val))
                     else:
                         pending_numbers.append(int(val))
+
                 elif v.startswith("R"):
                     pending_resources.append(int(v[1:]))
+
                 elif v.startswith("S"):
-                    pending_stats.append(int(v[1:]))
-                elif v.startswith("A"):
-                    pending_ages.append(int(v[1:]))
+                    val = v[1:]
+                    if '.' in val:
+                        stat_part, substat_part = val.split('.', 1)
+                        pending_stats.append(int(stat_part))
+                        pending_substats.append(int(substat_part))
+                    else:
+                        pending_stats.append(int(val))
+                        pending_substats.append(0)
+
                 elif v.startswith("X"):
                     pending_specials.append(v[1:])
+
+                elif v.startswith("A"):
+                    age = int(v[1:])
+                    if bonus_lines:
+                        new_lines = []
+                        for bl in bonus_lines:
+                            if bl.age is None:
+                                new_lines.append(
+                                    Bonus_Line(
+                                        category=bl.category,
+                                        unit=bl.unit,
+                                        number=bl.number,
+                                        resource=bl.resource,
+                                        stat=bl.stat,
+                                        substat=bl.substat,
+                                        age=age,
+                                        special=bl.special
+                                    )
+                                )
+                        bonus_lines.extend(new_lines)
+                    else:
+                        pending_ages.append(age)
         i += 1
 
-    # Finally, flush any remaining pending combos if there's a unit/category
+    # After collecting everything, flush all combinations
     if current_units or current_categories:
-        for num in pending_numbers or [None]:
-            for res in pending_resources or [None]:
-                for stat in pending_stats or [None]:
-                    for age in pending_ages or [None]:
+        ages_to_use = pending_ages if pending_ages else [None]
+        for age in ages_to_use:
+            for num in pending_numbers or [None]:
+                for res in pending_resources or [None]:
+                    # If there are no pending stats, still produce one combination with stat/substat = None
+                    stats_to_use = pending_stats or [None]
+                    substats_to_use = pending_substats or [None]
+                    for stat, substat in zip(stats_to_use, substats_to_use):
                         for spec in pending_specials or [None]:
-                            for unit in current_units or [None]:
-                                for cat in current_categories or [None]:
+                            units_or_default = current_units if current_units else [-1]
+                            cats_or_default = current_categories if current_categories else [-1]
+                            for unit in units_or_default:
+                                for cat in cats_or_default:
                                     bonus_lines.append(
                                         Bonus_Line(
-                                            category=cat if cat is not None else -1,
-                                            unit=unit if unit is not None else -1,
+                                            category=cat,
+                                            unit=unit,
                                             number=num,
                                             resource=res,
                                             stat=stat,
+                                            substat=substat,
                                             age=age,
                                             special=spec
                                         )
@@ -750,22 +739,47 @@ def create_bonus(bonus_string_original, civ_id):
 
     # Convert each bonus line into an effect command and/or a tech
     for bonus_line in bonus_lines:
+        # Create a new tech for each age specified
+        if bonus_line.age is not None and bonus_line.age != 0:
+            matching_tech = None
+
+            for tech in final_techs:
+                if tech.required_techs[0] == bonus_line.age:
+                    matching_tech = tech
+                    break
+                
+            if matching_tech:
+                # Use existing tech
+                target_tech = matching_tech
+            else:
+                # Check if first tech is still unassigned (all zeros)
+                if final_techs[0].required_techs == (0, 0, 0, 0, 0, 0):
+                    final_techs[0].required_techs = (bonus_line.age, -1, -1, -1, -1, -1)
+                    final_techs[0].required_tech_count = 1
+                    final_techs[0].civ = civ_id + 1
+                    target_tech = final_techs[0]
+                else:
+                    # No match and first tech is used—clone new
+                    new_tech = copy.deepcopy(final_techs[0])
+                    new_tech.required_techs = (bonus_line.age, -1, -1, -1, -1, -1)
+                    new_tech.required_tech_count = 1
+                    new_tech.civ = civ_id + 1
+                    final_techs.append(new_tech)
+                    target_tech = new_tech
+
+        # Create the effect commands
         if isinstance(bonus_line.number, int):
             final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(4, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
         elif isinstance(bonus_line.number, float):
             final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(5, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
 
-    print(final_effects[0].effect_commands)
-
-    # Set up the list
-    #bonus_effect_commands = []
-    #bonus_string = bonus_string.lower()
-
-    # Add the effect commands to the bonus
-    #bonus_effect.effect_commands = bonus_effect_commands
+    # DEBUG: Print the final results
+    #for tech in final_techs:
+    #    print('civ:', tech.civ, 'techs:', tech.required_techs, 'count:', tech.required_tech_count)
+    #print(final_effects[0].effect_commands)
 
     # Return the effect commands
-    #return final_techs, final_effects
+    return final_techs, final_effects
 
 def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
     # Get unit name or tech name
@@ -906,10 +920,13 @@ def open_mod(mod_folder):
             }'''
 
             # Clean the list of blanks
-            tech_ids = [f'T{x}' for x in tech_ids if x != -1]
+            try:
+                tech_ids = [f'T{x}' for x in tech_ids if x != -1]
 
-            if tech_ids:
-                TECH_CATEGORIES.setdefault(f"{unit_line}line upgrades", []).extend(tech_ids)
+                if tech_ids:
+                    TECH_CATEGORIES.setdefault(f"{unit_line}line upgrades", []).extend(tech_ids)
+            except:
+                pass
 
             # Elephants and Camels
             name = get_unit_name(unit.id).lower()
@@ -917,7 +934,8 @@ def open_mod(mod_folder):
                 UNIT_CATEGORIES.setdefault('elephant units', []).append(f'U{unit.id}')
             if 'camel' in name:
                 UNIT_CATEGORIES.setdefault('camel units', []).append(f'U{unit.id}')
-        except:
+        except Exception as e:
+            #print(str(e))
             pass
 
     # Convert 2 item lists
@@ -956,7 +974,42 @@ def open_mod(mod_folder):
     UNIT_CATEGORIES = {k: v for k, v in UNIT_CATEGORIES.items() if isinstance(v, list) and len(v) > 1}
 
     # Add manual items
-    UNIT_CATEGORIES = UNIT_CATEGORIES | {'demolition ships': [1104, 527, 528], 'fortified church': 'U1806', "foot archers": ['C0', 'U-7', 'U-6', 'U-1155'], "skirmishers": ['U7', 'U6', 'U1155'], "mounted archers": ['C36'], "mounted": ['C36', 'C12', 'C23'], "trade": ['C2', 'C19'], "infantry": ['C6'], "cavalry": ['C12'], "light horseman": ['C12'], "heavy cavalry": ['C12'], "warships": ['C22'], "gunpowder": ['C44', 'C23'], "siege": ['C13'], 'villagers': ['C4'], 'camel units': ['U282', 'U556'], 'mule carts': ['U1808'], 'military units': ['C0', 'C55', 'C35', 'C6', 'C54', 'C13', 'C51', 'C36', 'C12']}
+    new_entries = {
+        'demolition ships': ['U1104', 'U527', 'U528'],
+        'fortified church': 'U1806',
+        "foot archers": ['C0', 'U-7', 'U-6', 'U-1155'],
+        "skirmishers": ['U7', 'U6', 'U1155'],
+        "mounted archers": ['C36'],
+        "mounted": ['C36', 'C12', 'C23'],
+        "trade": ['C2', 'C19'],
+        "infantry": ['C6'],
+        "cavalry": ['C12'],
+        "light horseman": ['C12'],
+        "heavy cavalry": ['C12'],
+        "warships": ['C22'],
+        "gunpowder": ['C44', 'C23'],
+        "siege": ['C13'],
+        'villagers': ['C4'],
+        'camel units': ['U282', 'U556', 'U1263'],
+        'mule carts': ['U1808'],
+        'military units': ['C0', 'C55', 'C35', 'C6', 'C54', 'C13', 'C51', 'C36', 'C12']
+    }
+
+    for k, v in new_entries.items():
+        if k in UNIT_CATEGORIES:
+            old = UNIT_CATEGORIES[k]
+            if isinstance(old, list):
+                if isinstance(v, list):
+                    UNIT_CATEGORIES[k] = old + v
+                else:
+                    UNIT_CATEGORIES[k] = old + [v]
+            else:
+                if isinstance(v, list):
+                    UNIT_CATEGORIES[k] = [old] + v
+                else:
+                    UNIT_CATEGORIES[k] = [old, v]
+        else:
+            UNIT_CATEGORIES[k] = v
 
     # DEBUG: Print dictionary
     #for key, value in UNIT_CATEGORIES.items():
@@ -1512,6 +1565,11 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.hit_points = 110
         civ.units.append(elite_war_canoe)
 
+        # Naasiri
+        #naasiri = copy.deepcopy(DATA.civs[1].units[2327])
+        #change_string(421061, 'Naasiri')
+        #change_string(406076, 'Create Naasiri')
+
     # Set civilisations to canoe docks by disabling all other warships
     for effect_id in [447, 489, 3]:
         # Disable the warships
@@ -1591,8 +1649,6 @@ def main():
     except:
         pass
 
-    
-
     # Switch emoji based on the month
     emoji_bank = {1: '⛄', 2: '💝', 3: '🍀', 4: '🌷', 5: '👒', 6: '🌺', 7: '🌴', 8: '🌻', 9: '🌾', 10: '🎃', 11: '🍂', 12: '🌲'}
     title_emoji = emoji_bank[datetime.now().month] * 3
@@ -1635,8 +1691,7 @@ def main():
         #create_bonus(rf'Galley-line and Dromons fire an additional projectile', 0)
         #create_bonus(rf'Demolition Ships +20% blast radius; Galley-line and Dromons +1 range', 0)
         #create_bonus(rf'Infantry (except Spearman-line) +30 HP; Warrior Priests heal +100% faster', 0)
-        create_bonus(rf'Infantry +2 line of sight', 0)
-
+        #create_bonus(rf'Infantry and Cavalry have +2 attack in the Feudal Age', 0)
 
         # Display selected mod menu
         print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} {mod_name} Menu {title_emoji}'))
@@ -1970,7 +2025,10 @@ def main():
                                         bonus_tech, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
 
                                         # Exit if nothing was found
-                                        if bonus_effect == []:
+                                        if bonus_effect[0].effect_commands == []:
+                                            break
+                                        elif 'age' in bonus_to_add_ORIGINAL.lower():
+                                            print(colour(Back.RED, 'ERROR: Team Bonus cannot contain Age parametres.'))
                                             break
 
                                         # Find the previous team effect
@@ -1980,7 +2038,7 @@ def main():
                                                 team_bonus_effect = effect
 
                                         # Update the team bonus
-                                        team_bonus_effect.effect_commands = bonus_effect.effect_commands
+                                        team_bonus_effect.effect_commands = bonus_effect[0].effect_commands
 
                                         # Change team bonus in description
                                         bonus_found = False
@@ -2048,76 +2106,47 @@ def main():
                                         # Generate the bonus
                                         bonus_techs, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
 
-                                        # Use the old tech if it exists
-                                        if bonus_effect != []:
-                                            tech_found = False
-                                            for bonus_tech in bonus_techs:
-                                                for tech in DATA.techs:
-                                                    if tech.name == bonus_tech.name:
-                                                        bonus_tech = tech
-                                                        tech.effect_id = DATA.effects.index(bonus_effect)
-                                                        tech_found = True
-                                                        break
+                                        # Add the techs and effects to the .dat
+                                        DATA.effects.append(bonus_effect[0])
+                                        for tech in bonus_techs:
+                                            tech.effect_id = len(DATA.effects) - 1
+                                            DATA.techs.append(tech)
 
-                                                if not tech_found:
-                                                    # Add the tech if it didn't exist before
-                                                    DATA.techs.append(bonus_tech)
+                                        # Append bonus to description
+                                        bonus_found = False
+                                        for i, line in enumerate(description_lines):
+                                            # Add new bonus to the end of the bonuses list
+                                            if bonus_to_add_ORIGINAL.lower() in description_lines[i].lower():
+                                                break
+                                            if '•' in description_lines[i]:
+                                                bonus_found = True
+                                            elif description_lines[i] == '' and bonus_found:
+                                                description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
+                                                break
+#      
+                                        # Update the description
+                                        save_description(description_code, description_lines)
 
-                                                # Add the new effect if it doesn't already exist
-                                                effect_found = False
-                                                for i, effect in enumerate(DATA.effects):
-                                                    if effect.name == bonus_effect.name:
-                                                        # Give the new effect commands to the old effect
-                                                        effect.effect_commands = bonus_effect.effect_commands
-                                                        bonus_tech.effect_id = i
-                                                        effect_found = True
-                                                        break
-                                                    
-                                                if not effect_found:
-                                                    # Add the effect if it didn't exist before
-                                                    DATA.effects.append(bonus_effect)
-
-                                                # Connect the effect to the tech
-                                                bonus_tech.effect_id = DATA.effects.index(bonus_effect)
-
-                                            # Append bonus to description
-                                            bonus_found = False
-                                            for i, line in enumerate(description_lines):
-                                                # Add new bonus to the end of the bonuses list
-                                                if bonus_to_add_ORIGINAL.lower() in description_lines[i].lower():
-                                                    break
-                                                if '•' in description_lines[i]:
-                                                    bonus_found = True
-                                                elif description_lines[i] == '' and bonus_found:
-                                                    description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
-                                                    break
-#       
-                                            # Update the description
-                                            save_description(description_code, description_lines)
-
-                                            # Save changes
-                                            with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
-                                            print(f'Bonus added for {selected_civ_name}: {bonus_to_add_ORIGINAL}')
-                                            time.sleep(1)
+                                        # Save changes
+                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                        print(f'Bonus added for {selected_civ_name}: {bonus_to_add_ORIGINAL}')
+                                        time.sleep(1)
 
                         # Unique Unit
                         elif selection == '3':
                             # Populate all castle units
-                            all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel"]
-                            new_castle_unit = '?'
+                            all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel", 'naasiri']
 
                             # Get user input
-                            while new_castle_unit == '?':
+                            while True:
                                 new_castle_unit = input(f"\nEnter unique Castle unit for {selected_civ_name}: ").lower()
 
-                                if new_castle_unit == '':
-                                    break
-                                elif new_castle_unit not in all_castle_units:
-                                    new_castle_unit = '?'
-                                    print("\033[31mERROR: Unit not found.\033[0m")
-                                elif new_castle_unit == '?':
+                                if new_castle_unit == '?':
                                     print(all_castle_units)
-                                    continue
+                                elif new_castle_unit not in all_castle_units:
+                                    print("\033[31mERROR: Unit not found.\033[0m")
+                                else:
+                                    break
 
                             # Get elite upgrade tech
                             elite_upgrade_tech = None
@@ -2281,53 +2310,91 @@ def main():
                                 elif tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 103 and tech.research_location == 82:
                                     unique_techs_ids[1] = i
 
+                            # Clone and assign unique effects for each tech
+                            # Castle Age
+                            castle_effect_clone = copy.deepcopy(DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id])
+                            castle_effect_id = len(DATA.effects)
+                            DATA.effects.append(castle_effect_clone)
+                            DATA.techs[unique_techs_ids[0]].effect_id = castle_effect_id
+
+                            # Imperial Age
+                            imperial_effect_clone = copy.deepcopy(DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id])
+                            imperial_effect_id = len(DATA.effects)
+                            DATA.effects.append(imperial_effect_clone)
+                            DATA.techs[unique_techs_ids[1]].effect_id = imperial_effect_id
+
                             # Prompt the user for Castle Age tech
-                            new_castle_tech_name = prompt(f"\nChange Castle Age tech name: ", default=unique_techs_names[0])
+                            new_castle_tech_name = prompt(f"\nChange Castle Age tech name: ", default=unique_techs_names[0].strip())
                             if new_castle_tech_name == '':
                                 new_castle_tech_name = unique_techs_names[0]
-                            while True:
-                                prompt_default_text = description_lines[-5].split('(')[1].strip(')')
-                                new_castle_tech_description = prompt(f"Change Castle Age tech description: ", default=prompt_default_text)
 
+                            # Get default description
+                            prompt_default_text_castle = description_lines[-5].split('(')[1].strip(')')
+
+                            while True:
+                                new_castle_tech_description = prompt(
+                                    f"Change Castle Age tech description: ",
+                                    default=prompt_default_text_castle.strip()
+                                )
                                 new_castle_tech, new_castle_effect = create_bonus(new_castle_tech_description, selected_civ_index)
-                                if len(new_castle_effect.effect_commands) == 0:
+                                if len(new_castle_effect[0].effect_commands) == 0:
                                     print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
                                     continue
                                 else:
-                                    DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id].name = new_castle_tech_description
-                                    DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id].effect_commands = new_castle_effect.effect_commands
+                                    DATA.effects[castle_effect_id].name = new_castle_tech_name
+                                    DATA.effects[castle_effect_id].effect_commands = new_castle_effect[0].effect_commands
                                     break
 
-
-                            new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ", default=unique_techs_names[1])
+                            # Prompt the user for Imperial Age tech
+                            new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ", default=unique_techs_names[1].strip())
                             if new_imperial_tech_name == '':
                                 new_imperial_tech_name = unique_techs_names[1]
-                            while True:
-                                prompt_default_text = description_lines[-4].split('(')[1].strip(')')
-                                new_imperial_tech_description = prompt(f"Change Imperial Age tech description: ", default=prompt_default_text)
 
+                            # Get default description
+                            prompt_default_text_imperial = description_lines[-4].split('(')[1].strip(')')
+
+                            while True:
+                                new_imperial_tech_description = prompt(
+                                    f"Change Imperial Age tech description: ",
+                                    default=prompt_default_text_imperial.strip()
+                                )
                                 new_imperial_tech, new_imperial_effect = create_bonus(new_imperial_tech_description, selected_civ_index)
-                                if len(new_imperial_effect.effect_commands) == 0:
+                                if len(new_imperial_effect[0].effect_commands) == 0:
                                     print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
                                     continue
                                 else:
-                                    DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id].name = new_imperial_tech_description
-                                    DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id].effect_commands = new_imperial_effect.effect_commands
+                                    DATA.effects[imperial_effect_id].name = new_imperial_tech_name
+                                    DATA.effects[imperial_effect_id].effect_commands = new_imperial_effect[0].effect_commands
                                     break
-                                
-                            # Change the names
+
+                            # Change the names in string resources
                             change_string(DATA.techs[unique_techs_ids[0]].language_dll_name, new_castle_tech_name)
+                            change_string(DATA.techs[unique_techs_ids[0]].language_dll_name + 10000, new_castle_tech_name)
+                            change_string(DATA.techs[unique_techs_ids[0]].language_dll_description, f"Research {new_castle_tech_name} ({new_castle_tech_description})")
+                            change_string(DATA.techs[unique_techs_ids[0]].language_dll_description + 20000, rf"Research <b>{new_castle_tech_name}<b> (<cost>)\n{new_castle_tech_description}.")
                             change_string(DATA.techs[unique_techs_ids[1]].language_dll_name, new_imperial_tech_name)
+                            change_string(DATA.techs[unique_techs_ids[1]].language_dll_name + 10000, new_imperial_tech_name)
+                            change_string(DATA.techs[unique_techs_ids[1]].language_dll_description, f"Research {new_imperial_tech_name} ({new_imperial_tech_description})")
+                            change_string(DATA.techs[unique_techs_ids[1]].language_dll_description + 20000, rf"Research <b>{new_imperial_tech_name}<b> (<cost>)\n{new_imperial_tech_description}.")
+
+                            # Also update the internal tech names
                             DATA.techs[unique_techs_ids[0]].name = new_castle_tech_name
                             DATA.techs[unique_techs_ids[1]].name = new_imperial_tech_name
 
-                            # Update the description
+                            # Update description file
                             description_lines[-5] = f'• {new_castle_tech_name} ({new_castle_tech_description})'
                             description_lines[-4] = f'• {new_imperial_tech_name} ({new_imperial_tech_description})'
                             save_description(description_code, description_lines)
 
                             # Save file
-                            with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                            with_real_progress(
+                                lambda progress: save_dat(
+                                    progress,
+                                    rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'
+                                ),
+                                'Saving Mod',
+                                total_steps=100
+                            )
                             print(f'Unique techs changed for {selected_civ_name}.')
                             time.sleep(1)
 
