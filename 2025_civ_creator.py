@@ -1459,7 +1459,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 13))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 14))
         else:
-            # Disable pasture
+            # Disable pasture and pasture upgrades
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1008))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1012))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1013))
@@ -1567,13 +1567,60 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     DATA.effects[3].name = 'Inca Tech Tree'
     DATA.effects[4].name = 'Inca Team Bonus'
 
-    # Rename existing civ bonuses
+    # Group existing civ bonuses into age-based techs and effects
+    base_tech = genieutils.tech.Tech(
+        required_techs=(0, 0, 0, 0, 0, 0),
+        resource_costs=(
+            ResearchResourceCost(type=0, amount=0, flag=0),
+            ResearchResourceCost(type=0, amount=0, flag=0),
+            ResearchResourceCost(type=0, amount=0, flag=0),
+        ),
+        required_tech_count=0,
+        civ=civ_id + 1,
+        full_tech_mode=0,
+        research_location=-1,
+        language_dll_name=7000,
+        language_dll_description=8000,
+        research_time=0,
+        effect_id=-1,
+        type=0,
+        icon_id=-1,
+        button_id=0,
+        language_dll_help=107000,
+        language_dll_tech_tree=157000,
+        hot_key=-1,
+        name='',
+        repeatable=1
+    )
+
+    base_effect = genieutils.effect.Effect(name='', effect_commands=[])
+
+    ages_dictionary = {'Dark': 104, 'Feudal': 101, 'Castle': 102, 'Imperial': 103}
+    age_names = ['Dark', 'Feudal', 'Castle', 'Imperial']
+
+    for i, civ in enumerate(DATA.civs, start=1):
+        for age_name in age_names:
+            # Create bonus effect holder
+            bonus_effect = copy.deepcopy(base_effect)
+            bonus_effect.name = f'{civ.name.upper()}: {age_name} Age Bonuses'
+            DATA.effects.append(bonus_effect)
+
+            # Create bonus tech holder
+            bonus_tech = copy.deepcopy(base_tech)
+            bonus_tech.name = f'{civ.name.upper()}: {age_name} Age Bonuses'
+            bonus_tech.required_techs = (ages_dictionary[age_name], 0, 0, 0, 0, 0)
+            bonus_tech.required_tech_count = 1
+            bonus_tech.effect_id = len(DATA.effects) - 1
+            DATA.techs.append(bonus_tech)
+
+    # Unpair existing bonuses from their effects to be recreated later
     for i, tech in enumerate(DATA.techs):
         if tech.name.startswith(('C-Bonus,', 'C-Bonus')):
-            tech.name = tech.name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()}:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()}:')
+            tech.name = tech.name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:')
+            tech.effect_id = -1
 
         # Try to rename the effect as well
-        DATA.effects[tech.effect_id].name = DATA.effects[tech.effect_id].name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()}:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()}:')
+        DATA.effects[tech.effect_id].name = DATA.effects[tech.effect_id].name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:')
 
     '''preexisting_bonuses = [381, 382, 403, 383]
     new_existing_bonus_names = [
