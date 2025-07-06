@@ -407,101 +407,46 @@ def get_unit_line_ids(name):
 
     return node_ids
 
+# Complete text
 def make_completer(options_list):
     def completer(text, state):
         matches = [s for s in options_list if s.lower().startswith(text.lower())]
         return matches[state] if state < len(matches) else None
     return completer
 
+# Create bonuses
 import requests
 
 def create_bonus(bonus_string_original, civ_id):
+    # Create an empty list for bonus objects
     bonus_items = []
+
+    # Lowercase the bonus string
     bonus_string = bonus_string_original.lower()
 
-    # Create the base tech and effect
-    final_techs = [
-        genieutils.tech.Tech(
-            required_techs=(0, 0, 0, 0, 0, 0),
-            resource_costs=(
-                ResearchResourceCost(type=0, amount=0, flag=0),
-                ResearchResourceCost(type=0, amount=0, flag=0),
-                ResearchResourceCost(type=0, amount=0, flag=0),
-            ),
-            required_tech_count=0,
-            civ=civ_id + 1,
-            full_tech_mode=0,
-            research_location=-1,
-            language_dll_name=7000,
-            language_dll_description=8000,
-            research_time=0,
-            effect_id=-1,
-            type=0,
-            icon_id=-1,
-            button_id=0,
-            language_dll_help=107000,
-            language_dll_tech_tree=157000,
-            hot_key=-1,
-            name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}',
-            repeatable=1
-        )
-    ]
-    final_effects = [
-        genieutils.effect.Effect(
-            name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}',
-            effect_commands=[]
-        )
-    ]
+    # Create the tech and effect, set the civilisation and names
+    final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', repeatable=1)]
+    final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', effect_commands=[])]
 
-    words = bonus_string.split()
+    # Split the bonus string into words
+    words = bonus_string.lower().split()
 
-    stat_dictionary = {
-        'an additional projectile': ['N1', 'S107', 'S102'],
-        'blast radius': ['S22'],
-        'additional projectiles': ['S107', 'S102'],
-        'carry': ['S14'],
-        'hit points': ['S0'],
-        'hp': ['S0'],
-        'line of sight': ['S1', 'S23'],
-        'los': ['S1', 'S23'],
-        'move': ['S5'],
-        'pierce armor': ['S8.0768'],
-        'armor vs. cavalry archers': ['S8.7168'],
-        'armor vs. elephants': ['S8.128'],
-        'armor vs. infantry': ['S8.0256'],
-        'armor vs. cavalry': ['S8.2048'],
-        'armor vs. archers': ['S8.384'],
-        'armor vs. ships': ['S8.4096'],
-        'armor vs. siege': ['S8.512'],
-        'armor vs. gunpowder': ['S8.5888'],
-        'armor vs. spearmen': ['S8.6912'],
-        'armor vs. eagles': ['S8.7424'],
-        'armor vs. camels': ['S8.768'],
-        'armor': ['S8.1024'],
-        'attack': ['S9.1026', 'S9.770'],
-        'range': ['S1', 'S12', 'S23'],
-        'minimum range': ['S20'],
-        'train': ['S101'],
-        'work': ['S13'],
-        'heal': ['S13'],
-    }
+    # Stat dictionary
+    stat_dictionary = {'an additional projectile': ['N1', 'S107', 'S102'], 'blast radius': 'S22', 'additional projectiles': ['S107', 'S102'], 'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9.1026', 'S9.770'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13'], 'heal': ['S13']}
 
-    resource_dictionary = {
-        'food': ['R0', 'R103'],
-        'wood': ['R1', 'R104'],
-        'gold': ['R3', 'R105'],
-        'stone': ['R2', 'R106'],
-    }
+    # Resource dictionary
+    resource_dictionary = {'food': ['R0', 'R103'], 'wood': ['R1', 'R104'], 'gold': ['R3', 'R105'], 'stone': ['R2', 'R106']}
 
-    trigger_dictionary = {
-        'more effective': 'Xmore effective',
-        'available one age earlier': 'Xone age earlier',
-        'free relic': 'Xfree relic',
-        'do not need houses': 'Xdo not need houses',
-        'does not need houses': 'Xdoes not need houses',
-        'start with': 'Xstart with',
-    }
+    # Trigger dictionary
+    trigger_directionary = {'more effective': 'Xmore effective',
+                            'available one age earlier': 'Xone age earlier',
+                            'free relic': 'Xfree relic',
+                            }
 
+    # Declare exception
+    exception = ''
+
+    # Precompute at the start of the function
     unit_name_map = {}
     for unit in DATA.civs[1].units:
         try:
@@ -510,41 +455,56 @@ def create_bonus(bonus_string_original, civ_id):
         except:
             continue
 
+    # Add extra words to clarify meaning
+    for i, word in enumerate(words):
+        if str(word).endswith('-'):
+            if 'upgrade' in bonus_string or 'upgrades' in bonus_string:
+                words[i] = word + 'line upgrades'
+
     i = 0
     while i < len(words):
         word = words[i]
 
+        # Skip useless words
         if word in ['and', 'but', 'have', 'has']:
             i += 1
             continue
 
-        # Triggers inline
+        # Search for exception
+        if '(' in word:
+            exception = '-'
+
+        matched = False
+
+        # === Trigger Phrases ===
         phrase = ''
-        best = ''
-        best_len = 0
+        best_match = ''
         for j in range(i, len(words)):
             phrase = f"{phrase} {words[j]}".strip()
-            if phrase in trigger_dictionary:
-                best = phrase
-                best_len = j - i + 1
+            if phrase in trigger_directionary:
+                best_match = phrase
 
-        if best:
-            bonus_items.append([trigger_dictionary[best]])
-            i += best_len
-            continue
+        if best_match:
+            bonus_items.append(trigger_directionary[best_match])
 
+        # === Unit Categories ===
         phrase = ''
-        best = ''
+        best_match = ''
+
+        # Expand word by word from index i
         for j in range(i, len(words)):
             phrase = f"{phrase} {words[j]}".strip()
             if phrase in UNIT_CATEGORIES:
-                best = phrase
-        if best:
-            bonus_items.append(UNIT_CATEGORIES[best])
-            i += len(best.split())
-            continue
+                best_match = phrase
 
-        def norm(p):
+        # If a match was found, add its values
+        if best_match:
+            bonus_items.append(UNIT_CATEGORIES[best_match])
+            i += len(best_match.split())
+            continue  # Continue to next word after processing best match
+
+        # === Individual Units ===
+        def normalise_variants(p):
             variants = {p}
             if p.endswith('ies'):
                 variants.add(p[:-3] + 'y')
@@ -554,82 +514,118 @@ def create_bonus(bonus_string_original, civ_id):
                 variants.add(p.replace('men', 'man'))
             return variants
 
-        best_match = []
-        best_len = 0
+        best_unit_match = []
+        best_unit_match_length = 0
+
         for j in range(i, len(words)):
-            phrase = ' '.join(words[i:j+1])
-            for var in norm(phrase):
-                if var in unit_name_map:
-                    best_match = unit_name_map[var]
-                    best_len = j - i + 1
-                    break
-            if best_match:
-                break
-        if best_match:
-            bonus_items.append(best_match)
-            i += best_len
+            phrase = ' '.join(words[i:j+1]).strip().lower()
+            variants = normalise_variants(phrase)
+
+            for variant in variants:
+                if variant in unit_name_map:
+                    best_unit_match = unit_name_map[variant]
+                    best_unit_match_length = j - i + 1
+                    break  # take the first good match for performance
+            if best_unit_match:
+                break  # stop expanding once a match is found
+            
+        if best_unit_match:
+            bonus_items.append(best_unit_match)
+            i += best_unit_match_length
             continue
 
-        if any(c.isdigit() for c in word):
-            nums = word.split('/')
-            temp = []
-            for n in nums:
-                negative = '-' in n
-                percent = '%' in n
+        # === Numbers ===
+        if any(char.isdigit() for char in word):
+            old_numbers = word.split('/')
+            negative = '-' in word
+            percent = '%' in word
 
-                # Remove signs and percent
-                n_clean = n.strip('-+%')
-                value = int(n_clean)
+            temp_numbers = []
+            for number in old_numbers:
+                number = number.strip('-+%')
+                number = int(number)
 
-                if percent:
-                    if negative:
-                        # e.g., -25% becomes 0.75
-                        float_value = (100 - value) / 100
-                    else:
-                        # e.g., +25% becomes 1.25
-                        float_value = (100 + value) / 100
-                    temp.append(f'N{float_value}')
+                if percent and not negative:
+                    number = float(number / 100 + 1)
+                elif percent and negative:
+                    number = float((100 - number) / 100)
                 else:
                     if negative:
-                        value = -value
-                    temp.append(f'N{value}')
-            bonus_items.append(temp)
+                        number *= -1
+                temp_numbers.append(f'N{number}')
+
+            bonus_items.append(temp_numbers)
             i += 1
             continue
 
-        if any(a in word for a in ('dark', 'feudal', 'castle', 'imperial')):
-            ages = []
-            if 'dark' in word:
-                ages.append('A104')
-            elif 'feudal' in word:
-                ages.append('A101')
-            elif 'castle' in word:
-                ages.append('A102')
-            elif 'imperial' in word:
-                ages.append('A103')
-            bonus_items.append(ages)
+        # === Ages ===
+        if any(age in word for age in ('dark', 'feudal', 'castle', 'imperial')):
+            old_ages = word.split('/')
+            temp_ages = []
+            for age in old_ages:
+                if age == 'dark':
+                    temp_ages.append('A104')
+                elif age == 'feudal':
+                    temp_ages.append('A101')
+                elif age == 'castle':
+                    temp_ages.append('A102')
+                elif age == 'imperial':
+                    temp_ages.append('A103')
+            bonus_items.append(temp_ages)
             i += 1
             continue
 
-        if word in resource_dictionary:
+        # === Resources ===
+        try:
             bonus_items.append(resource_dictionary[word])
-            i += 1
+        except:
+            if word == 'cost' or word == 'costs':
+                resources_added = 0
+                for word_ in words[i+1:]:
+                    try:
+                        # If another cost is announced, break up searching for resources
+                        if word_ == 'cost' or word_ == 'costs':
+                            break
+
+                        bonus_items.append(resource_dictionary[word_])
+                        resources_added += 1
+                    except:
+                        pass
+                    
+                # Add all resources if no resource is specified
+                if resources_added == 0:
+                    for val in resource_dictionary.values():
+                        if val not in bonus_items:
+                            bonus_items.append(val)
+
+                i += 1
+                continue
+
+        # === Stats ===
+        for key in stat_dictionary:
+            key_words = key.split()
+            if word == key_words[0]:
+                following = words[i:i+len(key_words)]
+                if following == key_words:
+                    bonus_items.append(stat_dictionary[key])
+                    i += len(key_words)
+                    matched = True
+                    break
+        if matched:
             continue
 
-        for k in stat_dictionary:
-            k_words = k.split()
-            if words[i:i+len(k_words)] == k_words:
-                bonus_items.append(stat_dictionary[k])
-                i += len(k_words)
-                break
-        else:
-            i += 1
+        # Reset exception
+        if ')' in word:
+            exception = '-'
 
-    # DEBUG
-    print(f"Bonus Items: {bonus_items}")
+        i += 1
 
+    # DEBUG: Print bonus items
+    #print(f'{colour(Fore.BLUE, (bonus_string_original + ':'))} {bonus_items}')
+
+    # Create bonus lines
     class Bonus_Line:
-        def __init__(self, category, unit, number, resource, stat, substat, age, trigger):
+        def __init__(self, category, unit, number, resource, stat, substat, age, special):
             self.category = category
             self.unit = unit
             self.number = number
@@ -637,119 +633,152 @@ def create_bonus(bonus_string_original, civ_id):
             self.stat = stat
             self.substat = substat
             self.age = age
-            self.trigger = trigger
+            self.special = special
 
+    # Initialize
     bonus_lines = []
-    pending_number_stat_pairs = []
+    pending_numbers = []
     pending_resources = []
-    pending_triggers = []
+    pending_stats = []
+    pending_substats = []
+    pending_specials = []
     pending_ages = []
+
     current_units = []
     current_categories = []
 
     i = 0
     while i < len(bonus_items):
         item = bonus_items[i]
-        if not isinstance(item, list):
-            item = [item]
-        for v in item:
-            if v.startswith("U"):
-                current_units.append(int(v[1:]))
-            elif v.startswith("C"):
-                current_categories.append(int(v[1:]))
-            elif v.startswith("N"):
-                val = v[1:]
-                num = float(val) if '.' in val else int(val)
-                pending_number_stat_pairs.append([num, None, None])  # [number, stat, substat]
-            elif v.startswith("R"):
-                pending_resources.append(int(v[1:]))
-            elif v.startswith("S"):
-                val = v[1:]
-                if '.' in val:
-                    s, ss = val.split('.', 1)
-                    stat = int(s)
-                    substat = int(ss)
-                else:
-                    stat = int(val)
-                    substat = 0
-                # Attach stat to last number if exists, else create stat-only pair
-                if pending_number_stat_pairs and pending_number_stat_pairs[-1][1] is None:
-                    pending_number_stat_pairs[-1][1] = stat
-                    pending_number_stat_pairs[-1][2] = substat
-                else:
-                    pending_number_stat_pairs.append([None, stat, substat])
-            elif v.startswith("X"):
-                pending_triggers.append(v[1:])
-            elif v.startswith("A"):
-                pending_ages.append(int(v[1:]))
+
+        if isinstance(item, list):
+            for v in item:
+                if v.startswith("U"):
+                    current_units.append(int(v[1:]))
+
+                elif v.startswith("C"):
+                    current_categories.append(int(v[1:]))
+
+                elif v.startswith("N"):
+                    val = v[1:]
+                    if '.' in val:
+                        pending_numbers.append(float(val))
+                    else:
+                        pending_numbers.append(int(val))
+
+                elif v.startswith("R"):
+                    pending_resources.append(int(v[1:]))
+
+                elif v.startswith("S"):
+                    val = v[1:]
+                    if '.' in val:
+                        stat_part, substat_part = val.split('.', 1)
+                        pending_stats.append(int(stat_part))
+                        pending_substats.append(int(substat_part))
+                    else:
+                        pending_stats.append(int(val))
+                        pending_substats.append(0)
+
+                elif v.startswith("X"):
+                    pending_specials.append(v[1:])
+
+                elif v.startswith("A"):
+                    age = int(v[1:])
+                    if bonus_lines:
+                        new_lines = []
+                        for bl in bonus_lines:
+                            if bl.age is None:
+                                new_lines.append(
+                                    Bonus_Line(
+                                        category=bl.category,
+                                        unit=bl.unit,
+                                        number=bl.number,
+                                        resource=bl.resource,
+                                        stat=bl.stat,
+                                        substat=bl.substat,
+                                        age=age,
+                                        special=bl.special
+                                    )
+                                )
+                        bonus_lines.extend(new_lines)
+                    else:
+                        pending_ages.append(age)
         i += 1
 
-    # When flushing, if no ages, just None
-    ages = pending_ages if pending_ages else [None]
+    # After collecting everything, flush all combinations
+    if current_units or current_categories:
+        ages_to_use = pending_ages if pending_ages else [None]
+        for age in ages_to_use:
+            for num in pending_numbers or [None]:
+                for res in pending_resources or [None]:
+                    # If there are no pending stats, still produce one combination with stat/substat = None
+                    stats_to_use = pending_stats or [None]
+                    substats_to_use = pending_substats or [None]
+                    for stat, substat in zip(stats_to_use, substats_to_use):
+                        for spec in pending_specials or [None]:
+                            units_or_default = current_units if current_units else [-1]
+                            cats_or_default = current_categories if current_categories else [-1]
+                            for unit in units_or_default:
+                                for cat in cats_or_default:
+                                    bonus_lines.append(
+                                        Bonus_Line(
+                                            category=cat,
+                                            unit=unit,
+                                            number=num,
+                                            resource=res,
+                                            stat=stat,
+                                            substat=substat,
+                                            age=age,
+                                            special=spec
+                                        )
+                                    )
 
-    # Always at least one resource and one trigger slot
-    resources = pending_resources or [None]
-    triggers = pending_triggers or [None]
+    # DEBUG: Print Bonus Lines
+    #for line in bonus_lines:
+    #    print(f"Bonus_Line(category={line.category}, unit={line.unit}, number={line.number}, resource={line.resource}, stat={line.stat}, age={line.age})")
 
-    # Build final Bonus_Lines
-    for age in ages:
-        for res in resources:
-            for trig in triggers:
-                units = current_units if current_units else [-1]
-                cats = current_categories if current_categories else [-1]
-                if pending_number_stat_pairs:
-                    for num, stat, substat in pending_number_stat_pairs:
-                        for u in units:
-                            for c in cats:
-                                bonus_lines.append(Bonus_Line(
-                                    category=c,
-                                    unit=u,
-                                    number=num,
-                                    resource=res,
-                                    stat=stat,
-                                    substat=substat,
-                                    age=age,
-                                    trigger=trig
-                                ))
-                else:
-                    # No number/stat pairs, still create a line
-                    for u in units:
-                        for c in cats:
-                            bonus_lines.append(Bonus_Line(
-                                category=c,
-                                unit=u,
-                                number=None,
-                                resource=res,
-                                stat=None,
-                                substat=None,
-                                age=age,
-                                trigger=trig
-                            ))
-
-    # === Create the Effect Commands ===
-    # Triggers
+    # Convert each bonus line into an effect command and/or a tech
     for bonus_line in bonus_lines:
-        # Does not need houses
-        if bonus_line.trigger == 'do not need houses' or bonus_line.trigger == 'does not need houses':
-            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(1, 4, 1, -1, 2000))
+        # Create a new tech for each age specified
+        if bonus_line.age is not None and bonus_line.age != 0:
+            matching_tech = None
 
-        # Start with more/less resource
-        elif bonus_line.trigger == 'start with' and bonus_line.resource < 5:
-            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(1, bonus_line.resource + 91, 1, -1, bonus_line.number))
+            for tech in final_techs:
+                if tech.required_techs[0] == bonus_line.age:
+                    matching_tech = tech
+                    break
+                
+            if matching_tech:
+                # Use existing tech
+                target_tech = matching_tech
+            else:
+                # Check if first tech is still unassigned (all zeros)
+                if final_techs[0].required_techs == (0, 0, 0, 0, 0, 0):
+                    final_techs[0].required_techs = (bonus_line.age, -1, -1, -1, -1, -1)
+                    final_techs[0].required_tech_count = 1
+                    final_techs[0].civ = civ_id + 1
+                    target_tech = final_techs[0]
+                else:
+                    # No match and first tech is used—clone new
+                    new_tech = copy.deepcopy(final_techs[0])
+                    new_tech.required_techs = (bonus_line.age, -1, -1, -1, -1, -1)
+                    new_tech.required_tech_count = 1
+                    new_tech.civ = civ_id + 1
+                    final_techs.append(new_tech)
+                    target_tech = new_tech
 
-        # Edit Unit/Building
+        # Create the effect commands
         if isinstance(bonus_line.number, int):
             final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(4, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
         elif isinstance(bonus_line.number, float):
             final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(5, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
 
-    # DEBUG print each
-    for bl in bonus_lines:
-        print(
-            f"Bonus_Line(category={bl.category}, unit={bl.unit}, number={bl.number}, "
-            f"resource={bl.resource}, stat={bl.stat}, substat={bl.substat}, age={bl.age}, trigger={bl.trigger})"
-        )
+    # DEBUG: Print the final results
+    #for tech in final_techs:
+    #    print('civ:', tech.civ, 'techs:', tech.required_techs, 'count:', tech.required_tech_count)
+    #print(final_effects[0].effect_commands)
 
+    # Return the effect commands
     return final_techs, final_effects
 
 def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
@@ -2081,20 +2110,20 @@ def main():
                                         bonus_tech, bonus_effect = create_bonus(bonus_change_to, selected_civ_index)
 
                                         # Exit if nothing was found
-                                        if bonus_effect[0].effect_commands == []:
+                                        if bonus_effect == []:
                                             break
 
                                         # Unpair the effect from the original tech to disable it
                                         remove_bonus_selection = int(bonus_selection[0])
                                         if remove_bonus_selection != '':
                                             for tech in DATA.techs:
-                                                if tech.name.lower() == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}'.lower():
+                                                if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
                                                     tech.effect_id = -1
 
                                         # Find the existing bonus effect and give it the new bonus effect commands
                                         for i, effect in enumerate(DATA.effects):
                                             if selected_civ_name.lower() in effect.name.lower() and bonus_change_from in effect.name:
-                                                DATA.effects[i] = bonus_effect[0]
+                                                DATA.effects[i] = bonus_effect
                                                 DATA.effects[i].name = f'{selected_civ_name.upper()}: {bonus_change_to}'
                                                 break
 
