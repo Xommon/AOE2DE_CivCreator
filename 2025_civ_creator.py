@@ -913,8 +913,8 @@ def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
 
 def open_mod(mod_folder):
     with_real_progress(lambda progress: load_dat(progress, rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat'), 'Loading Mod', total_steps=100)
-    #global DATA
-    #DATA = DatFile.parse(rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat')
+    global DATA
+    DATA = DatFile.parse(rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat')
     global MOD_STRINGS
     MOD_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-modded-strings-utf8.txt'
     global ORIGINAL_STRINGS
@@ -1547,16 +1547,23 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 except:
                     pass
 
-    # Split the architecture sets for Southeast Asians, so the Khmer/Burmese use the Castle/Imperial graphics only, and the Malay use the Feudal graphics only
-    '''for civ in DATA.civs:
-        # Skip if the civ is not Khmer, Burmese, or Malay
+    # Split the architecture sets for Southeast Asians
+    for civ in DATA.civs:
         if civ.name not in ['Khmer', 'Burmese', 'Malay']:
             continue
 
-        # Set the number for the target age
-        number_variables = ['2', '3'] if civ.name == 'Malay' else ['3', '2']
+        if civ.name == 'Malay':
+            # For Malay: replace Age3 and Age4 with Age2
+            target_ages = ['Age3', 'Age4']
+            replacement_age = 'Age2'
+        else:
+            # For Khmer/Burmese: replace Age2 with Age3
+            target_ages = ['Age2']
+            replacement_age = 'Age3'
 
-        # Go through each unit and check if its standing_graphic has 'SEAS' and a number in it
+        # Regex to match any of the target ages
+        age_pattern = re.compile(rf"({'|'.join(target_ages)})(\D|$)")
+
         for unit in civ.units:
             try:
                 if unit.standing_graphic == (-1, -1):
@@ -1564,64 +1571,50 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             except:
                 continue
 
-            # Determine the new standing graphic
+            current_standing_name = DATA.graphics[unit.standing_graphic[0]].name
+
+            if 'SEAS' not in current_standing_name or not age_pattern.search(current_standing_name):
+                continue
+
+            matched_age = age_pattern.search(current_standing_name).group(1)
+
+            # Prepare the replacement names
+            new_standing_name = current_standing_name.replace(matched_age, replacement_age)
+
+            # Dying graphic
+            if 0 <= unit.dying_graphic < len(DATA.graphics):
+                current_dying_name = DATA.graphics[unit.dying_graphic].name
+                new_dying_name = current_dying_name.replace(matched_age, replacement_age)
+            else:
+                new_dying_name = None
+
+            # Search for matching graphics
             standing_graphic_id = -1
             dying_graphic_id = -1
 
-            current_standing_name = DATA.graphics[unit.standing_graphic[0]].name
+            for i, graphic in enumerate(DATA.graphics):
+                if graphic is None or not graphic.name:
+                    continue
 
-            if 'SEAS' in current_standing_name and number_variables[1] in current_standing_name:
-                # Build the candidate names
-                new_standing_name_1 = current_standing_name.replace(
-                    f'Age{number_variables[1]}', f'Age{number_variables[0]}'
-                )
-                new_standing_name_2 = current_standing_name.replace(
-                    'Age4', f'Age{number_variables[1]}'
-                )
+                if standing_graphic_id == -1 and graphic.name == new_standing_name:
+                    standing_graphic_id = i
 
-                # If dying_graphic exists, build candidate names
-                if unit.dying_graphic != -1:
-                    current_dying_name = DATA.graphics[unit.dying_graphic].name
-                    new_dying_name_1 = current_dying_name.replace(
-                        f'Age{number_variables[1]}', f'Age{number_variables[0]}'
-                    )
-                    new_dying_name_2 = current_dying_name.replace(
-                        'Age4', f'Age{number_variables[10]}'
-                    )
-                else:
-                    current_dying_name = None
-                    new_dying_name_1 = None
-                    new_dying_name_2 = None
+                if unit.dying_graphic != -1 and dying_graphic_id == -1:
+                    if new_dying_name and graphic.name == new_dying_name:
+                        dying_graphic_id = i
 
-                # Search for matching graphics
-                for i, graphic in enumerate(DATA.graphics):
-                    try:
-                        if standing_graphic_id == -1 and graphic.name in (new_standing_name_1, new_standing_name_2):
-                            standing_graphic_id = i
-                        if unit.dying_graphic != -1 and dying_graphic_id == -1:
-                            if graphic.name in (new_dying_name_1, new_dying_name_2):
-                                dying_graphic_id = i
+                if standing_graphic_id != -1 and (
+                    dying_graphic_id != -1 or unit.dying_graphic == -1
+                ):
+                    break
 
-                        # If found both, stop searching
-                        if standing_graphic_id != -1 and (dying_graphic_id != -1 or unit.dying_graphic == -1):
-                            break
-                    except:
-                        continue
-
-            # Set the new graphics if found
+            # Apply changes if found
             if standing_graphic_id != -1:
-                print(
-                    f'Changing {civ.name} {unit.name} standing graphic from '
-                    f'{current_standing_name} to {DATA.graphics[standing_graphic_id].name}'
-                )
-                unit.standing_graphic = (standing_graphic_id, 0)
+                unit.standing_graphic = (standing_graphic_id, -1)
 
             if unit.dying_graphic != -1 and dying_graphic_id != -1:
-                print(
-                    f'Changing {civ.name} {unit.name} dying graphic from '
-                    f'{current_dying_name} to {DATA.graphics[dying_graphic_id].name}'
-                )
-                unit.dying_graphic = dying_graphic_id'''
+                unit.dying_graphic = dying_graphic_id
+
 
     # Enable the pasture for Mongols, Berbers, Huns, and Cumans
     DATA.techs[1008].civ = -1
@@ -1716,7 +1709,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.creatable.total_projectiles = 3
         elite_war_canoe.hit_points = 110
         elite_war_canoe.type_50.attacks[0].amount = 12
-        elite_war_canoe.type_50.attack
         civ.units.append(elite_war_canoe)
 
         # Naasiri
@@ -1725,7 +1717,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         #change_string(406076, 'Create Naasiri')
 
     # Set civilisations to canoe docks by disabling all other warships
-    for effect_id in [447, 489, 3]:
+    for effect_id in [447, 489, 3, 648, 42, 710, 448, 227, 708]:
         # Disable the warships
         for tech_id in [604, 243, 246, 605, 244, 37, 376]:
             DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
@@ -1735,10 +1727,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 21 , len(DATA.civs[1].units)-2, -1, -1))
         DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 442 , len(DATA.civs[1].units)-1, -1, -1))
 
-    # Allow the Aztecs to train the Elite War Canoe
-    for i, ec in enumerate(DATA.effects[447].effect_commands):
-        if ec.type == 102 and ec.d == 35:
-            DATA.effects[447].effect_commands.pop(i)
+        # Allow every canoe civ to train the Elite War Canoe
+        for i, ec in enumerate(DATA.effects[effect_id].effect_commands):
+            if ec.type == 102 and ec.d == 35:
+                DATA.effects[447].effect_commands.pop(i)
 
     # Correct name mistakes
     DATA.civs[1].name = 'Britons'
@@ -1849,7 +1841,8 @@ def main():
             previous_mod_folder = pickle.load(file)
             print(previous_mod_folder)
             previous_mod_name = previous_mod_folder.split('/')[-1]
-    except:
+    except Exception as e:
+        print(str(e))
         pass
 
     # Switch emoji based on the month

@@ -22,8 +22,4 @@ time.sleep(1)
 
 # All code after here
 
-pyperclip.copy(DATA.civs[1].units[2383])
-print('Unit copied. Press enter.')
-input()
-pyperclip.copy(DATA.civs[1].units[2384])
-print('Unit copied.')
+print(DATA.graphics[10673].name)

@@ -9,12 +9,13 @@ To create a new mod, select the new mod selection on the main menu.
 
 ===== CHANGES FOR BASEGAME =====
 # GRAPHICS AND TEXT
-- Vikings and Lithuanian Monastery/Monk replaced with the Pagan Shrine/Pagan Priest graphics.
+- PAGANS: Vikings and Lithuanian Monastery/Monk replaced with the Pagan Shrine/Pagan Priest graphics.
 #- Southeastern European architecture set added and set for the Byzantines, Georgians, and Armenians.
 #- Chinese architecture set added and set for the Chinese, Vietnamese, Jurchens, Khitans, Shu, Wei, Wu, and Koreans. The Japanese and Mongols remain on the East Asian architecture set.
-- Caravanserai bonus text removed for the Persians and Hindustanis descriptions. These two civilisations still get the Caravanserai, but now any other civilisation can have their tech tree edited to have the Caravansarai enabled.
+- CARAVANSERAI: Caravanserai bonus text removed for the Persians and Hindustanis descriptions. These two civilisations still get the Caravanserai, but now any other civilisation can have their tech tree edited to have the Caravansarai enabled.
+#- SOUTHEAST ASIANS: Southeast Asian architecture split into two: Castle/Imperial graphics for the Khmer and Burmese, Feudal graphics for the Malay.
 
 # GAMEPLAY
-- Mongols, Berbers, Huns, and Cumans have pastures enabled instead of farms.
-- The Dragon Ship unique unit for the Chinese is reverted back to the Fast Fire Ship.
-- The Canoe/Battle Canoe/War Canoe and Burning Canoe/Burning Battle Canoe/Burning War Canoe replace ALL warship units for the Aztecs, Maya, and Inca. Each have access to all three canoes.
+- PASTURES: Mongols, Berbers, Huns, and Cumans have pastures enabled instead of farms.
+- DRAGON SHIP: The Dragon Ship unique unit for the Chinese is reverted back to the Fast Fire Ship, due to the War Canoe using its graphics.
+- CANOES: The Canoe/War Canoe/Elite War Canoe replace all warship units for the Aztecs, Maya, Inca, Huns, Mongols, Tatars, Malians, Cumans, and Malay. Each have access to all three canoes types.
