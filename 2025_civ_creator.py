@@ -213,6 +213,47 @@ def get_unit_id(name):
                 except:
                     pass
 
+def update_tech_tree_graphic(current_civ_name, tech_tree_id):
+    # Load the JSON
+    with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r', encoding="utf-8") as file:
+        json_tree = json.load(file)
+
+    # Collect disabled Node IDs from effect commands
+    '''disabled_ids = set()
+    for i, tech in enumerate(DATA.techs):
+        if "Tech Tree" in tech.name:
+            for cmd in DATA.effects[i].effect_commands:
+                if cmd.type == 4:
+                    disabled_ids.add(cmd.a)'''
+
+    # Gather all unique entries across all civs by Node ID
+    entry_bank = {}
+    for civ in json_tree["civs"]:
+        for key in ["civ_techs_buildings", "civ_techs_units", "civ_techs_researches"]:
+            for entry in civ.get(key, []):
+                node_id = entry.get("Node ID")
+                if node_id is not None and node_id not in entry_bank:
+                    entry_bank[node_id] = entry
+
+    # Find the specific civ in the JSON tree
+    selected_civ = next((civ for civ in json_tree["civs"] if civ.get("civ_id") == current_civ_name.upper()), None)
+
+    # Match the disabled effect commands with entry bank
+    entry_bank_disabled = {}
+    for effect_command in DATA.effects[tech_tree_id].effect_commands:
+        if effect_command.type == 102:
+            # Search in entry_bank for entries with matching Trigger Tech ID
+            for node_id, entry in entry_bank.items():
+                if entry.get("Trigger Tech ID") == effect_command.d:
+                    entry_bank_disabled[node_id] = entry
+
+    print("Disabled entries:")
+    for k, v in entry_bank_disabled.items():
+        print(f"- Node ID {k}: {v.get('Name')}")
+
+
+
+
 '''def get_unit_categories(name):
     # Switch name to id
     if int(name) != name:
@@ -435,12 +476,15 @@ def create_bonus(bonus_string_original, civ_id):
     stat_dictionary = {'an additional projectile': ['N1', 'S107', 'S102'], 'blast radius': 'S22', 'additional projectiles': ['S107', 'S102'], 'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9.1026', 'S9.770'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13'], 'heal': ['S13']}
 
     # Resource dictionary
-    resource_dictionary = {'food': ['R0', 'R103'], 'wood': ['R1', 'R104'], 'gold': ['R3', 'R105'], 'stone': ['R2', 'R106']}
+    resource_dictionary = {'food': ['R0'], 'wood': ['R1'], 'gold': ['R3'], 'stone': ['R2']}
 
     # Trigger dictionary
     trigger_directionary = {'more effective': 'Xmore effective',
                             'available one age earlier': 'Xone age earlier',
                             'free relic': 'Xfree relic',
+                            'do not need houses': 'Xdo not need houses',
+                            'does not need houses': 'Xdo not need houses',
+                            'start with': 'Xstart with',
                             }
 
     # Declare exception
@@ -479,13 +523,16 @@ def create_bonus(bonus_string_original, civ_id):
         # === Trigger Phrases ===
         phrase = ''
         best_match = ''
+        best_len = 0
         for j in range(i, len(words)):
             phrase = f"{phrase} {words[j]}".strip()
             if phrase in trigger_directionary:
                 best_match = phrase
-
+                best_len = j - i + 1
         if best_match:
             bonus_items.append(trigger_directionary[best_match])
+            i += best_len
+            continue
 
         # === Unit Categories ===
         phrase = ''
@@ -620,12 +667,33 @@ def create_bonus(bonus_string_original, civ_id):
 
         i += 1
 
+    # Flatten bonus items into one array
+    flat_bonus_items = []
+    stack = list(bonus_items)
+    while stack:
+        item = stack.pop(0)
+        if isinstance(item, list):
+            stack = list(item) + stack
+        else:
+            flat_bonus_items.append(item)
+    bonus_items = flat_bonus_items
+
     # DEBUG: Print bonus items
-    #print(f'{colour(Fore.BLUE, (bonus_string_original + ':'))} {bonus_items}')
+    print(f'{colour(Fore.BLUE, (bonus_string_original + ':'))} {bonus_items}')
 
     # Create bonus lines
     class Bonus_Line:
-        def __init__(self, category, unit, number, resource, stat, substat, age, special):
+        def __init__(
+            self,
+            category=-1,
+            unit=-1,
+            number=-1,
+            resource=-1,
+            stat=-1,
+            substat=-1,
+            age=-1,
+            trigger=''
+        ):
             self.category = category
             self.unit = unit
             self.number = number
@@ -633,152 +701,152 @@ def create_bonus(bonus_string_original, civ_id):
             self.stat = stat
             self.substat = substat
             self.age = age
-            self.special = special
+            self.trigger = trigger
 
-    # Initialize
+    # Convert bonus items into bonus lines
     bonus_lines = []
-    pending_numbers = []
-    pending_resources = []
-    pending_stats = []
-    pending_substats = []
-    pending_specials = []
-    pending_ages = []
+    selected_lines = 0
 
-    current_units = []
-    current_categories = []
+    for item in bonus_items:
+        # Category
+        if item[0] == 'C':
+            bonus_lines.append(Bonus_Line(category=int(item[1:])))
+            selected_lines += 1
 
-    i = 0
-    while i < len(bonus_items):
-        item = bonus_items[i]
+        # Unit
+        elif item[0] == 'U':
+            bonus_lines.append(Bonus_Line(unit=int(item[1:])))
+            selected_lines += 1
 
-        if isinstance(item, list):
-            for v in item:
-                if v.startswith("U"):
-                    current_units.append(int(v[1:]))
-
-                elif v.startswith("C"):
-                    current_categories.append(int(v[1:]))
-
-                elif v.startswith("N"):
-                    val = v[1:]
-                    if '.' in val:
-                        pending_numbers.append(float(val))
-                    else:
-                        pending_numbers.append(int(val))
-
-                elif v.startswith("R"):
-                    pending_resources.append(int(v[1:]))
-
-                elif v.startswith("S"):
-                    val = v[1:]
-                    if '.' in val:
-                        stat_part, substat_part = val.split('.', 1)
-                        pending_stats.append(int(stat_part))
-                        pending_substats.append(int(substat_part))
-                    else:
-                        pending_stats.append(int(val))
-                        pending_substats.append(0)
-
-                elif v.startswith("X"):
-                    pending_specials.append(v[1:])
-
-                elif v.startswith("A"):
-                    age = int(v[1:])
-                    if bonus_lines:
-                        new_lines = []
-                        for bl in bonus_lines:
-                            if bl.age is None:
-                                new_lines.append(
-                                    Bonus_Line(
-                                        category=bl.category,
-                                        unit=bl.unit,
-                                        number=bl.number,
-                                        resource=bl.resource,
-                                        stat=bl.stat,
-                                        substat=bl.substat,
-                                        age=age,
-                                        special=bl.special
-                                    )
-                                )
-                        bonus_lines.extend(new_lines)
-                    else:
-                        pending_ages.append(age)
-        i += 1
-
-    # After collecting everything, flush all combinations
-    if current_units or current_categories:
-        ages_to_use = pending_ages if pending_ages else [None]
-        for age in ages_to_use:
-            for num in pending_numbers or [None]:
-                for res in pending_resources or [None]:
-                    # If there are no pending stats, still produce one combination with stat/substat = None
-                    stats_to_use = pending_stats or [None]
-                    substats_to_use = pending_substats or [None]
-                    for stat, substat in zip(stats_to_use, substats_to_use):
-                        for spec in pending_specials or [None]:
-                            units_or_default = current_units if current_units else [-1]
-                            cats_or_default = current_categories if current_categories else [-1]
-                            for unit in units_or_default:
-                                for cat in cats_or_default:
-                                    bonus_lines.append(
-                                        Bonus_Line(
-                                            category=cat,
-                                            unit=unit,
-                                            number=num,
-                                            resource=res,
-                                            stat=stat,
-                                            substat=substat,
-                                            age=age,
-                                            special=spec
-                                        )
-                                    )
-
-    # DEBUG: Print Bonus Lines
-    #for line in bonus_lines:
-    #    print(f"Bonus_Line(category={line.category}, unit={line.unit}, number={line.number}, resource={line.resource}, stat={line.stat}, age={line.age})")
-
-    # Convert each bonus line into an effect command and/or a tech
-    for bonus_line in bonus_lines:
-        # Create a new tech for each age specified
-        if bonus_line.age is not None and bonus_line.age != 0:
-            matching_tech = None
-
-            for tech in final_techs:
-                if tech.required_techs[0] == bonus_line.age:
-                    matching_tech = tech
-                    break
-                
-            if matching_tech:
-                # Use existing tech
-                target_tech = matching_tech
+        # Stat
+        elif item.startswith('S'):
+            # Parse stat and substat
+            if '.' in item:
+                stat = int(item[1:].split('.')[0])
+                substat = int(item[1:].split('.')[1])
             else:
-                # Check if first tech is still unassigned (all zeros)
-                if final_techs[0].required_techs == (0, 0, 0, 0, 0, 0):
-                    final_techs[0].required_techs = (bonus_line.age, -1, -1, -1, -1, -1)
-                    final_techs[0].required_tech_count = 1
-                    final_techs[0].civ = civ_id + 1
-                    target_tech = final_techs[0]
+                stat = int(item[1:])
+                substat = -1
+
+            if not bonus_lines:
+                # No lines yet: create a new one
+                bonus_lines.append(Bonus_Line(stat=stat, substat=substat))
+                selected_lines = 1
+
+            else:
+                # Grab the recent group
+                recent = bonus_lines[-selected_lines:]
+
+                # Check if ANY are incomplete
+                any_unset = any(line.stat == -1 for line in recent)
+
+                if any_unset:
+                    # Just set stat/substat on all
+                    for line in recent:
+                        line.stat = stat
+                        line.substat = substat
                 else:
-                    # No match and first tech is used—clone new
-                    new_tech = copy.deepcopy(final_techs[0])
-                    new_tech.required_techs = (bonus_line.age, -1, -1, -1, -1, -1)
-                    new_tech.required_tech_count = 1
-                    new_tech.civ = civ_id + 1
-                    final_techs.append(new_tech)
-                    target_tech = new_tech
+                    # Clone each with the new stat
+                    clones = []
+                    for line in recent:
+                        new_line = Bonus_Line(
+                            category=line.category,
+                            unit=line.unit,
+                            number=line.number,
+                            resource=line.resource,
+                            stat=stat,
+                            substat=substat,
+                            age=line.age,
+                            trigger=line.trigger
+                        )
+                        clones.append(new_line)
+                    bonus_lines.extend(clones)
 
-        # Create the effect commands
-        if isinstance(bonus_line.number, int):
-            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(4, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
-        elif isinstance(bonus_line.number, float):
-            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(5, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
+        # Unified handler for Resource, Number, Age, and Trigger
+        elif item[0] in {'R', 'N', 'A', 'X'}:
+            kind = item[0]
+            raw = item[1:]
 
-    # DEBUG: Print the final results
-    #for tech in final_techs:
-    #    print('civ:', tech.civ, 'techs:', tech.required_techs, 'count:', tech.required_tech_count)
-    #print(final_effects[0].effect_commands)
+            # Parse the value
+            if kind == 'R':
+                value = int(raw)
+                attr = 'resource'
+                default = -1
+            elif kind == 'N':
+                value = float(raw) if '.' in raw else int(raw)
+                attr = 'number'
+                default = -1
+            elif kind == 'A':
+                value = int(raw)
+                attr = 'age'
+                default = -1
+            elif kind == 'X':
+                value = raw
+                attr = 'trigger'
+                default = ''
 
-    # Return the effect commands
+            # No previous lines: create new
+            if not bonus_lines:
+                kwargs = {attr: value}
+                bonus_lines.append(Bonus_Line(**kwargs))
+                selected_lines = 1
+            else:
+                recent = bonus_lines[-selected_lines:]
+                any_unset = any(getattr(line, attr) == default for line in recent)
+                if any_unset:
+                    for line in recent:
+                        setattr(line, attr, value)
+                else:
+                    clones = []
+                    for line in recent:
+                        new_line = Bonus_Line(
+                            category=line.category,
+                            unit=line.unit,
+                            number=line.number,
+                            resource=line.resource,
+                            stat=line.stat,
+                            substat=line.substat,
+                            age=line.age,
+                            trigger=line.trigger
+                        )
+                        setattr(new_line, attr, value)
+                        clones.append(new_line)
+                    bonus_lines.extend(clones)
+
+    # DEBUG: Print bonus lines
+    for b in bonus_lines:
+        print(
+            f"Bonus_Line(category={b.category}, "
+            f"unit={b.unit}, "
+            f"number={b.number}, "
+            f"resource={b.resource}, "
+            f"stat={b.stat}, "
+            f"substat={b.substat}, "
+            f"age={b.age}, "
+            f"trigger='{b.trigger}')"
+        )
+
+    # Turn bonus lines into techs and effects
+    for bonus_line in bonus_lines:
+        # Age
+        if bonus_line.age:
+            # Add the age to the tech
+            final_techs[0].required_techs = (bonus_line.age, 0, 0, 0, 0, 0)
+            final_techs[0].required_tech_count = 1
+
+        # Triggers
+        if bonus_line.trigger == 'do not need houses' or bonus_line.trigger == 'does not need houses':
+            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(1, 4, 1, -1, 2000))
+
+        # General edit stat of unit
+        else:
+            if isinstance(bonus_line.number, float):
+                final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(5, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
+            elif isinstance(bonus_line.number, int):
+                final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(4, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
+            pass
+
+    # Pass on the tech and the effect
     return final_techs, final_effects
 
 def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
@@ -1017,6 +1085,7 @@ def open_mod(mod_folder):
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
+    update_tech_tree_graphic('Britons', 254)
     #print(get_unit_line(473))
 
     # DEBUG: Print attributes of the unit
@@ -1102,6 +1171,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         # Check if source is a file or a folder
         if os.path.isfile(source_path):
             shutil.copy(source_path, destination_path)  # Copy file
+
+    # Define original strings
+    global ORIGINAL_STRINGS
+    ORIGINAL_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-strings-utf8.txt'
 
     # Open .dat file
     with_real_progress(lambda progress: load_dat(progress, rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat'), 'Creating Mod', total_steps=100)
@@ -1474,6 +1547,82 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 except:
                     pass
 
+    # Split the architecture sets for Southeast Asians, so the Khmer/Burmese use the Castle/Imperial graphics only, and the Malay use the Feudal graphics only
+    '''for civ in DATA.civs:
+        # Skip if the civ is not Khmer, Burmese, or Malay
+        if civ.name not in ['Khmer', 'Burmese', 'Malay']:
+            continue
+
+        # Set the number for the target age
+        number_variables = ['2', '3'] if civ.name == 'Malay' else ['3', '2']
+
+        # Go through each unit and check if its standing_graphic has 'SEAS' and a number in it
+        for unit in civ.units:
+            try:
+                if unit.standing_graphic == (-1, -1):
+                    continue
+            except:
+                continue
+
+            # Determine the new standing graphic
+            standing_graphic_id = -1
+            dying_graphic_id = -1
+
+            current_standing_name = DATA.graphics[unit.standing_graphic[0]].name
+
+            if 'SEAS' in current_standing_name and number_variables[1] in current_standing_name:
+                # Build the candidate names
+                new_standing_name_1 = current_standing_name.replace(
+                    f'Age{number_variables[1]}', f'Age{number_variables[0]}'
+                )
+                new_standing_name_2 = current_standing_name.replace(
+                    'Age4', f'Age{number_variables[1]}'
+                )
+
+                # If dying_graphic exists, build candidate names
+                if unit.dying_graphic != -1:
+                    current_dying_name = DATA.graphics[unit.dying_graphic].name
+                    new_dying_name_1 = current_dying_name.replace(
+                        f'Age{number_variables[1]}', f'Age{number_variables[0]}'
+                    )
+                    new_dying_name_2 = current_dying_name.replace(
+                        'Age4', f'Age{number_variables[10]}'
+                    )
+                else:
+                    current_dying_name = None
+                    new_dying_name_1 = None
+                    new_dying_name_2 = None
+
+                # Search for matching graphics
+                for i, graphic in enumerate(DATA.graphics):
+                    try:
+                        if standing_graphic_id == -1 and graphic.name in (new_standing_name_1, new_standing_name_2):
+                            standing_graphic_id = i
+                        if unit.dying_graphic != -1 and dying_graphic_id == -1:
+                            if graphic.name in (new_dying_name_1, new_dying_name_2):
+                                dying_graphic_id = i
+
+                        # If found both, stop searching
+                        if standing_graphic_id != -1 and (dying_graphic_id != -1 or unit.dying_graphic == -1):
+                            break
+                    except:
+                        continue
+
+            # Set the new graphics if found
+            if standing_graphic_id != -1:
+                print(
+                    f'Changing {civ.name} {unit.name} standing graphic from '
+                    f'{current_standing_name} to {DATA.graphics[standing_graphic_id].name}'
+                )
+                unit.standing_graphic = (standing_graphic_id, 0)
+
+            if unit.dying_graphic != -1 and dying_graphic_id != -1:
+                print(
+                    f'Changing {civ.name} {unit.name} dying graphic from '
+                    f'{current_dying_name} to {DATA.graphics[dying_graphic_id].name}'
+                )
+                unit.dying_graphic = dying_graphic_id'''
+
     # Enable the pasture for Mongols, Berbers, Huns, and Cumans
     DATA.techs[1008].civ = -1
     DATA.techs[1014].civ = -1
@@ -1483,7 +1632,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         name = effect.name.lower()
         if any(group in name for group in ['mongols', 'berbers', 'huns', 'cumans']):
             # Disable farms and farm upgrades
-            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 216))
+            #effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 216))
+            effect.effect_commands.append(genieutils.effect.EffectCommand(3, 50, 1889, -1, -1))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 12))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 13))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 14))
@@ -1514,6 +1664,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         canoe = copy.deepcopy(base_unit)
         canoe.creatable.train_location_id = 45
         canoe.creatable.button_id = 4
+        canoe.type_50.attacks[0].amount = 8
         civ.units.append(canoe)
 
         # War Canoe
@@ -1538,6 +1689,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         war_canoe.type_50.attacks[2].amount = 8
         war_canoe.type_50.displayed_attack = 8
         war_canoe.hit_points = 90
+        war_canoe.type_50.attacks[0].amount = 10
         civ.units.append(war_canoe)
 
         # Elite War Canoe
@@ -1554,8 +1706,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.undead_graphic = civ.units[1302].undead_graphic
         elite_war_canoe.dead_fish.walking_graphic = civ.units[1302].dead_fish.walking_graphic
         elite_war_canoe.dead_fish.running_graphic = civ.units[1302].dead_fish.running_graphic
-        war_canoe.type_50.attack_graphic = civ.units[1302].type_50.attack_graphic
-        war_canoe.type_50.attack_graphic_2 = civ.units[1302].type_50.attack_graphic_2
+        elite_war_canoe.type_50.attack_graphic = civ.units[1302].type_50.attack_graphic
+        elite_war_canoe.type_50.attack_graphic_2 = civ.units[1302].type_50.attack_graphic_2
         elite_war_canoe.icon_id = civ.units[1302].icon_id
         elite_war_canoe.type_50.max_range = 9
         elite_war_canoe.type_50.displayed_range = 9
@@ -1563,6 +1715,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.type_50.displayed_attack = 9
         elite_war_canoe.creatable.total_projectiles = 3
         elite_war_canoe.hit_points = 110
+        elite_war_canoe.type_50.attacks[0].amount = 12
+        elite_war_canoe.type_50.attack
         civ.units.append(elite_war_canoe)
 
         # Naasiri
@@ -1628,7 +1782,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     age_names = ['Dark', 'Feudal', 'Castle', 'Imperial']
 
     for i, civ in enumerate(DATA.civs, start=1):
-        for age_name in age_names:
+        '''for age_name in age_names:
             # Create bonus effect holder
             bonus_effect = copy.deepcopy(base_effect)
             bonus_effect.name = f'{civ.name.upper()}: {age_name} Age Bonuses'
@@ -1640,27 +1794,28 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             bonus_tech.required_techs = (ages_dictionary[age_name], 0, 0, 0, 0, 0)
             bonus_tech.required_tech_count = 1
             bonus_tech.effect_id = len(DATA.effects) - 1
-            DATA.techs.append(bonus_tech)
+            DATA.techs.append(bonus_tech)'''
 
-    # Unpair existing bonuses from their effects to be recreated later
+    # Rename existing bonuses (DELETE ONCE NEXT BLOCK IS COMPLETE)
     for i, tech in enumerate(DATA.techs):
         if tech.name.startswith(('C-Bonus,', 'C-Bonus')):
-            tech.name = tech.name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:')
-            tech.effect_id = -1
+            tech.name = tech.name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()}:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()}:')
 
         # Try to rename the effect as well
         DATA.effects[tech.effect_id].name = DATA.effects[tech.effect_id].name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:')
 
-    '''preexisting_bonuses = [381, 382, 403, 383]
-    new_existing_bonus_names = [
-        r'BRITONS: Town Centers cost -50% wood starting in the Castle Age',
-        r'BRITONS: Foot archers (except skirmishers) +1 range in Castle Age',
-        r'BRITONS: Foot archers (except skirmishers) +1 range in Imperial Age',
-        r'BRITONS: Shepherds work 25% faster'
-        ]
-    for i, tech_id in enumerate(preexisting_bonuses):
-        DATA.techs[tech_id].name = new_existing_bonus_names[i]
-        DATA.effects[DATA.techs[tech_id].effect_id].name = new_existing_bonus_names[i]'''
+    # Update the names of preexisting bonuses
+    preexisting_bonuses = {
+        # Britons
+        383: 'BRITONS: shepherds work 25% faster',
+        381: 'BRITONS: town Centers cost -50% wood starting in the castle age',
+        382: 'BRITONS: foot archers +1/+2 range in the castle/imperial age',
+        403: 'BRITONS: foot archers +1/+2 range in the castle/imperial age',
+    }
+
+    for key, value in preexisting_bonuses.items():
+        DATA.techs[key].name = value
+        DATA.effects[DATA.techs[key].effect_id].name = value
 
     # Fix the Tech Tree JSON names
     with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
@@ -1692,6 +1847,7 @@ def main():
     try:
         with open('settings.pkl', 'rb') as file:
             previous_mod_folder = pickle.load(file)
+            print(previous_mod_folder)
             previous_mod_name = previous_mod_folder.split('/')[-1]
     except:
         pass
@@ -1766,7 +1922,7 @@ def main():
             time.sleep(0.5)
             yes = input("Enter 'Y' to continue: ")
 
-            if yes:
+            if yes.lower() == 'y' or yes.lower() == 'yes':
                 new_mod(MOD_FOLDER, ORIGINAL_FOLDER, MOD_NAME, True)
             else:
                 print("Mod was not reverted.\n")
