@@ -22,4 +22,4 @@ time.sleep(1)
 
 # All code after here
 
-print(DATA.graphics[10673].name)
+print(DATA.effects[3].effect_commands[8])

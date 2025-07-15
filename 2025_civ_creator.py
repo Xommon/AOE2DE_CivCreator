@@ -326,20 +326,23 @@ def update_tech_tree_graphic(current_civ_name, tech_tree_id):
 def get_tech_id(name):
     # Search with internal_name
     for i, tech in enumerate(DATA.techs):
-        if tech.name == name:
+        if tech.name.lower() == name.lower():
             return i
-        
-    # As a backup, search for name elsewhere
-    string_id = -1
-    with open(ORIGINAL_STRINGS, 'r') as file:
-        get_tech_id_lines = file.readlines()
-        for line in get_tech_id_lines:
-            if name in line.lower():
-                string_id = re.sub(r'^\d+\s+', '', line)
 
-    for i, tech in enumerate(DATA.techs):
-        if tech.language_dll_name == string_id:
-            return i
+    # As a backup, search for name elsewhere
+    string_id = None
+    with open(ORIGINAL_STRINGS, 'r') as file:
+        for line in file:
+            if name.lower() in line.lower():
+                string_id = re.sub(r'^\d+\s+', '', line)
+                break
+
+    if string_id:
+        for i, tech in enumerate(DATA.techs):
+            if tech.language_dll_name == string_id:
+                return i
+
+    return -1
         
 def get_string(code):
     with open(ORIGINAL_STRINGS, 'r') as original_file:
@@ -837,6 +840,7 @@ def create_bonus(bonus_string_original, civ_id):
         # Triggers
         if bonus_line.trigger == 'do not need houses' or bonus_line.trigger == 'does not need houses':
             final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(1, 4, 1, -1, 2000))
+            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(2, 70, 0, -1, 0))
 
         # General edit stat of unit
         else:
@@ -1085,7 +1089,7 @@ def open_mod(mod_folder):
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
-    update_tech_tree_graphic('Britons', 254)
+    #update_tech_tree_graphic('Britons', 254)
     #print(get_unit_line(473))
 
     # DEBUG: Print attributes of the unit
@@ -1712,9 +1716,31 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         civ.units.append(elite_war_canoe)
 
         # Naasiri
-        #naasiri = copy.deepcopy(DATA.civs[1].units[2327])
-        #change_string(421061, 'Naasiri')
-        #change_string(406076, 'Create Naasiri')
+        naasiri = copy.deepcopy(DATA.civs[1].units[2327])
+        change_string(94000, 'Naasiri')
+        change_string(95000, 'Create Naasiri')
+        naasiri.language_dll_name = 94000
+        naasiri.language_dll_creation = 95000
+        naasiri.name = 'Naasiri'
+        naasiri.creatable.train_location_id = 82
+        naasiri.creatable.button_id = 1
+        naasiri.type_50.attacks[0].amount = 7
+        naasiri.type_50.displayed_attack = 7
+        civ.units.append(naasiri)
+
+        # Elite Naasiri
+        elite_naasiri = copy.deepcopy(naasiri)
+        change_string(96000, 'Elite Naasiri')
+        change_string(97000, 'Create Elite Naasiri')
+        elite_naasiri.language_dll_name = 96000
+        elite_naasiri.language_dll_creation = 97000
+        elite_naasiri.name = 'Elite Naasiri'
+        elite_naasiri.creatable.train_location_id = 82
+        elite_naasiri.creatable.button_id = 1
+        elite_naasiri.type_50.attacks[0].amount = 9
+        elite_naasiri.type_50.displayed_attack = 9
+        elite_naasiri.hit_points = 110
+        civ.units.append(elite_naasiri)
 
     # Set civilisations to canoe docks by disabling all other warships
     for effect_id in [447, 489, 3, 648, 42, 710, 448, 227, 708]:
@@ -1791,23 +1817,39 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # Rename existing bonuses (DELETE ONCE NEXT BLOCK IS COMPLETE)
     for i, tech in enumerate(DATA.techs):
         if tech.name.startswith(('C-Bonus,', 'C-Bonus')):
-            tech.name = tech.name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()}:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()}:')
+            tech.name = tech.name.replace('C-Bonus,', f'{DATA.civs[tech.civ].name.upper()}:').replace('C-Bonus', f'{DATA.civs[tech.civ].name.upper()}:')
 
         # Try to rename the effect as well
-        DATA.effects[tech.effect_id].name = DATA.effects[tech.effect_id].name.replace('C-Bonus,', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:').replace('C-Bonus', f'#{DATA.civs[tech.civ].name.upper()} OBSOLETE:')
+        DATA.effects[tech.effect_id].name = DATA.effects[tech.effect_id].name.replace('C-Bonus,', f'{DATA.civs[tech.civ].name.upper()}:').replace('C-Bonus', f'{DATA.civs[tech.civ].name.upper()}:')
 
     # Update the names of preexisting bonuses
     preexisting_bonuses = {
         # Britons
-        383: 'BRITONS: shepherds work 25% faster',
+        383: r'BRITONS: shepherds work 25% faster',
         381: 'BRITONS: town Centers cost -50% wood starting in the castle age',
         382: 'BRITONS: foot archers +1/+2 range in the castle/imperial age',
         403: 'BRITONS: foot archers +1/+2 range in the castle/imperial age',
+        # Huns
+        225: 'HUNS: Do not need houses, but start with -100 wood',
+        458: 'HUNS: Cavalry Archers cost -10/20% in Castle/Imperial Age',
+        459: 'HUNS: Cavalry Archers cost -10/20% in Castle/Imperial Age',
     }
 
     for key, value in preexisting_bonuses.items():
         DATA.techs[key].name = value
         DATA.effects[DATA.techs[key].effect_id].name = value
+
+    # Add bonuses techs and effects that didn't previously exist
+    DATA.techs.append(genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name='HUNS: Trebuchets fire more accurately at units and small targets', repeatable=1))
+    DATA.effects.append(genieutils.effect.Effect(name='HUNS: Trebuchets fire more accurately at units and small targets', effect_commands=[genieutils.effect.EffectCommand(4, 42, -1, 11, 35)]))
+
+    # Remake the bonuses so that they're compact
+    # HUNS
+    DATA.effects[214].effect_commands.append(genieutils.effect.EffectCommand(1, 4, 1, -1, 2000)) # Huns: Do not need houses, but start with -100 wood
+    DATA.effects[214].effect_commands.append(genieutils.effect.EffectCommand(2, 70, 0, -1, 0))
+    DATA.effects[448].effect_commands.remove(genieutils.effect.EffectCommand(2, 70, 0, -1, 0))
+    DATA.effects[448].effect_commands.remove(genieutils.effect.EffectCommand(1, 4, 1, -1, 2000))
+    DATA.effects[448].effect_commands.remove(genieutils.effect.EffectCommand(4, 42, -1, 11, 35))
 
     # Fix the Tech Tree JSON names
     with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
@@ -2016,7 +2058,7 @@ def main():
 
                             # Determine which architecture set is currently being used
                             # KEY: (university: 209, castle: 82, wonder: 276)
-                            architecture_sets = {'African': [9084, 8747], 'Central Asian': [12084, 11747], 'Central European': [566, 171], 'East Asian': [567, 172], 'Eastern European': [8084, 7747], 'Mediterranean': [593, 177], 'Middle Eastern': [568, 173], 'Mesoamerican': [7084, 6747], 'South Asian': [10084, 12477], 'Southeast Asian': [11084, 10747], 'Southeast European': [15806, 15848], 'Western European': [569, 174]}
+                            architecture_sets = {'African': [9084, 8747], 'Austronesian': [10084, 12477], 'Central Asian': [12084, 11747], 'Central European': [566, 171], 'East Asian': [567, 172], 'Eastern European': [8084, 7747], 'Mediterranean': [593, 177], 'Middle Eastern': [568, 173], 'Mesoamerican': [7084, 6747], 'South Asian': [10084, 12477], 'Southeast Asian': [11084, 10747], 'Southeast European': [15806, 15848], 'Western European': [569, 174]}
                             for arch, ids in architecture_sets.items():
                                 if unit_id in ids:
                                     return arch
@@ -2224,7 +2266,7 @@ def main():
                                         if bonus_effect[0].effect_commands == []:
                                             break
                                         elif 'age' in bonus_to_add_ORIGINAL.lower():
-                                            print(colour(Back.RED, 'ERROR: Team Bonus cannot contain Age parametres.'))
+                                            print(colour(Fore.RED, 'ERROR: Team Bonus cannot contain Age parameters.'))
                                             break
 
                                         # Find the previous team effect
@@ -2757,6 +2799,68 @@ def main():
                         elif selection == '7':
                             # Import the tech tree
                             while True:
+                                try:
+                                    # Prompt user for action
+                                    tech_tree_action = input('\nSpecify units: ').lower()
+
+                                    # Get tech tree effect ID
+                                    tech_tree_indexes = [254, 258, 259, 262, 255, 257, 256, 260, 261, 263, 275, 277, 276, 446, 447, 449, 448, 504, 20, 1, 3, 5, 7, 31, 28, 42, 27, 646, 648, 650, 652, 706, 708, 710, 712, 782, 784, 801, 803, 808, 840, 842, 890, 923, 927, 1101, 1107, 1129, 1030, 1031, 1028, 986, 988]
+
+                                    # React to responses
+                                    if tech_tree_action == '':
+                                        # Save data
+                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                        print('Tech tree updated.')
+                                        time.sleep(1)
+                                        break
+                                    elif tech_tree_action == 'all' or tech_tree_action == 'clear':
+                                        # Clear the tech tree
+                                        DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.clear()
+                                        print('Tech tree cleared.')
+                                        time.sleep(1)
+                                    else:
+                                        # Separate items into a list
+                                        items_to_disable = tech_tree_action.replace(', ', ',').split(',')
+
+                                        # Disable tech tree items
+                                        for item in items_to_disable:
+                                            # Correct mistakes
+                                            if item == 'trebuchet':
+                                                item = 'trebuchet (packed)'
+
+                                            #print('Trying for:', item)
+                                            # Determine the item ID
+                                            tech_id = -1
+                                            unit_id = get_unit_id(item)
+                                            if unit_id == -1 or unit_id == None:
+                                                tech_id = get_tech_id(item)
+                                                #print('technology id for', item, ':', tech_id)
+
+                                            if unit_id == -1 and tech_id == -1:
+                                                print(colour(Fore.RED, f'ERROR: Cannot find item: {item}'))
+                                                continue
+                                            else:
+                                                for i, tech in enumerate(DATA.techs):
+                                                    # Disable tech
+                                                    if tech_id != -1 and tech.name.lower() == item.lower():
+                                                        DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
+                                                        #print(f'Tech for technology ({item}):', i)
+                                                        continue
+
+                                                    # Disable unit
+                                                    elif unit_id != -1:
+                                                        try:
+                                                            if (DATA.effects[tech.effect_id].effect_commands[0].a == unit_id and DATA.effects[tech.effect_id].effect_commands[0].type == 2) or (DATA.effects[tech.effect_id].effect_commands[0].b == unit_id and DATA.effects[tech.effect_id].effect_commands[0].type == 3):
+                                                                # Add the effect command to the tech tree effect
+                                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, i))
+                                                                #print(f'Tech for unit ({item}):', i)
+                                                                continue
+                                                        except:
+                                                            pass
+                                except Exception as e:
+                                    print(str(e))
+
+                            '''while True:
                                 # Tech tree main menu
                                 print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Tech Tree Menu {title_emoji}'))
                                 print(colour(Fore.WHITE, "0️⃣  Barracks"))
@@ -2861,7 +2965,7 @@ def main():
                                     else:
                                         pass
 
-                                '''while True:
+                                while True:
                                     global TECH_TREE
                                     TECH_TREE = {}
                                     with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
