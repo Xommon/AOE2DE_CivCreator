@@ -459,8 +459,6 @@ def make_completer(options_list):
     return completer
 
 # Create bonuses
-import requests
-
 def create_bonus(bonus_string_original, civ_id):
     # Create an empty list for bonus objects
     bonus_items = []
@@ -833,14 +831,20 @@ def create_bonus(bonus_string_original, civ_id):
     for bonus_line in bonus_lines:
         # Age
         if bonus_line.age:
+            if final_techs[-1].required_techs != (0, 0, 0, 0, 0, 0):
+                # Create a new tech for the age
+                final_techs.append(copy.deepcopy(final_techs[-1]))
+
             # Add the age to the tech
-            final_techs[0].required_techs = (bonus_line.age, 0, 0, 0, 0, 0)
-            final_techs[0].required_tech_count = 1
+            final_techs[-1].required_techs = (bonus_line.age, 0, 0, 0, 0, 0)
+            final_techs[-1].required_tech_count = 1
 
         # Triggers
         if bonus_line.trigger == 'do not need houses' or bonus_line.trigger == 'does not need houses':
             final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(1, 4, 1, -1, 2000))
             final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(2, 70, 0, -1, 0))
+        elif bonus_line.trigger == 'start with':
+            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(1, bonus_line.resource + 91, 1, -1, bonus_line.number))
 
         # General edit stat of unit
         else:
@@ -853,7 +857,7 @@ def create_bonus(bonus_string_original, civ_id):
     # Pass on the tech and the effect
     return final_techs, final_effects
 
-def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
+'''def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
     # Get unit name or tech name
     is_tech = '_' in str(unit_index)
     if is_tech:
@@ -913,7 +917,7 @@ def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
             if effect_command.type == 102 and effect_command.d == tech_index:
                 DATA.effects[tech_tree_index].effect_commands.pop(i)
     elif mode == 'disable':
-        DATA.effects[tech_tree_index].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))
+        DATA.effects[tech_tree_index].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))'''
 
 def open_mod(mod_folder):
     with_real_progress(lambda progress: load_dat(progress, rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat'), 'Loading Mod', total_steps=100)
@@ -1726,6 +1730,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         naasiri.creatable.button_id = 1
         naasiri.type_50.attacks[0].amount = 7
         naasiri.type_50.displayed_attack = 7
+        naasiri.creatable.train_time = 22
         civ.units.append(naasiri)
 
         # Elite Naasiri
@@ -1735,8 +1740,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_naasiri.language_dll_name = 96000
         elite_naasiri.language_dll_creation = 97000
         elite_naasiri.name = 'Elite Naasiri'
-        elite_naasiri.creatable.train_location_id = 82
-        elite_naasiri.creatable.button_id = 1
         elite_naasiri.type_50.attacks[0].amount = 9
         elite_naasiri.type_50.displayed_attack = 9
         elite_naasiri.hit_points = 110
