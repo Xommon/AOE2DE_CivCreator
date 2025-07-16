@@ -719,6 +719,18 @@ def create_bonus(bonus_string_original, civ_id):
             bonus_lines.append(Bonus_Line(unit=int(item[1:])))
             selected_lines += 1
 
+        # Age
+        elif item[0] == 'A':
+            # Choose when the age is set
+            start_index = 0
+            for i, line in enumerate(bonus_lines):
+                if line.category == bonus_lines[-1].category and line.unit == bonus_lines[-1].unit and line.age == -1:
+                    start_index = i
+                    break
+
+            # Set the age for the first line
+            bonus_lines[start_index].age = int(item[1:])
+
         # Stat
         elif item.startswith('S'):
             # Parse stat and substat
@@ -738,8 +750,17 @@ def create_bonus(bonus_string_original, civ_id):
                 # Grab the recent group
                 recent = bonus_lines[-selected_lines:]
 
-                # Check if ANY are incomplete
-                any_unset = any(line.stat == -1 for line in recent)
+                # Choose when the stat is set
+                start_index = 0
+                for i, line in enumerate(bonus_lines):
+                    if line.category == bonus_lines[-1].category and line.unit == bonus_lines[-1].unit and line.stat == -1:
+                        start_index = i
+                        break
+
+                # Set the stat for the first line
+                bonus_lines[start_index].stat = int(item[1:])
+
+                '''any_unset = any(line.stat == -1 for line in recent)
 
                 if any_unset:
                     # Just set stat/substat on all
@@ -761,7 +782,7 @@ def create_bonus(bonus_string_original, civ_id):
                             trigger=line.trigger
                         )
                         clones.append(new_line)
-                    bonus_lines.extend(clones)
+                    bonus_lines.extend(clones)'''
 
         # Unified handler for Resource, Number, Age, and Trigger
         elif item[0] in {'R', 'N', 'A', 'X'}:
@@ -830,7 +851,7 @@ def create_bonus(bonus_string_original, civ_id):
     # Turn bonus lines into techs and effects
     for bonus_line in bonus_lines:
         # Age
-        if bonus_line.age:
+        if bonus_line.age != -1:
             if final_techs[-1].required_techs != (0, 0, 0, 0, 0, 0):
                 # Create a new tech for the age
                 final_techs.append(copy.deepcopy(final_techs[-1]))
@@ -1086,6 +1107,21 @@ def open_mod(mod_folder):
                     UNIT_CATEGORIES[k] = [old, v]
         else:
             UNIT_CATEGORIES[k] = v
+
+    # Send the unit categories to the LLM
+    with open(f'{os.path.dirname(os.path.abspath(__file__))}/Modelfile', 'r+') as LLM_file:
+        # Read all lines
+        LLM_lines = LLM_file.readlines()
+        if len(LLM_lines) > 1:
+            # Modify the second-to-last line
+            LLM_lines[-2] = f'{LLM_lines[-2].strip()} {UNIT_CATEGORIES}\n'
+
+            # Go back to the start
+            LLM_file.seek(0)
+            # Write back all lines
+            LLM_file.writelines(LLM_lines)
+            # Truncate to remove any leftover content
+            LLM_file.truncate()
 
     # DEBUG: Print dictionary
     #for key, value in UNIT_CATEGORIES.items():
@@ -1666,7 +1702,17 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         canoe.creatable.train_location_id = 45
         canoe.creatable.button_id = 4
         canoe.type_50.attacks[0].amount = 8
+        canoe.type_50.reload_time = 2
+        canoe.type_50.displayed_reload_time = 2
         civ.units.append(canoe)
+
+        # Add guns upgrade for the Canoe
+        DATA.effects[174].effect_commands.append(
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 16, 380),
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 65, 380),
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 10, 3.45),
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 9, 785)
+        )
 
         # War Canoe
         war_canoe = copy.deepcopy(base_unit)
@@ -1691,7 +1737,17 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         war_canoe.type_50.displayed_attack = 8
         war_canoe.hit_points = 90
         war_canoe.type_50.attacks[0].amount = 10
+        war_canoe.type_50.reload_time = 2
+        war_canoe.type_50.displayed_reload_time = 2
         civ.units.append(war_canoe)
+
+        # Add guns upgrade for the War Canoe
+        DATA.effects[174].effect_commands.append(
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 16, 380),
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 65, 380),
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 10, 3.45),
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 9, 785)
+        )
 
         # Elite War Canoe
         elite_war_canoe = copy.deepcopy(base_unit)
@@ -1715,9 +1771,20 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.type_50.attacks[2].amount = 9
         elite_war_canoe.type_50.displayed_attack = 9
         elite_war_canoe.creatable.total_projectiles = 3
+        elite_war_canoe.creatable.max_total_projectiles = 3
         elite_war_canoe.hit_points = 110
         elite_war_canoe.type_50.attacks[0].amount = 12
+        elite_war_canoe.type_50.reload_time = 2
+        elite_war_canoe.type_50.displayed_reload_time = 2
         civ.units.append(elite_war_canoe)
+
+        # Add guns upgrade for the Elite War Canoe
+        DATA.effects[174].effect_commands.append(
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 16, 380),
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 65, 380),
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 10, 3.45),
+            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 9, 785)
+        )
 
         # Naasiri
         naasiri = copy.deepcopy(DATA.civs[1].units[2327])

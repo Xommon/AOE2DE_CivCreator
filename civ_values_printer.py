@@ -22,4 +22,5 @@ time.sleep(1)
 
 # All code after here
 
-print(DATA.effects[3].effect_commands[8])
+for ec in DATA.effects[174].effect_commands:
+    print(ec)

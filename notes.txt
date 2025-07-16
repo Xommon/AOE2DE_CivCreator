@@ -19,3 +19,4 @@ To create a new mod, select the new mod selection on the main menu.
 - PASTURES: Mongols, Berbers, Huns, and Cumans have pastures enabled instead of farms.
 - DRAGON SHIP: The Dragon Ship unique unit for the Chinese is reverted back to the Fast Fire Ship, due to the War Canoe using its graphics.
 - CANOES: The Canoe/War Canoe/Elite War Canoe replace all warship units for the Aztecs, Maya, Inca, Huns, Mongols, Tatars, Malians, Cumans, and Malay. Each have access to all three canoes types.
+- CANOES: Civilisations with the canoe-line AND the hand cannoneer will have their canoe-line projectiles swapped with the hand cannoneer project, attack increased, and reload time increased
