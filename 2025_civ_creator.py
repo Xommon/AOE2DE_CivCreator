@@ -1698,6 +1698,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     base_unit = DATA.civs[1].units[778]
     for civ in DATA.civs:
         # Canoe
+        canoe_id = len(civ.units)
         canoe = copy.deepcopy(base_unit)
         canoe.creatable.train_location_id = 45
         canoe.creatable.button_id = 4
@@ -1705,14 +1706,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         canoe.type_50.reload_time = 2
         canoe.type_50.displayed_reload_time = 2
         civ.units.append(canoe)
-
-        # Add guns upgrade for the Canoe
-        DATA.effects[174].effect_commands.append(
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 16, 380),
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 65, 380),
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 10, 3.45),
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 9, 785)
-        )
 
         # War Canoe
         war_canoe = copy.deepcopy(base_unit)
@@ -1740,14 +1733,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         war_canoe.type_50.reload_time = 2
         war_canoe.type_50.displayed_reload_time = 2
         civ.units.append(war_canoe)
-
-        # Add guns upgrade for the War Canoe
-        DATA.effects[174].effect_commands.append(
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 16, 380),
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 65, 380),
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 10, 3.45),
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 9, 785)
-        )
 
         # Elite War Canoe
         elite_war_canoe = copy.deepcopy(base_unit)
@@ -1778,13 +1763,13 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.type_50.displayed_reload_time = 2
         civ.units.append(elite_war_canoe)
 
-        # Add guns upgrade for the Elite War Canoe
-        DATA.effects[174].effect_commands.append(
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 16, 380),
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 65, 380),
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 10, 3.45),
-            genieutils.effect.EffectCommand(0, len(DATA.civs[1].units)-1, -1, 9, 785)
-        )
+        # Projectiles for canoes
+        civ.units.append(copy.deepcopy(civ.units[512])) # Arrow
+        canoe_arrow_id = len(civ.units) - 1
+        civ.units.append(copy.deepcopy(civ.units[380])) # Bullets
+        civ.units[canoe_id].projectile = 512
+        civ.units[canoe_id + 1].projectile = 512
+        civ.units[canoe_id + 2].projectile = 512
 
         # Naasiri
         naasiri = copy.deepcopy(DATA.civs[1].units[2327])
@@ -1813,20 +1798,33 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         civ.units.append(elite_naasiri)
 
     # Set civilisations to canoe docks by disabling all other warships
-    for effect_id in [447, 489, 3, 648, 42, 710, 448, 227, 708]:
+    for effect_id in [447, 489, 3, 648, 42, 710, 448, 227, 708, 652, 646]:
         # Disable the warships
         for tech_id in [604, 243, 246, 605, 244, 37, 376]:
             DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
 
         # Swap galley-line for canoe-line
-        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 539 , len(DATA.civs[1].units)-3, -1, -1))
-        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 21 , len(DATA.civs[1].units)-2, -1, -1))
-        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 442 , len(DATA.civs[1].units)-1, -1, -1))
+        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 539 , canoe_id, -1, -1))
+        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 21 , canoe_id+1, -1, -1))
+        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 442 , canoe_id+2, -1, -1))
 
         # Allow every canoe civ to train the Elite War Canoe
         for i, ec in enumerate(DATA.effects[effect_id].effect_commands):
             if ec.type == 102 and ec.d == 35:
-                DATA.effects[447].effect_commands.pop(i)
+                DATA.effects[effect_id].effect_commands.pop(i)
+
+    # Enable gun canoes for civs with canoes and hand cannoneers
+    DATA.techs.append(copy.deepcopy(DATA.techs[1250]))
+    DATA.techs[-1].name = 'Gun Canoe'
+    DATA.effects.append(genieutils.effect.Effect(name='Gun Canoe', effect_commands=[]))
+    DATA.techs[-1].effect_id = len(DATA.effects) - 1
+    DATA.effects[-1].effect_commands.append(genieutils.effect.EffectCommand(3, canoe_arrow_id, canoe_arrow_id+1, -1, 0))
+    for i in range (3):
+        pass
+        #DATA.effects[174].effect_commands.append(genieutils.effect.EffectCommand(0, canoe_id+i, -1, 16, 380))
+        #DATA.effects[174].effect_commands.append(genieutils.effect.EffectCommand(0, canoe_id+i, -1, 65, 380))
+        #DATA.effects[174].effect_commands.append(genieutils.effect.EffectCommand(0, canoe_id+i, -1, 10, 3.45))
+        #DATA.effects[174].effect_commands.append(genieutils.effect.EffectCommand(0, canoe_id+i, -1, 9, 785))
 
     # Correct name mistakes
     DATA.civs[1].name = 'Britons'
@@ -2871,7 +2869,7 @@ def main():
                             while True:
                                 try:
                                     # Prompt user for action
-                                    tech_tree_action = input('\nSpecify units: ').lower()
+                                    tech_tree_action = input('\nSpecify units (start line with * to enable units): ').lower()
 
                                     # Get tech tree effect ID
                                     tech_tree_indexes = [254, 258, 259, 262, 255, 257, 256, 260, 261, 263, 275, 277, 276, 446, 447, 449, 448, 504, 20, 1, 3, 5, 7, 31, 28, 42, 27, 646, 648, 650, 652, 706, 708, 710, 712, 782, 784, 801, 803, 808, 840, 842, 890, 923, 927, 1101, 1107, 1129, 1030, 1031, 1028, 986, 988]
@@ -2889,6 +2887,10 @@ def main():
                                         print('Tech tree cleared.')
                                         time.sleep(1)
                                     else:
+                                        # Check if enable or disable
+                                        enable = '*' in tech_tree_action
+                                        tech_tree_action = tech_tree_action.replace('*', '').strip()
+
                                         # Separate items into a list
                                         items_to_disable = tech_tree_action.replace(', ', ',').split(',')
 
@@ -2909,7 +2911,7 @@ def main():
                                             if unit_id == -1 and tech_id == -1:
                                                 print(colour(Fore.RED, f'ERROR: Cannot find item: {item}'))
                                                 continue
-                                            else:
+                                            elif not enable:
                                                 for i, tech in enumerate(DATA.techs):
                                                     # Disable tech
                                                     if tech_id != -1 and tech.name.lower() == item.lower():
@@ -2927,6 +2929,27 @@ def main():
                                                                 continue
                                                         except:
                                                             pass
+                                            elif enable:
+                                                # Gather all techs to enable
+                                                items_to_enable = []
+                                                for item in items_to_disable:
+                                                    if item == 'trebuchet':
+                                                        item = 'trebuchet (packed)'
+                                                    
+                                                    if get_tech_id(item) != -1:
+                                                        items_to_enable.append(get_tech_id(item))
+                                                    elif get_unit_id(item) != -1:
+                                                        items_to_enable.append(get_unit_id(item))
+
+                                                # Enable unit or tech
+                                                for ec in DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands[::-1]:
+                                                    if ec.type == 102 and ec.d in items_to_enable:
+                                                        # Remove the effect command from the tech tree
+                                                        DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.remove(ec)
+                                                        #print(f'Removed effect command for {ec.d}.')
+                                                
+                                        # Print results
+                                        print('Units enabled.' if enable else 'Units disabled.')
                                 except Exception as e:
                                     print(str(e))
 
