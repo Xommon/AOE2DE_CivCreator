@@ -22,5 +22,4 @@ time.sleep(1)
 
 # All code after here
 
-for ec in DATA.effects[174].effect_commands:
-    print(ec)
+print(DATA.civs[1].units[875].creatable.resource_costs)

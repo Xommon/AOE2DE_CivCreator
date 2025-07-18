@@ -460,15 +460,145 @@ def make_completer(options_list):
 
 # Create bonuses
 def create_bonus(bonus_string_original, civ_id):
-    # Create an empty list for bonus objects
-    bonus_items = []
+    def get_units_and_categories(string):
+        # Split units into a list
+        string = string.replace('and', ',')
+        units = string.split(',')
+
+        # Clean up the strings
+        units = [unit.strip() for unit in units if unit.strip()]
+
+        # Final output lists
+        unit_ids = []
+        category_ids = []
+
+        # Category dictionary
+        category_dictionary = {
+            'archer': 0, 'infantry': 6, 'cavalry': 12, 'siege': 13,
+            'monk': 18, 'mounted hand cannoneer': 23, 'cavalry archer': 36,
+            'hand cannoneer': 44, 'siege weapon': 55
+        }
+
+        def generate_variants(p):
+            variants = {p}
+            if p.endswith('ies'):
+                variants.add(p[:-3] + 'y')
+            if p.endswith('s') and not p.endswith('ss'):
+                variants.add(p[:-1])
+            if 'men' in p:
+                variants.add(p.replace('men', 'man'))
+            return variants
+
+        for unit in units:
+            matched = False
+            # Try matching against category variants
+            for variant in generate_variants(unit):
+                if variant in category_dictionary:
+                    category_ids.append(category_dictionary[variant])
+                    matched = True
+                    break
+            if not matched:
+                # Try to get unit ID
+                unit_id = get_unit_id(unit)
+                if unit_id != -1:
+                    unit_ids.append(unit_id)
+
+        return unit_ids, category_ids
+
+    def get_numbers(string, inverse=False):
+        # Clean the string
+        string = string.strip()
+
+        # Determine if percent
+        percent = '%' in string
+        string = string.replace('%', '')
+
+        # Determine if positive or negative
+        negative = '-' in string
+        negative = '+' not in string
+        string = string.replace('-', '').replace('+', '')
+
+        # Influence by inverse
+        if inverse:
+            negative = not inverse
+
+        # Split into a list
+        numbers = string.split('/')
+
+        # Bonus numbers
+        bonus_numbers = []
+
+        # Convert to int or float
+        for number in numbers:
+            number = number.strip()
+            if not number:
+                continue
+
+            # Check if the number is a percentage
+            if percent:
+                if negative:
+                    number = float((100 - float(number)) / 100)
+                else:
+                    number = float(float(number) / 100 + 1)
+            else:
+                number = int(number)
+                if negative:
+                    number *= -1
+
+            # Return the number
+            bonus_numbers.append(number)
+
+        return bonus_numbers
+
+    # Prepare final techs and effects
+    final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', repeatable=1)]
+    final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', effect_commands=[])]
 
     # Lowercase the bonus string
     bonus_string = bonus_string_original.lower()
 
+    # Separate the bonus string into clauses
+    bonus_strings = bonus_string.split(';')
+
+    # Read each clause
+    for bonus in bonus_strings:
+        # Clean up the clause
+        bonus = bonus.strip()
+
+        # [Unit] work [Number] faster
+        if 'work' in bonus and ('faster' in bonus or 'slower' in bonus):
+            # Extract units and numbers
+            temp_bonus = bonus.replace('work', '|').replace('faster', '|').replace('slower', '|').split('|')
+            bonus_numbers = get_numbers(temp_bonus[1], False)
+            bonus_units, bonus_categories = get_units_and_categories(temp_bonus[0])
+
+            # Create the effect commands
+            for number in bonus_numbers:
+                for category_id in bonus_categories:
+                    final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(5 if isinstance(number, float) else 4, -1, category_id, 13, number))
+                for unit_id in bonus_units:
+                    final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(5 if isinstance(number, float) else 4, unit_id, -1, 13, number))
+
+    # Return the final techs and final effects
+    return final_techs, final_effects
+
+'''def create_bonus(bonus_string_original, civ_id):
+    # Clean up string and check for cosmetic
+    bonus_string_original = bonus_string_original.strip()
+    cosmetic = bonus_string_original.startswith('*')
+    if cosmetic:
+        bonus_string_original = bonus_string_original[1:].strip()
+
     # Create the tech and effect, set the civilisation and names
     final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', repeatable=1)]
     final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', effect_commands=[])]
+
+    # Check for cosmetic bonus
+    if cosmetic:
+        return final_techs, final_effects
+    
+    # Lowercase the bonus string
+    bonus_string = bonus_string_original.lower()
 
     # Split the bonus string into words
     words = bonus_string.lower().split()
@@ -760,7 +890,7 @@ def create_bonus(bonus_string_original, civ_id):
                 # Set the stat for the first line
                 bonus_lines[start_index].stat = int(item[1:])
 
-                '''any_unset = any(line.stat == -1 for line in recent)
+                any_unset = any(line.stat == -1 for line in recent)
 
                 if any_unset:
                     # Just set stat/substat on all
@@ -782,7 +912,7 @@ def create_bonus(bonus_string_original, civ_id):
                             trigger=line.trigger
                         )
                         clones.append(new_line)
-                    bonus_lines.extend(clones)'''
+                    bonus_lines.extend(clones)
 
         # Unified handler for Resource, Number, Age, and Trigger
         elif item[0] in {'R', 'N', 'A', 'X'}:
@@ -877,7 +1007,7 @@ def create_bonus(bonus_string_original, civ_id):
 
     # Pass on the tech and the effect
     return final_techs, final_effects
-
+'''
 '''def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
     # Get unit name or tech name
     is_tech = '_' in str(unit_index)
@@ -1284,9 +1414,11 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                     correct_name = 'Britons'
                 elif correct_name == 'French':
                     correct_name = 'Franks'
+                elif correct_name == 'Byzantine':
+                    correct_name = 'Byzantines'
 
                 # Skip certain civilizations
-                if correct_name == 'Athenians' or correct_name == 'Spartans' or correct_name == 'Achaemenids':
+                if correct_name in ['Athenians', 'Spartans', 'Achaemenids', 'Wu', 'Shu', 'Wei']:
                     continue
 
                 # Create new name
@@ -1687,6 +1819,12 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             if civ.name != 'Gaia' and civ.name != 'Spartans' and civ.name != 'Athenians' and civ.name != 'Achaemenids':
                 pickle.dump(civ.units, file)
 
+    # Set the Dock selection sound to the Port selection sound
+    DATA.civs[1].units[45].selection_sound = 708
+    DATA.civs[1].units[47].selection_sound = 708
+    DATA.civs[1].units[51].selection_sound = 708
+    DATA.civs[1].units[133].selection_sound = 708
+
     # Remove the Dragon Ship upgrade for the Chinese
     DATA.techs[1010].effect_id = -1
     for i, ec in enumerate(DATA.effects[257].effect_commands):
@@ -1705,6 +1843,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         canoe.type_50.attacks[0].amount = 8
         canoe.type_50.reload_time = 2
         canoe.type_50.displayed_reload_time = 2
+        canoe.line_of_sight = 7
+        canoe.bird.search_radius = 7
         civ.units.append(canoe)
 
         # War Canoe
@@ -1726,6 +1866,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         war_canoe.icon_id = civ.units[1302].icon_id
         war_canoe.type_50.max_range = 7
         war_canoe.type_50.displayed_range = 7
+        war_canoe.line_of_sight = 9
+        war_canoe.bird.search_radius = 9
         war_canoe.type_50.attacks[2].amount = 8
         war_canoe.type_50.displayed_attack = 8
         war_canoe.hit_points = 90
@@ -1753,6 +1895,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.icon_id = civ.units[1302].icon_id
         elite_war_canoe.type_50.max_range = 9
         elite_war_canoe.type_50.displayed_range = 9
+        elite_war_canoe.line_of_sight = 11
+        elite_war_canoe.bird.search_radius = 11
         elite_war_canoe.type_50.attacks[2].amount = 9
         elite_war_canoe.type_50.displayed_attack = 9
         elite_war_canoe.creatable.total_projectiles = 3
@@ -1762,14 +1906,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.type_50.reload_time = 2
         elite_war_canoe.type_50.displayed_reload_time = 2
         civ.units.append(elite_war_canoe)
-
-        # Projectiles for canoes
-        civ.units.append(copy.deepcopy(civ.units[512])) # Arrow
-        canoe_arrow_id = len(civ.units) - 1
-        civ.units.append(copy.deepcopy(civ.units[380])) # Bullets
-        civ.units[canoe_id].projectile = 512
-        civ.units[canoe_id + 1].projectile = 512
-        civ.units[canoe_id + 2].projectile = 512
 
         # Naasiri
         naasiri = copy.deepcopy(DATA.civs[1].units[2327])
@@ -1797,6 +1933,42 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_naasiri.hit_points = 110
         civ.units.append(elite_naasiri)
 
+        # Elephant Gunner
+        elephant_gunner = copy.deepcopy(DATA.civs[1].units[875])
+        change_string(98000, 'Elephant Gunner')
+        change_string(99000, 'Create Elephant Gunner')
+        elephant_gunner.language_dll_name = 98000
+        elephant_gunner.language_dll_creation = 99000
+        elephant_gunner.name = 'Elephant Gunner'
+        elephant_gunner.creatable.train_location_id = 82
+        elephant_gunner.creatable.button_id = 1
+        elephant_gunner.type_50.max_range = 7
+        elephant_gunner.type_50.displayed_range = 7
+        elephant_gunner.line_of_sight = 9
+        elephant_gunner.bird.search_radius = 9
+        elephant_gunner.type_50.attacks[1].amount = 19
+        elephant_gunner.type_50.displayed_attack = 19
+        elephant_gunner.hit_points = 200
+        elephant_gunner.speed = 0.8
+        elephant_gunner.type_50.reload_time = 3.45
+        elephant_gunner.type_50.accuracy_percent = 75
+        elephant_gunner.creatable.train_time = 28
+        elephant_gunner.creatable.resource_costs = (ResourceCost(type=0, amount=80, flag=1), ResourceCost(type=3, amount=100, flag=1), ResourceCost(type=4, amount=1, flag=0))
+        elephant_gunner.type_50.projectile_unit_id = 380
+        civ.units.append(elephant_gunner)
+
+        # Elite Elephant Gunner
+        elite_elephant_gunner = copy.deepcopy(elephant_gunner)
+        change_string(100000, 'Elite Elephant Gunner')
+        change_string(101000, 'Create Elite Elephant Gunner')
+        elite_elephant_gunner.language_dll_name = 100000
+        elite_elephant_gunner.language_dll_creation = 101000
+        elite_elephant_gunner.name = 'Elite Elephant Gunner'
+        elite_elephant_gunner.type_50.attacks[1].amount = 21
+        elite_elephant_gunner.type_50.displayed_attack = 21
+        elite_elephant_gunner.hit_points = 250
+        civ.units.append(elite_elephant_gunner)
+
     # Set civilisations to canoe docks by disabling all other warships
     for effect_id in [447, 489, 3, 648, 42, 710, 448, 227, 708, 652, 646]:
         # Disable the warships
@@ -1814,11 +1986,11 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 DATA.effects[effect_id].effect_commands.pop(i)
 
     # Enable gun canoes for civs with canoes and hand cannoneers
-    DATA.techs.append(copy.deepcopy(DATA.techs[1250]))
-    DATA.techs[-1].name = 'Gun Canoe'
-    DATA.effects.append(genieutils.effect.Effect(name='Gun Canoe', effect_commands=[]))
-    DATA.techs[-1].effect_id = len(DATA.effects) - 1
-    DATA.effects[-1].effect_commands.append(genieutils.effect.EffectCommand(3, canoe_arrow_id, canoe_arrow_id+1, -1, 0))
+    #DATA.techs.append(copy.deepcopy(DATA.techs[1250]))
+    #DATA.techs[-1].name = 'Gun Canoe'
+    #DATA.effects.append(genieutils.effect.Effect(name='Gun Canoe', effect_commands=[]))
+    #DATA.techs[-1].effect_id = len(DATA.effects) - 1
+    #DATA.effects[-1].effect_commands.append(genieutils.effect.EffectCommand(3, canoe_arrow_id, canoe_arrow_id+1, -1, 0))
     for i in range (3):
         pass
         #DATA.effects[174].effect_commands.append(genieutils.effect.EffectCommand(0, canoe_id+i, -1, 16, 380))
@@ -2441,7 +2613,7 @@ def main():
                         # Unique Unit
                         elif selection == '3':
                             # Populate all castle units
-                            all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel", 'naasiri']
+                            all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel", 'naasiri', 'elephant gunner']
 
                             # Get user input
                             while True:
@@ -2828,7 +3000,7 @@ def main():
                                     all_languages.append('Franks')
                                 else:
                                     all_languages.append(civ.name)
-                            all_languages.extend(['Greek', 'Somalis'])
+                            all_languages.extend(['Greek', 'Somalis', 'Siamese'])
 
                             # Change language
                             while True:
