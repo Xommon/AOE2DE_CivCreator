@@ -182,20 +182,24 @@ def get_unit_name(unit_id):
             return 'NOT_FOUND^'
             
 def get_unit_id(name):
+    name = name.lower()
     names = [name]
     # Try to depluralise the word
     if name[:-1] == 's':
         names.append(name[-1])
     if name[:-3] == 'ies':
         names.append(f'{name[-3]}y')
-    if name == 'men-at-arms':
-        names.append('man-at-arms')
+    if 'men' in name:
+        names.append(name.replace('men', 'man'))
 
     for name_type in names:
         try:
             for i, unit in enumerate(DATA.civs[1].units):
                 if unit.name.lower() == name_type.lower():
-                    return i
+                    if i == 778:
+                        continue
+                    else:
+                        return i
         except:
             # As a backup, search for name in the strings JSON file
             string_ids = []
@@ -210,7 +214,10 @@ def get_unit_id(name):
             for i, unit in enumerate(DATA.civs[1].units):
                 try:
                     if str(unit.language_dll_name) in string_ids:
-                        return i
+                        if i == 778:
+                            continue
+                        else:
+                            return i
                 except:
                     pass
 
@@ -1424,7 +1431,7 @@ def open_mod(mod_folder):
             UNIT_CATEGORIES[k] = v
 
     # Send the unit categories to the LLM
-    with open(f'{os.path.dirname(os.path.abspath(__file__))}/Modelfile', 'r+', encoding='utf-8') as LLM_file:
+    '''with open(f'{os.path.dirname(os.path.abspath(__file__))}/Modelfile', 'r+', encoding='utf-8') as LLM_file:
         # Read all lines
         LLM_lines = LLM_file.readlines()
         if len(LLM_lines) > 1:
@@ -1436,7 +1443,21 @@ def open_mod(mod_folder):
             # Write back all lines
             LLM_file.writelines(LLM_lines)
             # Truncate to remove any leftover content
-            LLM_file.truncate()
+            LLM_file.truncate()'''
+    
+    # Assemble all castle units
+    global ALL_CASTLE_UNITS
+    ALL_CASTLE_UNITS = []
+    for i, unit in enumerate(DATA.civs[1].units):
+        try:
+            for location in unit.creatable.train_locations:
+                if location.unit_id == 82 and location.button_id == 1:
+                    # Check if there is a regular version and an elite version
+                    if 'elite' not in get_unit_name(i).lower() and get_unit_id(f'elite {get_unit_name(i)}') != None:
+                        ALL_CASTLE_UNITS.append(get_unit_name(i))
+                        break
+        except:
+            pass
 
     # DEBUG: Print dictionary
     #for key, value in UNIT_CATEGORIES.items():
@@ -1863,7 +1884,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             except:
                 pass
 
-    # Remove the Caravansarai text for the Persians/Hindustanis
+    # Remove the Caravanserai text for the Persians/Hindustanis
     with open(MOD_STRINGS, 'r+', encoding='utf-8') as modded_file:
         modded_strings = modded_file.readlines()
         modded_file.seek(0)  # rewind to start
@@ -1872,13 +1893,24 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             modded_file.write(line)
         modded_file.truncate()
 
-    # Make the Caravansarai potentially available to all civs
+    # Make the Caravanserai potentially available to all civs
     DATA.techs[518].civ = -1
     DATA.techs[552].effect_id = -1
-    DATA.techs[552].name = 'Caravansarai (DISABLED)'
+    DATA.techs[552].name = 'Caravanserai (DISABLED)'
     for effect in [effect for effect in DATA.effects if 'tech tree' in effect.name.lower()]:
         if 'persians' not in effect.name.lower() and 'hindustanis' not in effect.name.lower():
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 518))
+
+    # Make the Winged Hussar potentially available to all civs
+    DATA.techs[786].required_techs[0] = 103
+    DATA.techs[786].required_techs[2] = 0
+    DATA.techs[786].required_techs[3] = 0
+    for tech_id in [788, 789, 791]:
+        DATA.techs[tech_id].effect_id = -1
+
+    # Make other unique units potentially available to all civs
+    for tech_id in [521, 858, 655, 598, 599, 528, 992, 1037, 522, 773, 885, 1075, 272, 447, 448, 948, 84, 703, 787, 1005, 1065, 790, 842, 843, 526]:
+        DATA.techs[tech_id].civ = -1
 
     # Change the Monastery and Monk graphics for the Vikings and Lithuanians
     graphic_replacements = [1712, 1712, 1712, 1712, 1526, 1940, 1941, 1941, 1941, 1941]
@@ -2105,13 +2137,12 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             break
 
     # Create the Canoe, War Canoe, and Elite War Canoe units, techs, and effects
-    base_unit = DATA.civs[1].units[778]
     for civ in DATA.civs:
         # Canoe
         canoe_id = len(civ.units)
-        canoe = copy.deepcopy(base_unit)
-        canoe.creatable.train_location_id = 45
-        canoe.creatable.button_id = 4
+        canoe = copy.deepcopy(DATA.civs[1].units[778])
+        canoe.creatable.train_locations[0].unit_id = 45
+        canoe.creatable.train_locations[0].button_id = 4
         canoe.type_50.attacks[0].amount = 8
         canoe.type_50.reload_time = 2
         canoe.type_50.displayed_reload_time = 2
@@ -2120,14 +2151,12 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         civ.units.append(canoe)
 
         # War Canoe
-        war_canoe = copy.deepcopy(base_unit)
+        war_canoe = copy.deepcopy(canoe)
         change_string(90000, 'War Canoe')
         change_string(91000, 'Create War Canoe')
         war_canoe.language_dll_name = 90000
         war_canoe.language_dll_creation = 91000
         war_canoe.name = 'War Canoe'
-        war_canoe.creatable.train_location_id = 45
-        war_canoe.creatable.button_id = 4
         war_canoe.standing_graphic = civ.units[1302].standing_graphic
         war_canoe.dying_graphic = civ.units[1302].dying_graphic
         war_canoe.undead_graphic = civ.units[1302].undead_graphic
@@ -2149,14 +2178,12 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         civ.units.append(war_canoe)
 
         # Elite War Canoe
-        elite_war_canoe = copy.deepcopy(base_unit)
+        elite_war_canoe = copy.deepcopy(war_canoe)
         change_string(92000, 'Elite War Canoe')
         change_string(93000, 'Create Elite War Canoe')
         elite_war_canoe.language_dll_name = 92000
         elite_war_canoe.language_dll_creation = 93000
         elite_war_canoe.name = 'Elite War Canoe'
-        elite_war_canoe.creatable.train_location_id = 45
-        elite_war_canoe.creatable.button_id = 4
         elite_war_canoe.standing_graphic = civ.units[1302].standing_graphic
         elite_war_canoe.dying_graphic = civ.units[1302].dying_graphic
         elite_war_canoe.undead_graphic = civ.units[1302].undead_graphic
@@ -2186,8 +2213,9 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         naasiri.language_dll_name = 94000
         naasiri.language_dll_creation = 95000
         naasiri.name = 'Naasiri'
-        naasiri.creatable.train_location_id = 82
-        naasiri.creatable.button_id = 1
+        naasiri.creatable.train_locations[0].unit_id = 82
+        naasiri.creatable.train_locations[0].button_id = 1
+        naasiri.creatable.train_locations[0].train_time = 24
         naasiri.type_50.attacks[0].amount = 7
         naasiri.type_50.displayed_attack = 7
         naasiri.creatable.train_time = 22
@@ -2212,8 +2240,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elephant_gunner.language_dll_name = 98000
         elephant_gunner.language_dll_creation = 99000
         elephant_gunner.name = 'Elephant Gunner'
-        elephant_gunner.creatable.train_location_id = 82
-        elephant_gunner.creatable.button_id = 1
+        elephant_gunner.creatable.train_locations[0].unit_id = 82
+        elephant_gunner.creatable.train_locations[0].button_id = 1
         elephant_gunner.type_50.max_range = 7
         elephant_gunner.type_50.displayed_range = 7
         elephant_gunner.line_of_sight = 9
@@ -2243,10 +2271,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
         # Flamethrower
         flamethrower = copy.deepcopy(DATA.civs[1].units[188])
-        flamethrower.creatable.train_location_id = 82
-        flamethrower.creatable.button_id = 1
-        elite_elephant_gunner.type_50.attacks[1].amount = 6
-        elite_elephant_gunner.type_50.displayed_attack = 6
+        flamethrower.creatable.train_locations[0].unit_id = 82
+        flamethrower.creatable.train_locations[0].button_id = 1
+        flamethrower.type_50.attacks[1].amount = 6
+        flamethrower.type_50.displayed_attack = 6
         civ.units.append(flamethrower)
 
         # Elite Flamethrower
@@ -2255,9 +2283,9 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         change_string(103000, 'Create Elite Flamethrower')
         elite_flamethrower.language_dll_name = 102000
         elite_flamethrower.language_dll_creation = 103000
-        elite_elephant_gunner.type_50.attacks[1].amount = 6
-        elite_elephant_gunner.type_50.displayed_attack = 6
-        elite_elephant_gunner.hit_points = 180
+        elite_flamethrower.type_50.attacks[1].amount = 6
+        elite_flamethrower.type_50.displayed_attack = 6
+        elite_flamethrower.hit_points = 180
         elite_flamethrower.name = 'Elite Flamethrower'
         civ.units.append(elite_flamethrower)
 
@@ -2267,26 +2295,32 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         change_string(105000, 'Create Weichafe')
         weichafe.language_dll_name = 104000
         weichafe.language_dll_creation = 105000
+        weichafe.creatable.train_locations[0].unit_id = 82
+        weichafe.creatable.train_locations[0].button_id = 1
         weichafe.class_ = 0
+        weichafe_base_attack = copy.deepcopy(weichafe.type_50.attacks[0])
         weichafe.type_50.attacks.clear()
-        weichafe.type_50.attacks.append(AttackOrArmor(3, 4))
+        weichafe.type_50.attacks.append(weichafe_base_attack)
+        weichafe.type_50.attacks[0].amount = 4
         weichafe.type_50.displayed_attack = 4
         weichafe.type_50.max_range = 4
         weichafe.type_50.displayed_range = 4
         weichafe.line_of_sight = 6
         weichafe.bird.search_radius = 6
-        #weichafe.bird.tasks
+        weichafe.bird.tasks = DATA.civs[1].units[1959].bird.tasks
+        for i in range(6, 20):
+            weichafe.bird.tasks[i].work_value_1 = -0.25
         weichafe.name = 'Weichafe'
         civ.units.append(weichafe)
 
         # Elite Weichafe
         elite_weichafe = copy.deepcopy(weichafe)
-        change_string(106000, 'Weichafe')
-        change_string(107000, 'Create Weichafe')
+        change_string(106000, 'Elite Weichafe')
+        change_string(107000, 'Create Elite Weichafe')
         elite_weichafe.language_dll_name = 106000
         elite_weichafe.language_dll_creation = 107000
         elite_weichafe.class_ = 0
-        elite_weichafe.type_50.attacks[0] = 5
+        elite_weichafe.type_50.attacks[0].amount = 5
         elite_weichafe.type_50.displayed_attack = 5
         elite_weichafe.type_50.max_range = 5
         elite_weichafe.type_50.displayed_range = 5
@@ -2459,8 +2493,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             file.write(line)
 
     # Save changes
-    #with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Formatting Mod', total_steps=100)
-    DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+    with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Formatting Mod', total_steps=100)
 
     # Open the new mod
     if revert:
@@ -2588,16 +2621,26 @@ def main():
                                 print(f"{i}: {allciv}")
                             continue
 
-                        # Check to break loop
-                        elif int(selection) < len(DATA.civs) - 4:
-                            break
+                        # Back
                         elif selection == '':
-                            continue
+                            break
+
                         else:
-                            print(colour(Fore.RED, 'ERROR: Invalid entry.'))
-                            continue
+                            # Catch error
+                            try:
+                                int(selection)
+                            except:
+                                print("\033[31mERROR: Invalid civilization ID.\033[0m")
+                                continue
+
+                            # Check to break loop
+                            if int(selection) < len(DATA.civs) - 4:
+                                break
+                            else:
+                                print(colour(Fore.RED, 'ERROR: Invalid entry.'))
+                                continue
                         
-                    if int(selection) < len(DATA.civs) or isinstance(selection, string):
+                    if int(selection) < len(DATA.civs):
                         # Use the civilization ID
                         selected_civ_index = int(selection)
                         if selected_civ_index > 44:
@@ -2971,15 +3014,15 @@ def main():
                         # Unique Unit
                         elif selection == '3':
                             # Populate all castle units
-                            all_castle_units = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel", 'naasiri', 'elephant gunner', 'flamethrower']
+                            ALL_CASTLE_UNITS = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pogoda', 'liao diao', 'white feather guard', 'tiger cavalry', 'fire archer', "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel", 'naasiri', 'elephant gunner', 'flamethrower', 'weichafe']
 
                             # Get user input
                             while True:
                                 new_castle_unit = input(f"\nEnter unique Castle unit for {selected_civ_name}: ").lower()
 
                                 if new_castle_unit == '?':
-                                    print(all_castle_units)
-                                elif new_castle_unit not in all_castle_units:
+                                    print(ALL_CASTLE_UNITS)
+                                elif new_castle_unit not in ALL_CASTLE_UNITS:
                                     print("\033[31mERROR: Unit not found.\033[0m")
                                 else:
                                     break
@@ -3072,9 +3115,9 @@ def main():
                                             
                                         # Get the units IDs
                                         if unit_name:
-                                            if unit_name == all_castle_units[selected_civ_index]:
+                                            if unit_name == ALL_CASTLE_UNITS[selected_civ_index]:
                                                 castle_unit_indexes[0] = i
-                                            elif unit_name == f'elite {all_castle_units[selected_civ_index]}':
+                                            elif unit_name == f'elite {ALL_CASTLE_UNITS[selected_civ_index]}':
                                                 castle_unit_indexes[1] = i
                                             elif unit_name == new_castle_unit:
                                                 castle_unit_indexes[2] = i
@@ -3408,13 +3451,21 @@ def main():
                                     if tech_tree_action == '':
                                         # Save data
                                         with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
-                                        print('Tech tree updated.')
+                                        print('Tech tree saved.')
                                         time.sleep(1)
                                         break
-                                    elif tech_tree_action == 'all' or tech_tree_action == 'clear':
+                                    elif tech_tree_action in ['all', 'clear']:
                                         # Clear the tech tree
                                         DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.clear()
-                                        print('Tech tree cleared.')
+                                        print('Tech tree completely cleared.')
+                                        time.sleep(1)
+                                    elif tech_tree_action in ['reset', 'default']:
+                                        # Clear the tech tree
+                                        DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.clear()
+                                        # Disable all unique units
+                                        for tech_id in [84, 272, 447, 448, 521, 522, 528, 574, 598, 599, 655, 703, 773, 786, 787, 790, 842, 843, 858, 885, 948, 992, 1005, 1008, 1012, 1013, 1014, 1037, 1065, 1075]:
+                                            DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
+                                        print('Tech tree set to default.')
                                         time.sleep(1)
                                     else:
                                         # Check if enable or disable
@@ -3426,6 +3477,24 @@ def main():
 
                                         # Disable tech tree items
                                         for item in items_to_disable:
+                                            # Disable tech
+                                            if item == 'stable':
+                                                # Disable stable units
+                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 25))
+                                                for tech_id in [204, 254, 428, 521, 858, 1065, 790, 842, 843, 166, 209, 265, 526, 236, 235, 435, 714, 715, 630, 631, 1033, 1032, 39]:
+                                                    DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
+                                                continue
+                                            elif item == 'ship dock':
+                                                # Disable all ships and enable canoes
+                                                for tech_id in [604, 243, 246, 605, 244, 37, 376, 886, 1034]:
+                                                    DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
+                                                
+                                                # Enable canoe-line
+                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 539, get_unit_id('canoe'), -1, -1))
+                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 21, get_unit_id('canoe')+1, -1, -1))
+                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 442, get_unit_id('canoe')+2, -1, -1))
+                                                continue
+
                                             # Correct mistakes
                                             if item == 'trebuchet':
                                                 item = 'trebuchet (packed)'
@@ -3443,7 +3512,6 @@ def main():
                                                 continue
                                             elif not enable:
                                                 for i, tech in enumerate(DATA.techs):
-                                                    # Disable tech
                                                     if tech_id != -1 and tech.name.lower() == item.lower():
                                                         DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
                                                         #print(f'Tech for technology ({item}):', i)

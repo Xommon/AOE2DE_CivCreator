@@ -22,4 +22,5 @@ time.sleep(1)
 
 # All code after here
 
-print(DATA.civs[1].units[875].creatable.resource_costs)
+for tech_id in [521, 858, 655, 598, 599, 528, 992, 1037, 522, 773, 885, 1075, 272, 447, 448, 948, 84, 703, 787, 1005, 1065, 790, 842, 843]:
+    print(tech_id, f': {DATA.techs[tech_id].name}')
