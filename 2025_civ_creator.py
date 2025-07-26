@@ -181,9 +181,12 @@ def get_unit_name(unit_id):
         except:
             return 'NOT_FOUND^'
             
-def get_unit_id(name):
+def get_unit_id(name, list_ids):
     name = name.lower()
     names = [name]
+
+    final_ids = []
+
     # Try to depluralise the word
     if name[:-1] == 's':
         names.append(name[-1])
@@ -198,6 +201,8 @@ def get_unit_id(name):
                 if unit.name.lower() == name_type.lower():
                     if i == 778:
                         continue
+                    elif list_ids == True:
+                        final_ids.append(i)
                     else:
                         return i
         except:
@@ -216,10 +221,14 @@ def get_unit_id(name):
                     if str(unit.language_dll_name) in string_ids:
                         if i == 778:
                             continue
+                        elif list_ids == True:
+                            final_ids.append(i)
                         else:
                             return i
                 except:
                     pass
+
+    return list(set(final_ids))
 
 def update_tech_tree_graphic(current_civ_name, tech_tree_id):
     # Load the JSON
@@ -398,7 +407,7 @@ def change_string(index, new_string):
 def get_unit_line(unit_id):
     # Convert name to ID if needed
     if isinstance(unit_id, str):
-        unit_id = get_unit_id(unit_id)
+        unit_id = get_unit_id(unit_id, False)
 
     # Step 1: Walk down to the base unit
     base_unit = None
@@ -444,7 +453,7 @@ def get_unit_line_ids(name):
     if str(name).isdigit():
         unit_index = int(name)
     else:
-        unit_index = get_unit_id(name)
+        unit_index = get_unit_id(name, False)
 
     base_id = DATA.civs[1].units[unit_index].base_id
     node_ids = []
@@ -504,8 +513,8 @@ def create_bonus(bonus_string_original, civ_id):
 
             # Only try get_unit_id if not matched as category
             if not found_category:
-                new_unit = get_unit_id(unit)
-                if new_unit not in (-1, None):
+                new_units = get_unit_id(unit, True)
+                for new_unit in new_units:
                     unit_ids.add(new_unit)
 
         return (
@@ -1408,7 +1417,7 @@ def open_mod(mod_folder):
         "gunpowder": ['C44', 'C23'],
         "siege": ['C13'],
         'villagers': ['C4'],
-        'camel units': ['U282', 'U556', 'U1263', f'U{get_unit_id('Naasiri')}', f'U{get_unit_id('Elite Naasiri')}'],
+        'camel units': ['U282', 'U556', 'U1263', f'U{get_unit_id('Naasiri', False)}', f'U{get_unit_id('Elite Naasiri', False)}'],
         'mule carts': ['U1808'],
         'military units': ['C0', 'C55', 'C35', 'C6', 'C54', 'C13', 'C51', 'C36', 'C12'],
         'shock infantry' : ['U751', 'U752', 'U753', 'U1901', 'U1903', 'U1974', 'U1976']
@@ -1453,7 +1462,7 @@ def open_mod(mod_folder):
             for location in unit.creatable.train_locations:
                 if location.unit_id == 82 and location.button_id == 1:
                     # Check if there is a regular version and an elite version
-                    if 'elite' not in get_unit_name(i).lower() and get_unit_id(f'elite {get_unit_name(i)}') != None:
+                    if 'elite' not in get_unit_name(i).lower() and get_unit_id(f'elite {get_unit_name(i)}', False) != None:
                         ALL_CASTLE_UNITS.append(get_unit_name(i))
                         break
         except:
@@ -2828,7 +2837,7 @@ def main():
                                     split_lines = line.split(r'\n')
 
                                     # Show the bonuses menu
-                                    print("\033[32m\n--- Bonuses Menu ---\033[0m")
+                                    print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Bonuses Menu {title_emoji}'))
                                     bonus_count = 0
                                     searching_for_dots = True
                                     next_line = False
@@ -2849,7 +2858,7 @@ def main():
                                         print('\n\x1b[35mEnter bonus description to add a new bonus.\x1b[0m')
                                         print('\x1b[35mEnter existing bonus index number to remove that bonus.\x1b[0m')
                                         print('\x1b[35mEnter existing bonus index, a colon (:), and then the bonus description to change an existing bonus.\x1b[0m')
-                                        print('\x1b[35mEnter "Team bonus: " followed by the bonus description to change the team bonus.\x1b[0m')
+                                        print('\x1b[35mEnter "t:" followed by the bonus description to change the team bonus.\x1b[0m')
                                         time.sleep(1)
                                         continue
                                     
@@ -3368,7 +3377,7 @@ def main():
                                                 # Find the custom unit
                                                 if y == 0:
                                                     # Built unit
-                                                    custom_unit_id = get_unit_id(custom_arcs[i][architecture_changes[i] - len(base_architectures)])
+                                                    custom_unit_id = get_unit_id(custom_arcs[i][architecture_changes[i] - len(base_architectures)], False)
                                                 elif y == 1:
                                                     # Rubble unit
                                                     custom_rubbles = {'Poenari Castle': 1488, 'Aachen Cathedral': 1517, 'Dome of the Rock': 1482, 'Dormition Cathedral': 1493, 'Gol Gumbaz': 1487, 'Minaret of Jam': 1530, 'Pyramid': 1515, 'Quimper Cathedral': 1489, 'Sankore Madrasah': 1491, 'Tower of London': 1492}
@@ -3490,9 +3499,9 @@ def main():
                                                     DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
                                                 
                                                 # Enable canoe-line
-                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 539, get_unit_id('canoe'), -1, -1))
-                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 21, get_unit_id('canoe')+1, -1, -1))
-                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 442, get_unit_id('canoe')+2, -1, -1))
+                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 539, get_unit_id('canoe', False), -1, -1))
+                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 21, get_unit_id('canoe', False)+1, -1, -1))
+                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 442, get_unit_id('canoe', False)+2, -1, -1))
                                                 continue
 
                                             # Correct mistakes
@@ -3502,7 +3511,7 @@ def main():
                                             #print('Trying for:', item)
                                             # Determine the item ID
                                             tech_id = -1
-                                            unit_id = get_unit_id(item)
+                                            unit_id = get_unit_id(item, False)
                                             if unit_id == -1 or unit_id == None:
                                                 tech_id = get_tech_id(item)
                                                 #print('technology id for', item, ':', tech_id)
@@ -3536,8 +3545,8 @@ def main():
                                                     
                                                     if get_tech_id(item) != -1:
                                                         items_to_enable.append(get_tech_id(item))
-                                                    elif get_unit_id(item) != -1:
-                                                        items_to_enable.append(get_unit_id(item))
+                                                    elif get_unit_id(item, False) != -1:
+                                                        items_to_enable.append(get_unit_id(item), False)
 
                                                 # Enable unit or tech
                                                 for ec in DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands[::-1]:
