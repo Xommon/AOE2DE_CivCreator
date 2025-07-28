@@ -22,5 +22,9 @@ time.sleep(1)
 
 # All code after here
 
-for tech_id in [521, 858, 655, 598, 599, 528, 992, 1037, 522, 773, 885, 1075, 272, 447, 448, 948, 84, 703, 787, 1005, 1065, 790, 842, 843]:
-    print(tech_id, f': {DATA.techs[tech_id].name}')
+for tech in DATA.techs:
+    if tech.civ == 17:
+        tech.effect_id = -1
+    elif tech.civ == 52:
+        tech.effect_id = 17
+print('done')

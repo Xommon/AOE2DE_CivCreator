@@ -1,0 +1,37 @@
+import os
+
+# Path to the folder you want to process
+folder_path = "/home/xommon/Documents/GitHub/AOE2DE_CivCreator/sounds"
+
+while True:
+    old_language = input('Old Language: ')
+    new_language = input('New Language: ')
+
+    found = False  # Flag to check if any file matched
+
+    # Loop through all files in the folder
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+
+        # Skip if it's not a file
+        if not os.path.isfile(file_path):
+            continue
+
+        # Split name and extension
+        name, ext = os.path.splitext(filename)
+
+        # Match prefix (case-insensitive), split by underscore
+        parts = name.split('_')
+        if parts[0].lower() == old_language.lower():
+            found = True
+            parts[0] = new_language.title()  # Replace with new language
+            new_filename = f"{'_'.join(parts)}{ext}"
+            new_filename = new_filename.replace('Task', 'Move')
+            new_file_path = os.path.join(folder_path, new_filename)
+
+            os.rename(file_path, new_file_path)
+
+    if found:
+        print("Renaming complete.\n")
+    else:
+        print(f"Error: No files found starting with '{old_language}'.\n")
