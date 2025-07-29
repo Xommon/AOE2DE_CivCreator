@@ -17,7 +17,8 @@ To create a new mod, select the new mod selection on the main menu.
 #- Chinese architecture set added and set for the Chinese, Vietnamese, Jurchens, Khitans, Shu, Wei, Wu, and Koreans. The Japanese and Mongols remain on the East Asian architecture set.
 - CARAVANSERAI: Caravanserai bonus text removed for the Persians and Hindustanis descriptions. These two civilisations still get the Caravanserai, but now any other civilisation can have their tech tree edited to have the Caravansarai enabled.
 - SOUTHEAST ASIANS: Southeast Asian architecture split into two: Castle/Imperial graphics for the Khmer and Burmese, Feudal graphics for the Malay.
-- GOTHS: Goths units speak Gothic instead of the Teuton's German
+- GOTHS: Goths units speak Gothic, instead of German
+- WU: Wu units speak Cantonese, instead of Mandarin
 
 ## GAMEPLAY ##
 - PASTURES: Mongols, Berbers, Huns, and Cumans have pastures enabled instead of farms.

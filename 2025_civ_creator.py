@@ -1776,7 +1776,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         DATA.sounds[sound_id].items.clear()
 
     # Set defaults for each civilization
-    for civ_id, civ in enumerate(DATA.civs[1:]):
+    for civ_id, civ in enumerate(DATA.civs):
         for sound_id in sound_ids:
             # Get the amount of sound items to add
             sound_count = int(sound_ids[sound_id][-1])
@@ -2851,18 +2851,27 @@ def main():
                             unit_id = int(DATA.civs[edit_civ_index + 1].units[unit_id].standing_graphic[0])
 
                             # Determine which architecture set is currently being used
-                            # KEY: (university: 209, castle: 82, wonder: 276)
-                            architecture_sets = {'African': [9084, 8747], 'Austronesian': [10084, 12477], 'Central Asian': [12084, 11747], 'Central European': [566, 171], 'East Asian': [567, 172], 'Eastern European': [8084, 7747], 'Mediterranean': [593, 177], 'Middle Eastern': [568, 173], 'Mesoamerican': [7084, 6747], 'South Asian': [10084, 12477], 'Southeast Asian': [11084, 10747], 'Southeast European': [15806, 15848], 'Western European': [569, 174]}
-                            for arch, ids in architecture_sets.items():
-                                if unit_id in ids:
-                                    return arch
-                            return ''  # or 'Unknown' if you prefer a string
+                            # KEY: (house: 463)
+                            architecture_sets = {8916: 'West African', 10909: 'Austronesian', 11909: 'Central Asian', 2206: 'Central European', 2207: 'East Asian', 7909: 'Eastern European', 9202: 'Mediterranean', 2208: 'Middle Eastern', 6909: 'Mesoamerican', 9909: 'South Asian', 10916: 'Southeast Asian', -1: 'Southeast European', 2209: 'Western European'}
+                            try:
+                                if DATA.civs[selected_civ_index + 1].units[463].standing_graphic[0] in architecture_sets:
+                                    return architecture_sets[DATA.civs[selected_civ_index + 1].units[463].standing_graphic[0]]
+                                else:
+                                    return '' 
+                            except Exception as e:
+                                print(str(e))
 
                         # Get current language
                         current_language = ''
                         for sound_item in DATA.sounds[301].items:
                             if sound_item.civilization == selected_civ_index + 1:
-                                current_language = sound_item.filename.split('_')[0]
+                                print(sound_item.civilization)
+                                try:
+                                    current_language = sound_item.filename.split('_')[0]
+                                except:
+                                    print(sound_item.filename.split('_'))
+                                    current_language = 'FAILED'
+                                break
 
                         # Print the civilization menu
                         print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Edit {selected_civ_name} {title_emoji}'))
