@@ -1782,7 +1782,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             sound_count = int(sound_ids[sound_id][-1])
 
             # Add the sound items to the sound
-            language_presets = {1: "English", 2: "French", 3: "Gothic", 4: "German", 5: "Japanese", 6: "Mandarin", 7: "Latin", 8: "Persian", 9: "Arabic", 10: "Turkish", 11: "Norse", 12: "Mongolian", 13: "Gaelic", 14: "Spanish", 15: "Yucatec", 16: "Kaqchikel", 17: "Mongolian", 18: "Korean", 19: "Latin", 20: "Hindustani", 21: "Quechua", 22: "Hungarian", 23: "Russian", 24: "Portuguese", 25: "Amharic", 26: "Maninka", 27: "Taqbaylit", 28: "Khmer", 29: "Malaysian", 30: "Burmese", 31: "Vietnamese", 32: "Bulgarian", 33: "Chagatai", 34: "Cuman", 35: "Lithuanian", 36: "Burgundian", 37: "Sicilian", 38: "Polish", 39: "Czech", 40: "Tamil", 41: "Bengali", 42: "Gujarati", 43: "Vulgar Latin", 44: "Armenian", 45: "Georgian", 49: "Mandarin", 50: "Cantonese", 51: "Mandarin", 52: "Mandarin", 53: "Mongolian"}
+            language_presets = {1: "English", 2: "French", 3: "Gothic", 4: "German", 5: "Japanese", 6: "Mandarin", 7: "Greek", 8: "Persian", 9: "Arabic", 10: "Turkish", 11: "Norse", 12: "Mongolian", 13: "Gaelic", 14: "Spanish", 15: "Yucatec", 16: "Kaqchikel", 17: "Mongolian", 18: "Korean", 19: "Latin", 20: "Hindustani", 21: "Quechua", 22: "Hungarian", 23: "Russian", 24: "Portuguese", 25: "Amharic", 26: "Maninka", 27: "Taqbaylit", 28: "Khmer", 29: "Malaysian", 30: "Burmese", 31: "Vietnamese", 32: "Bulgarian", 33: "Chagatai", 34: "Cuman", 35: "Lithuanian", 36: "Burgundian", 37: "Sicilian", 38: "Polish", 39: "Czech", 40: "Tamil", 41: "Bengali", 42: "Gujarati", 43: "Vulgar Latin", 44: "Armenian", 45: "Georgian", 49: "Mandarin", 50: "Cantonese", 51: "Mandarin", 52: "Mandarin", 53: "Mongolian"}
             for i in range(sound_count):
                 # Correct the name
                 if civ_id not in language_presets:
@@ -2272,8 +2272,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # Write the architecture sets to a file
     with open(f'{MOD_FOLDER}/{mod_name}.pkl', 'wb') as file:
         for civ in DATA.civs:
-            if civ.name != 'Gaia' and civ.name != 'Spartans' and civ.name != 'Athenians' and civ.name != 'Achaemenids':
-                pickle.dump(civ.units, file)
+            pickle.dump(civ.units, file)
 
     # Set the Dock selection sound to the Port selection sound
     '''for civ in DATA.civs:
@@ -2859,13 +2858,12 @@ def main():
                                 else:
                                     return '' 
                             except Exception as e:
-                                print(str(e))
+                                pass
 
                         # Get current language
                         current_language = ''
                         for sound_item in DATA.sounds[301].items:
                             if sound_item.civilization == selected_civ_index + 1:
-                                print(sound_item.civilization)
                                 try:
                                     current_language = sound_item.filename.split('_')[0]
                                 except:
@@ -3447,144 +3445,135 @@ def main():
                             print(f'Unique techs changed for {selected_civ_name}.')
                             time.sleep(1)
 
-                        # Architecture
+                        # Graphics
                         elif selection == '5':
-                            # Gather base architectures
-                            general_architecture_sets = {'West African': 26, 'Central Asian': 33, 'Central European': 22, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1}
-                            monk_sets = {'Generic': 0, 'Native American': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40, 'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35}
-                            monastery_sets = {'West African': 26, 'Central Asian': 33, 'Central European': 22, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Nomadic': 12, 'Pagan': 35}
-
-                            base_architectures = [
-                                list(general_architecture_sets.keys()),
-                                [],
-                                [],
-                                list(monk_sets.keys()),
-                                list(monastery_sets.keys()),
-                            ]
-                            for civ in DATA.civs:
-                                if civ.name.lower() not in ['achaemenids', 'spartans', 'athenians', 'gaia']:
-                                    base_architectures[1].append(civ.name)
-                                    base_architectures[2].append(civ.name)
-
-                            # Gather custom architectures
-                            custom_arcs = [
-                                [],
-                                ['Poenari Castle'],
-                                ['Aachen Cathedral', 'Dome of the Rock', 'Dormition Cathedral', 'Gol Gumbaz', 'Minaret of Jam', 'Pyramid', 'Quimper Cathedral', 'Sankore Madrasah', 'Tower of London'],
-                                [],
-                                [],
-                            ]
-
-                            # User prompts
-                            architecture_types = ["General", "Castle", "Wonder", 'Monk', 'Monastery'] # Add types to here
-                            architecture_changes = [-1] * len(architecture_types)
+                            save = ''
+                            # Gather all graphics
+                            general_architecture_sets = {'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1}
+                            monk_sets = {'Christian': 0, 'Native American': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40, 'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35}
+                            monastery_sets = {'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Tengri': 12, 'Pagan': 35}
+                            trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
+                            ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5, "Eastern European": 23, "Mediterranean": 14, "Mesoamerican": 15, "Middle Eastern": 9, "Southeast Asian": 28, "Western European": 1}
+                            castle_sets = {}
+                            wonder_sets = {}
+                            for i, civ in enumerate(DATA.civs):
+                                if civ.name.lower() in ['achaemenids', 'spartans', 'athenians', 'gaia']:
+                                    continue
+                                castle_sets[civ.name] = i
+                                wonder_sets[civ.name] = i
                             
-                            for i in range(len(architecture_types)):
-                                # Assemble all architecture options
-                                all_architectures = base_architectures[i] + custom_arcs[i]
+                            # Custom Castles
+                            for custom_castle in ['Poenari Castle']:
+                                castle_sets[custom_castle] = len(castle_sets)
 
-                                while True:
-                                    # Get user input
-                                    readline.set_completer(make_completer(all_architectures))
-                                    readline.parse_and_bind("tab: complete")
-                                    architecture_selection = input(f"Enter {architecture_types[i]} architecture for {selected_civ_name}: ").lower()
+                            # Custom Wonders
+                            for custom_wonder in ['Aachen Cathedral', 'Dome of the Rock', 'Dormition Cathedral', 'Gol Gumbaz', 'Minaret of Jam', 'Pyramid', 'Quimper Cathedral', 'Sankore Madrasah', 'Tower of London']:
+                                wonder_sets[custom_wonder] = len(wonder_sets)
 
-                                    # Help
-                                    if architecture_selection == '?':
-                                        # Print all available options
-                                        for j, arc in enumerate(all_architectures):
-                                            print(f'{j}: {arc}')
-                                        print('Leave blank to default to general architecture graphic.\n')
-                                        #print('Type \'default\' to switch back to the Civilization\'s original architecture.')
-                                        continue
+                            # Combine all dictionaries
+                            graphic_sets = [general_architecture_sets, castle_sets, wonder_sets, monk_sets, monastery_sets, trade_cart_sets, ship_sets]
 
-                                    # Try to convert to an integer
-                                    try:
-                                        # Convert word to index
-                                        if architecture_selection in [opt.lower() for opt in all_architectures]:
-                                            architecture_selection = int([opt.lower() for opt in all_architectures].index(architecture_selection))
-                                        elif architecture_selection == '':
-                                            architecture_selection = -1
-                                        else:
-                                            architecture_selection = int(architecture_selection)
-                                    except:
-                                        print(f'\033[31mERROR: {architecture_types[i]} architecture index not valid.\n\033[0m')
-                                        continue
+                            # Get current graphics
+                            graphic_titles = ["General", "Castle", "Wonder", 'Monk', 'Monastery', 'Trade Cart', 'Ships']
+                            unit_bank = {0: range(0, len(DATA.civs[1].units)), 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [128, 204], 6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
+                            current_graphics = [''] * len(graphic_titles)
 
-                                    # Check against architecture options
-                                    if architecture_selection >= -1 and architecture_selection < len(all_architectures):
-                                        if -1 <= architecture_selection < len(all_architectures):
-                                            # Castle or Wonder → use index directly into custom_arcs
-                                            if i in [1, 2]:
-                                                architecture_changes[i] = architecture_selection
+                            while True:
+                                # Scan the units for their graphics
+                                for i, graphic_set in enumerate(graphic_sets):
+                                    test_unit = unit_bank[i][0] if i > 0 else 463
 
-                                            # General, Monk, Monastery → use corresponding dict to map name/index to civ_id
-                                            elif i == 0:
-                                                key = list(general_architecture_sets.keys())[architecture_selection]
-                                                architecture_changes[i] = general_architecture_sets[key]
-                                            elif i == 3:
-                                                key = list(monk_sets.keys())[architecture_selection]
-                                                architecture_changes[i] = monk_sets[key]
-                                            elif i == 4:
-                                                key = list(monastery_sets.keys())[architecture_selection]
-                                                architecture_changes[i] = monastery_sets[key]
-                                        break
+                                    for key, value in graphic_set.items():
+                                        if DATA.civs[selected_civ_index + 1].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
+                                            current_graphics[i] = key
+                                            break
+
+                                # Show graphics menu
+                                print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Graphics{save} {title_emoji}'))
+                                print(colour(Fore.WHITE, f"0️⃣  Architecture") + f" -- {colour(Fore.GREEN, current_graphics[0])}")
+                                print(colour(Fore.WHITE, f"1️⃣  Castle") + f" -- {colour(Fore.GREEN, current_graphics[1])}")
+                                print(colour(Fore.WHITE, f"2️⃣  Wonder") + f" -- {colour(Fore.GREEN, current_graphics[2])}")
+                                print(colour(Fore.WHITE, f"3️⃣  Monk") + f" -- {colour(Fore.GREEN, current_graphics[3])}")
+                                print(colour(Fore.WHITE, f"4️⃣  Monastery") + f" -- {colour(Fore.GREEN, current_graphics[4])}")
+                                print(colour(Fore.WHITE, f"5️⃣  Trade Cart") + f" -- {colour(Fore.GREEN, current_graphics[5])}")
+                                print(colour(Fore.WHITE, f"6️⃣  Ships") + f" -- {colour(Fore.GREEN, current_graphics[6])}")
+                                selection = input(colour(Fore.BLUE, "Selection: "))
+
+                                # Read selection
+                                if selection == '':
+                                    if save == '*':
+                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                        print(f'Graphics for {selected_civ_name} saved.')
+                                        time.sleep(1)
+                                    break
+                                try:
+                                    if int(selection) > -1 and int(selection) < len(graphic_sets):
+                                        selection = int(selection)
                                     else:
-                                        # Print error
-                                        if i == 3:
-                                            print(f'\033[31mERROR: {architecture_types[i]} graphic index not valid.\n\033[0m')
-                                        else:
-                                            print(f'\033[31mERROR: {architecture_types[i]} architecture index not valid.\n\033[0m')
-
-                            #print(architecture_changes)
-                            for i in range(len(architecture_types)):
-                                # Skip if unspecified
-                                if architecture_changes[i] == -1:
+                                        print(f'\033[31mERROR: Invalid selection.\n\033[0m')
+                                        continue
+                                except:
+                                    print(f'\033[31mERROR: Invalid selection.\n\033[0m')
                                     continue
 
-                                # Specify which unit IDs need to change
-                                unit_bank = {0: range(0, len(DATA.civs[1].units)), 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [13, 1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
-                                all_units_to_change = unit_bank[i]
-                                
-                                try:
-                                    for y, unit_id in enumerate(all_units_to_change):
-                                        # Replace the unit or the graphics
-                                        if architecture_changes[i] < len(base_architectures):
-                                            # Base units
-                                            if i == 0 or i == 3:
-                                                DATA.civs[selected_civ_index + 1].units[unit_id] = ARCHITECTURE_SETS[architecture_changes[i]][unit_id]
+                                # Prompt user
+                                change = -1
+                                while True:
+                                    # Get user input
+                                    readline.set_completer(make_completer(graphic_sets[selection]))
+                                    readline.parse_and_bind("tab: complete")
+                                    if selection in [3, 5, 6]: # Graphics
+                                        graphic_selection = input(f"\nEnter {graphic_titles[selection]} graphic for {selected_civ_name}: ").lower()
+                                    else: # Architecture
+                                        graphic_selection = input(f"\nEnter {graphic_titles[selection]} architecture for {selected_civ_name}: ").lower()
+
+                                    # Help
+                                    if graphic_selection == '?':
+                                        # Print all available options
+                                        for j, arc in enumerate(graphic_sets[selection]):
+                                            print(f'{j}: {arc}')
+                                        print('Leave blank to default to general graphic.\n')
+                                        continue
+                                    elif graphic_selection == '':
+                                        change = -1
+                                        break
+                                    else:
+                                        # Convert to integer
+                                        try:
+                                            # Try numeric index
+                                            if int(graphic_selection) < len(graphic_sets[selection]):
+                                                change = list(graphic_sets[selection].values())[int(graphic_selection)]
+                                                break
                                             else:
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].standing_graphic
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].dying_graphic
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = ARCHITECTURE_SETS[architecture_changes[i]][unit_id].damage_graphics
-                                        else:
-                                            # Custom units
-                                            try:
-                                                # Find the custom unit
-                                                if y == 0:
-                                                    # Built unit
-                                                    custom_unit_id = get_unit_id(custom_arcs[i][architecture_changes[i] - len(base_architectures)], False)
-                                                elif y == 1:
-                                                    # Rubble unit
-                                                    custom_rubbles = {'Poenari Castle': 1488, 'Aachen Cathedral': 1517, 'Dome of the Rock': 1482, 'Dormition Cathedral': 1493, 'Gol Gumbaz': 1487, 'Minaret of Jam': 1530, 'Pyramid': 1515, 'Quimper Cathedral': 1489, 'Sankore Madrasah': 1491, 'Tower of London': 1492}
-                                                    custom_unit_id = custom_rubbles[custom_arcs[i][architecture_changes[i] - len(base_architectures)]]
+                                                print(f'\033[31mERROR: {graphic_titles[selection]} graphic index not valid.\n\033[0m')
+                                        except ValueError:
+                                            # Normalize dictionary for case-insensitive key lookup
+                                            normalized_dict = {k.lower(): v for k, v in graphic_sets[selection].items()}
+                                            key = graphic_selection.lower()
+                                            if key in normalized_dict:
+                                                change = normalized_dict[key]
+                                                break
+                                            else:
+                                                print(f'\033[31mERROR: {graphic_titles[selection]} graphic name not valid.\n\033[0m')
 
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].standing_graphic = DATA.civs[1].units[custom_unit_id].standing_graphic
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].dying_graphic = DATA.civs[1].units[custom_unit_id].dying_graphic
-                                                DATA.civs[selected_civ_index + 1].units[unit_id].damage_graphics = DATA.civs[1].units[custom_unit_id].damage_graphics
-                                            except Exception as e:
-                                                pass
-                                                #print(str(e))
-                                except Exception as e:
-                                    print(str(e))
+                                #print('change:', change)
+                                # Convert unit graphics
+                                if change > -1:
+                                    for unit_id in unit_bank[selection]:
+                                        try:
+                                            # Change all units that are not in the other unit lists
+                                            if selection > 0 or unit_id not in [item for key in sorted(unit_bank) if key >= 1 for item in unit_bank[key]]:
+                                                DATA.civs[selected_civ_index + 1].units[unit_id] = ARCHITECTURE_SETS[change][unit_id]
+                                        except:
+                                            pass
 
-                            # Save changes
-                            if architecture_changes != [-1] * len(architecture_types):
-                                with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
-                                print(f"Architecture changed for {selected_civ_name}.")
-                            else:
-                                print(f"Architecture was not changed for {selected_civ_name}.")
-                            time.sleep(1)
+                                    print(f"Graphics changed for {selected_civ_name}.")
+                                    save = '*'
+
+                                # Update changes
+                                else:
+                                    print(f"Graphics not changed for {selected_civ_name}.")
+                                time.sleep(1)
 
                         # Language
                         elif selection == '6':
