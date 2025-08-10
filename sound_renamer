@@ -26,7 +26,8 @@ while True:
             found = True
             parts[0] = new_language.title()  # Replace with new language
             new_filename = f"{'_'.join(parts)}{ext}"
-            new_filename = new_filename.replace('Task', 'Move')
+            new_filename = new_filename.replace('Villager_Male', 'Villager-Male')
+            new_filename = new_filename.replace('Villager_Female', 'Villager-Female')
             new_file_path = os.path.join(folder_path, new_filename)
 
             os.rename(file_path, new_file_path)

@@ -9,8 +9,10 @@ from genieutils.graphic import Graphic
 from genieutils.graphic import GraphicDelta
 from genieutils.graphic import GraphicAngleSound
 import time
+import genieutils.tech
 import genieutils.unit
 import pyperclip
+from genieutils.tech import Tech
 
 # Open file
 print('Values Printer Running...')
@@ -20,11 +22,23 @@ DATA = DatFile.parse(path)
 print('File opened')
 time.sleep(1)
 
-# All code after here
+# Edit code after here
 
-for tech in DATA.techs:
-    if tech.civ == 17:
-        tech.effect_id = -1
-    elif tech.civ == 52:
-        tech.effect_id = 17
-print('done')
+for i, civ in enumerate(DATA.civs):
+    tech_tree = None
+    if i not in [0, 46, 47, 48]:
+        for y, effect in enumerate(DATA.effects):
+            if effect.name.lower() == f'{civ.name.lower()} tech tree':
+                tech_tree = y
+
+    if not tech_tree:
+        continue
+
+    disabled_techs = []
+    for ec in DATA.effects[tech_tree].effect_commands:
+        if ec.type == 102 and ec.d > 0:
+            disabled_techs.append(int(ec.d))
+
+    print(f"{civ.name.title()}: {', '.join(str(x) for x in disabled_techs)}")
+
+        

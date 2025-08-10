@@ -50,75 +50,72 @@ PERSIANS:
 DELETED: Can build Caravanserai in Imperial Age
 
 SARACENS:
-• Market trading fee only 5%; Markets cost -100 wood
-• Camel Units +25% HP
-• Galley-line attacks +25% faster
-• Transport Ships +100% HP, +20 carry capacity
+355/354: Market trading fee only 5%; Markets cost -100 wood
+312/312: Camel Units +25% HP
+404/416: Galley-line attacks +25% faster
+337/311: Transport Ships +100% HP, +20 carry capacity
 
 TURKS:
-• Gold miners work +20% faster
-• Scout Cavalry-line +1 pierce armor and upgrades free
-• Chemistry free; Gunpowder Units +25% HP
-• Bombard Tower and Elite Cannon Galleon upgrade costs -50%
+300/295: Gold miners work +20% faster
+452/509: Scout Cavalry-line +1 pierce armor and upgrades free
+285/301, 301/296: Chemistry free; Gunpowder Units +25% HP
+TREE(DEL: 19-27, 28-31): Bombard Tower and Elite Cannon Galleon upgrade costs -50%
 
 VIKINGS:
-• Wheelbarrow, Hand Cart free
-• Infantry +20% HP starting in Feudal Age
-• Warships cost -15/15/20% in Feudal/Castle/Imperial Age
+TREE(29-34): Wheelbarrow, Hand Cart free
+416/428: Infantry +20% HP starting in Feudal Age
+395/394, 501/386, 502/383: Warships cost -15/15/20% in Feudal/Castle/Imperial Age
 
 MONGOLS:
-• Hunters work +40% faster
-• Cavalry Archers attack +25% faster
-• Light Horsemen +20/30% HP in Castle/Imperial Age
+389/388: Hunters work +40% faster
+: Cavalry Archers attack +25% faster
+286, 287, 288, 388: Light Horsemen +20/30% HP in Castle/Imperial Age
 
 CELTS:
-• Lumberjacks work +15% faster
-• Livestock animals within Celt unit line of sight cannot be stolen
-• Infantry moves +5/10/15/20% faster in Dark/Feudal/Castle/Imperial Age
-• Siege Weapons attack +25% faster
+385: Lumberjacks work +15% faster
+405: Livestock animals within Celt unit line of sight cannot be stolen
+393, 898, 899, 900: Infantry moves +5/10/15/20% faster in Dark/Feudal/Castle/Imperial Age
+386: Siege Weapons attack +25% faster
 
 SPANISH:
-• Builders work +30% faster
-• Receive +20 gold for each technology researched
-• Blacksmith upgrades cost no gold
-• Gunpowder Units attack +18% faster
-• Cannon Galleons fire more accurately at moving targets
+TREE(24-25): Builders work +30% faster
+186: Receive +20 gold for each technology researched
+TREE(5, 14-23): Blacksmith upgrades cost no gold
+TREE(32-36) Gunpowder Units attack +18% faster
+TREE(38-39) Cannon Galleons fire more accurately at moving targets
+(26-29) DELETE Town Centers are built +30% faster
+(30) DELETE Wonders are built +8% faster
+DECOUPLE 159
 
 AZTECS:
-• Start with +50 gold
-• Villagers carry +3
-• Military Units train +15% faster
-• Monks gain +5 HP for each researched Monastery technology
+224: Start with +50 gold
+TREE(35): Villagers carry +3
+TREE(36-42, 44, 47, 50): Military Units train +15% faster
+29, 30, 31, 32, 33, 36, 38, 40, 41, 66, 456: Monks gain +5 HP for each researched Monastery technology
 
 MAYA:
-• Start with +1 Villager, but -50 food
-• Resources last +15% longer
-• Foot Archers cost -10/20/30% in Feudal/Castle/Imperial Age
-
-HUNS:
-• Do not need houses, but start with -100 wood
-• Cavalry Archers cost -10/20% in Castle/Imperial Age
-• Trebuchets fire more accurately at units and small targets
-• On Nomadic maps, the first Town Center spawns a scouting Horse
+554, 227: Start with +1 Villager, but -50 food
+TREE(34-37, 40-55, 59, 68-71, 86-91): Resources last +15% longer
+53, 56, TREE(29-33): Foot Archers cost -10/20/30% in Feudal/Castle/Imperial Age
 
 KOREANS:
-• Stone miners work +20% faster
-• Ranged Soldiers and Infantry cost -50% wood
-• Archer armor and tower upgrades free (Bombard Tower requires Chemistry)
-• Warships cost -20% wood
+TREE(23-24) Stone miners work +20% faster
+390(EC: 0-1, 3): Ranged Soldiers and Infantry cost -50% wood
+451, TREE(14-22): Archer armor and tower upgrades free (Bombard Tower requires Chemistry)
+390(EC: 2): Warships cost -20% wood
 
 ITALIANS:
-• Advancing to the next Age costs -15%
-• Foot Archers and Condottieri +1 melee/+1 pierce armor
-• Dock and University technologies cost -33%
-• Gunpowder Units cost -20%
-• Fishing Ships cost -15%
+TREE(8-12): Advancing to the next Age costs -15%
+901: Foot Archers and Condottieri +1 melee/+1 pierce armor
+TREE(16-17, 19-34, 45-70): Dock and University technologies cost -33%
+500: Gunpowder Units cost -20%
+TREE(13): Fishing Ships cost -15%
 
 HINDUSTANIS:
 • Villagers cost -8/13/18/23% in Dark/Feudal/Castle/Imperial Age
 • Camel Riders attack +20% faster
 • Gunpowder Units +1 melee/+1 pierce armor
-• Can build Caravanserai in Imperial Age
+DELETED: Can build Caravanserai in Imperial Age
 
 INCA:
 • Houses provide +5 population space
