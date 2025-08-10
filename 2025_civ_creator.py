@@ -715,38 +715,54 @@ def create_bonus(bonus_string, civ_id):
         def parse_number(text):
             if '%' in text:
                 value = int(text.replace('%', ''))
-                return round(1 + (value / 100), 2), True  # float, percent
-            return int(text), False  # int, not percent
+                return round(1 + (value / 100), 2), True
+            return int(text), False
 
         def build_modifiers(bonus_string, unit_lines, categories):
+            s = bonus_string.lower()
             output = []
-            last_target = None
 
-            bonus_string = bonus_string.lower()
+            # 1) Collect ALL targets present in the string (unit-lines and categories)
+            targets = []
+            for name, ids in unit_lines.items():
+                if name.lower() in s:
+                    targets.append(("unit", ids))
+            for name, ids in categories.items():
+                if name.lower() in s:
+                    targets.append(("category", ids))
 
-            # Determine target first (unit_line or category)
-            for key in list(unit_lines.keys()) + list(categories.keys()):
-                if key.lower() in bonus_string:
-                    last_target = ("unit", unit_lines.get(key, [])) if key in unit_lines else ("category", categories[key])
+            # De-dup targets (same group may be found more than once)
+            seen = set()
+            unique_targets = []
+            for ttype, ids in targets:
+                key = (ttype, tuple(ids))
+                if key not in seen:
+                    seen.add(key)
+                    unique_targets.append((ttype, ids))
 
-            if not last_target:
+            if not unique_targets:
                 return ""  # No valid target found
 
+            # 2) Walk all stat patterns and apply to ALL collected targets
             for pattern, stat_ids in stat_patterns:
-                for match in pattern.finditer(bonus_string):
-                    number_str = match.group(1) if match.groups() else "+1"
+                for match in pattern.finditer(s):
+                    number_str = match.group(1) if match.lastindex else "+1"
                     num, is_percent = parse_number(number_str)
 
                     for stat_id in stat_ids:
-                        # Invert for attack speed stat (stat 10)
-                        final_value = round(1 / num, 2) if stat_id == 10 and isinstance(num, float) else num
+                        # Special handling for attack speed (stat 10): +25% faster -> 0.75
+                        if stat_id == 10 and isinstance(num, float):
+                            final_value = round(1 - (num - 1), 2)
+                        else:
+                            final_value = num
+
                         marker = "E4" if isinstance(final_value, int) else "E5"
 
-                        target_type, ids = last_target
-                        for tid in ids:
-                            unit_id = tid if target_type == "unit" else -1
-                            category_id = tid if target_type == "category" else -1
-                            output.append(f"{marker}~{unit_id}~{category_id}~{stat_id}~{final_value}")
+                        for ttype, ids in unique_targets:
+                            for tid in ids:
+                                unit_id = tid if ttype == "unit" else -1
+                                category_id = tid if ttype == "category" else -1
+                                output.append(f"{marker}~{unit_id}~{category_id}~{stat_id}~{final_value}")
 
             return "|".join(output)
 
@@ -760,11 +776,7 @@ def create_bonus(bonus_string, civ_id):
             # Free techs
             tech_names = [
                 t.strip()
-                for t in re.search(r"^(.*?)\s+free", bonus_string, re.IGNORECASE)
-                    .group(1)
-                    .replace('and', ',')
-                    .split(',')
-            ]
+                for t in re.search(r"^(.*?)\s+free", bonus_string, re.IGNORECASE).group(1).replace('and', ',').split(',')]
 
             tech_ids = []
             for tech_name in tech_names:
