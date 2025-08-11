@@ -786,26 +786,6 @@ def create_bonus(bonus_string, civ_id):
                 bonus_response += f'E101~{tech_id}~0~0~0|E101~{tech_id}~1~0~0|E101~{tech_id}~2~0~0|E101~{tech_id}~3~0~0|E103~{tech_id}~0~0~0|'
         else:
             bonus_response = build_modifiers(bonus_string, unit_lines, categories)
-
-        '''# Look for specific bonus strings
-        if bonus_string.lower() == 'start with two scouts':
-            bonus_response = rf"T(639, 307, -1, -1, -1, -1)~2|E1~234~0~-1~1|E7~{DATA.civs[civ_id + 1].resources[263]}~619~1~-1"
-        elif bonus_string.lower() == 'start with three scouts':
-            bonus_response = rf"T(639, 307, -1, -1, -1, -1)~2|E1~234~0~-1~1|E7~{DATA.civs[civ_id + 1].resources[263]}~619~2~-1"
-        else:
-            # Send bonus string to Ollama
-            response = requests.post(
-                'http://localhost:11434/api/generate',
-                json={
-                    'model': 'bonus_creator', 
-                    'prompt': bonus_string,
-                    'stream': False
-                }
-            )
-            
-            # Get the response from Ollama
-            bonus_response = response.json()['response']
-            print('RESPONSE:', bonus_response)'''
         
         print(bonus_response)
 
@@ -873,909 +853,6 @@ def create_bonus(bonus_string, civ_id):
         print(f"Exception type: {type(e).__name__}")
         print(f"Exception message: {e}")
         traceback.print_exc(file=sys.stdout)
-
-
-'''def create_bonus(bonus_string_original, civ_id):
-    def get_units_and_categories(string):
-        # Split units into a list
-        string = string.replace('and', ',')
-        units = string.split(',')
-
-        # Clean up the strings
-        units = [unit.strip() for unit in units if unit.strip()]
-
-        # Final output lists
-        unit_ids = set()
-        category_ids = set()
-
-        def generate_variants(p):
-            variants = set(p.lower())
-            if p.endswith('ies'):
-                variants.add(p[:-3] + 'y')
-            if p.endswith('s') and not p.endswith('ss'):
-                variants.add(p[:-1])
-            if 'men' in p:
-                variants.add(p.replace('men', 'man'))
-            variants = list(variants)
-            return variants
-
-        for unit in units:
-            found_category = False
-            for variant in generate_variants(unit):
-                if variant in UNIT_CATEGORIES:
-                    for value in UNIT_CATEGORIES[variant]:
-                        if 'C' in value:
-                            category_ids.add(int(value[1:]))
-                        elif 'U' in value:
-                            unit_ids.add(int(value[1:]))
-                    found_category = True
-                    break
-
-            # Only try get_unit_id if not matched as category
-            if not found_category:
-                for variant in generate_variants(unit):
-                    new_units = get_unit_id(variant, True)
-                    for new_unit in new_units:
-                        unit_ids.add(new_unit)
-
-        return ([x for x in unit_ids if x not in (-1, None)], [x for x in category_ids if x not in (-1, None)])
-
-    def get_numbers(bonus_string_original, inverse=False):
-        # Clean the string
-        string = bonus_string_original.strip()
-
-        # Determine if percent
-        percent = '%' in string
-        string = string.replace('%', '')
-
-        # Determine if positive or negative
-        negative = '-' in string
-        negative = '+' not in string
-        string = string.replace('-', '').replace('+', '')
-
-        # Influence by inverse
-        if inverse:
-            negative = not inverse
-
-        # Split into a list
-        numbers = string.split('/')
-
-        # Bonus numbers
-        bonus_numbers = []
-
-        # Convert to int or float
-        for number in numbers:
-            number = number.strip()
-            if not number:
-                continue
-
-            # Check if the number is a percentage
-            if percent:
-                if negative:
-                    number = float((100 - float(number)) / 100)
-                else:
-                    number = float(float(number) / 100 + 1)
-            else:
-                number = int(number)
-                if negative:
-                    number *= -1
-
-            # Return the number
-            bonus_numbers.append(number)
-
-        return bonus_numbers
-
-    # Get ages
-    ages_dictionary = {'dark': 104, 'feudal': 101, 'castle': 102, 'imperial': 103}
-
-    def get_ages(string):
-        # Normalize string
-        string = string.lower()
-        result_ages = []
-
-        # Check for specific age phrases
-        if 'starting in the' in string:
-            for key in ages_dictionary:
-                if key in string:
-                    result_ages.append(ages_dictionary[key])
-
-        # Check for phrases like "in the dark/feudal/castle/imperial age"
-        elif 'age' in string:
-            for key in ages_dictionary:
-                if key in string:
-                    result_ages.append(ages_dictionary[key])
-
-        # Remove duplicates while preserving order
-        seen = set()
-        result_ages = [age for age in result_ages if not (age in seen or seen.add(age))]
-
-        return result_ages
-    
-    # Get techs
-    def get_techs(string):
-        # Split techs into a list
-        string = string.replace('and', ',')
-        techs = string.split(',')
-
-        # Clean up the strings
-        techs = [tech.strip() for tech in techs if tech.strip()]
-
-        # Final output lists
-        techs_ids = set()
-
-        for tech_id in techs:
-            if get_tech_id(tech_id) != -1:
-                techs_ids.add(get_tech_id(tech_id))
-
-        return techs_ids
-    
-    # Get resources
-    def get_resources(string):
-        resources_dictionary = {'food': 0, 'wood': 1, 'gold': 2, 'stone': 3}
-
-        resources = []
-
-        for key in resources_dictionary:
-            if key in string:
-                resources.append(resources_dictionary[key])
-
-        return resources
-    
-    # Get tech cost
-    def get_tech_cost(tech_id, gold_then_stone):
-        tech_costs = [0, 0, 0, 0]
-
-        for cost in DATA.techs[tech_id].resource_costs:
-            if cost.flag == 1:
-                tech_costs[cost.type] = cost.amount
-
-        # Make the gold appear first, then stone second
-        if gold_then_stone:
-            temp_stone_cost = tech_costs[2]
-            tech_costs[2] = tech_costs [3]
-            tech_costs[3] = temp_stone_cost
-
-        return tech_costs
-    
-    # Get stats
-    stat_dictionary = {'an additional projectile': [107, 102], 'blast radius': [22], 'additional projectiles': [107, 102], 'carry': [14], 'hit points': [0], 'hp': [0], 'line of sight': [1, 23], 'los': [1, 23], 'move': [5], 'pierce armor': [8.0768], 'armor vs. cavalry archers': [8.7168], 'armor vs. elephants': [8.128], 'armor vs. infantry': [8.0256], 'armor vs. cavalry': [8.2048], 'armor vs. archers': [8.384], 'armor vs. ships': [8.4096], 'armor vs. siege': [8.512], 'armor vs. gunpowder': [8.5888], 'armor vs. spearmen': [8.6912], 'armor vs. eagles': [8.7424], 'armor vs. camels': [8.768], 'armor': [8.1024], 'attack': [9.1026, 9.77], 'range': [1, 12, 23], 'minimum range': [20], 'train': [101], 'work': [13], 'heal': [13]}
-    def get_stats(string):
-        final_stats = []
-        for key in stat_dictionary:
-            if key in string:
-                final_stats.extend(stat_dictionary[key])
-
-        return list(set(final_stats))
-
-    # Prepare final techs and effects
-    final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), research_locations=[ResearchLocation(0, 0, 0, 0)], resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original.replace('*', '')}', repeatable=1)]
-    final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original.replace('*', '')}', effect_commands=[])]
-
-    # Cosmetic break
-    if '*' in bonus_string_original:
-        return final_techs, final_effects
-
-    # Lowercase the bonus string
-    bonus_string = bonus_string_original.lower()
-
-    # Separate the bonus string into clauses
-    bonus_strings = bonus_string.split(';')
-
-    # Read each clause
-    for bonus in bonus_strings:
-        # Clean up the clause
-        bonus = bonus.strip()
-
-        # [Unit] work [Number] faster
-        if ('work' in bonus or 'works' in bonus) and ('faster' in bonus or 'slower' in bonus):
-            # Extract units, numbers, and ages
-            bonus = bonus.replace('works', 'work')
-            temp_bonus = bonus.replace('work', '|').replace('faster', '|').replace('slower', '|').split('|')
-            bonus_numbers = get_numbers(temp_bonus[1], False)
-            bonus_units, bonus_categories = get_units_and_categories(temp_bonus[0])
-            bonus_ages = get_ages(bonus)
-
-            # Create the techs
-            for age in bonus_ages:
-                if final_techs[0].required_techs == (0, 0, 0, 0, 0, 0):
-                    final_techs[0].required_techs = (age, 0, 0, 0, 0, 0)
-                    final_techs[0].required_tech_count = 1
-                else:
-                    final_techs.append(copy.deepcopy(final_techs[-1]))
-                    final_techs[-1].required_techs = (age, 0, 0, 0, 0, 0)
-                    final_techs[-1].required_tech_count = 1
-
-            # Create the effect commands
-            commands = []
-            for number in bonus_numbers:
-                # Create total list of effect commands
-                for category_id in bonus_categories:
-                    commands.append(genieutils.effect.EffectCommand(5 if isinstance(number, float) else 4, -1, category_id, 13, number))
-                for unit_id in bonus_units:
-                    commands.append(genieutils.effect.EffectCommand(5 if isinstance(number, float) else 4, unit_id, -1, 13, number))
-
-            # Set the first effect as the base effect
-            base_effect = copy.deepcopy(final_effects[0])
-
-            # Assign effect commands to effects
-            if len(bonus_ages) > 1:
-                # Make the amount of techs match the effects
-                while len(final_effects) < len(final_techs):
-                    final_effects.append(copy.deepcopy(base_effect))
-
-                per_age = int(ceil(len(commands) / len(final_effects)))
-                command_index = 0
-
-                # Add the effect commands to each effect
-                for effect in final_effects:
-                    for i in range(per_age):
-                        if command_index < len(commands):
-                            effect.effect_commands.append(commands[command_index])
-                            command_index += 1
-                        else:
-                            break
-            else:
-                final_effects[0].effect_commands.extend(commands)
-
-            # Attach the effects to the tech
-            for i, tech in enumerate(final_techs):
-                tech.effect_id = len(DATA.effects) + i
-
-        # [Unit] cost [Number] [Resource]
-        if 'cost' in bonus or 'costs' in bonus:
-            bonus = bonus.replace('costs', 'cost')
-            # Extract parts
-            temp_bonus = bonus.replace('cost', '|').replace('more', '|').replace('less', '|').split('|')
-            bonus_numbers = get_numbers(temp_bonus[1], False)
-            bonus_resources = get_resources(temp_bonus[1])
-            bonus_units, bonus_categories = get_units_and_categories(temp_bonus[0])
-            bonus_techs = get_techs(temp_bonus[0])
-            bonus_ages = get_ages(bonus)
-
-            # Create the techs
-            for age in bonus_ages:
-                if final_techs[0].required_techs == (0, 0, 0, 0, 0, 0):
-                    final_techs[0].required_techs = (age, 0, 0, 0, 0, 0)
-                    final_techs[0].required_tech_count = 1
-                else:
-                    final_techs.append(copy.deepcopy(final_techs[-1]))
-                    final_techs[-1].required_techs = (age, 0, 0, 0, 0, 0)
-                    final_techs[-1].required_tech_count = 1
-
-            # Breaks
-            if len(bonus_resources) == 0:
-                bonus_resources.extend([0, 1, 2, 3])
-
-            # Create the effect commands
-            commands = []
-            for number in bonus_numbers:
-                for resource in bonus_resources:
-                    # Create total list of effect commands
-                    for category_id in bonus_categories:
-                        commands.append(genieutils.effect.EffectCommand(5 if isinstance(number, float) else 4, -1, category_id, 103, number))
-                    for unit_id in bonus_units:
-                        commands.append(genieutils.effect.EffectCommand(5 if isinstance(number, float) else 4, unit_id, -1, 103, number))
-                    for tech_id in bonus_techs:
-                        starting_resource_int = get_tech_cost(tech_id, False)[resource]
-                        commands.append(genieutils.effect.EffectCommand(101, tech_id, resource, 0, int(starting_resource_int + number) if isinstance(number, int) else int(starting_resource_int * number)))
-            
-            commands = list(dict.fromkeys(copy.deepcopy(commands)))
-
-            # Set the first effect as the base effect
-            base_effect = copy.deepcopy(final_effects[0])
-
-            # Assign effect commands to effects
-            if len(bonus_ages) > 1:
-                # Make the amount of techs match the effects
-                while len(final_effects) < len(final_techs):
-                    final_effects.append(copy.deepcopy(base_effect))
-
-                per_age = int(ceil(len(commands) / len(final_effects)))
-                command_index = 0
-
-                # Add the effect commands to each effect
-                for effect in final_effects:
-                    for i in range(per_age):
-                        if command_index < len(commands):
-                            effect.effect_commands.append(commands[command_index])
-                            command_index += 1
-                        else:
-                            break
-            else:
-                final_effects[0].effect_commands.extend(commands)
-
-            # Attach the effects to the tech
-            for i, tech in enumerate(final_techs):
-                tech.effect_id = len(DATA.effects) + i
-
-        # Change attribute
-        temp_bonus_words = bonus.split(' ')
-        temp_bonus = bonus
-        for word in temp_bonus_words:
-            if len(get_numbers(bonus)) > 0:
-                temp_bonus = bonus.split(word)
-
-                bonus_units, bonus_categories = get_units_and_categories(temp_bonus[0])
-        
-        ## Infantry +2 attack
-        ## Infantry and Cavalry +50 hit points
-        temp_bonus_words = bonus.split(' ')
-        required_number = False
-        required_unitcategorytechs = False
-        required_stat = False
-        for word in temp_bonus_words:
-            # Unit/Category/Tech
-            if not required_unitcategorytechs:
-                t_units, t_categories = get_units_and_categories(word)
-                t_techs = get_techs(word)
-                required_unitcategorytechs = len(t_units) + len(t_categories) + len(t_techs) > 0
-            # Number
-            if not required_number:
-                required_number = len(get_numbers(word, False)) > 0
-            # Stat
-            if not required_stat:
-                required_stat = len(get_stats(word)) > 0
-
-        if required_number and required_unitcategorytechs and required_stat:
-            # Extract parts
-            bonus_ages = get_ages(bonus)
-            for word in temp_bonus_words:
-
-                bonus_numbers = get_numbers(temp_bonus[1], False)
-                bonus_resources = get_resources(temp_bonus[1])
-                bonus_units, bonus_categories = get_units_and_categories(temp_bonus[0])
-                bonus_techs = get_techs(temp_bonus[0])
-                bonus_ages = get_ages(bonus)0
-
-            # Create the techs
-            for age in bonus_ages:
-                if final_techs[0].required_techs == (0, 0, 0, 0, 0, 0):
-                    final_techs[0].required_techs = (age, 0, 0, 0, 0, 0)
-                    final_techs[0].required_tech_count = 1
-                else:
-                    final_techs.append(copy.deepcopy(final_techs[-1]))
-                    final_techs[-1].required_techs = (age, 0, 0, 0, 0, 0)
-                    final_techs[-1].required_tech_count = 1
-
-            # Breaks
-            if len(bonus_resources) == 0:
-                bonus_resources.extend([0, 1, 2, 3])
-
-            # Create the effect commands
-            commands = []
-            for number in bonus_numbers:
-                for resource in bonus_resources:
-                    # Create total list of effect commands
-                    for category_id in bonus_categories:
-                        commands.append(genieutils.effect.EffectCommand(5 if isinstance(number, float) else 4, -1, category_id, 103, number))
-                    for unit_id in bonus_units:
-                        commands.append(genieutils.effect.EffectCommand(5 if isinstance(number, float) else 4, unit_id, -1, 103, number))
-                    for tech_id in bonus_techs:
-                        starting_resource_int = get_tech_cost(tech_id, False)[resource]
-                        commands.append(genieutils.effect.EffectCommand(101, tech_id, resource, 0, int(starting_resource_int + number) if isinstance(number, int) else int(starting_resource_int * number)))
-            
-            commands = list(dict.fromkeys(copy.deepcopy(commands)))
-
-            # Set the first effect as the base effect
-            base_effect = copy.deepcopy(final_effects[0])
-
-            # Assign effect commands to effects
-            if len(bonus_ages) > 1:
-                # Make the amount of techs match the effects
-                while len(final_effects) < len(final_techs):
-                    final_effects.append(copy.deepcopy(base_effect))
-
-                per_age = int(ceil(len(commands) / len(final_effects)))
-                command_index = 0
-
-                # Add the effect commands to each effect
-                for effect in final_effects:
-                    for i in range(per_age):
-                        if command_index < len(commands):
-                            effect.effect_commands.append(commands[command_index])
-                            command_index += 1
-                        else:
-                            break
-            else:
-                final_effects[0].effect_commands.extend(commands)
-
-            # Attach the effects to the tech
-            for i, tech in enumerate(final_techs):
-                tech.effect_id = len(DATA.effects) + i
-
-        if True:
-            pass
-
-    # Return the final techs and final effects
-    return final_techs, final_effects'''
-
-'''def create_bonus(bonus_string_original, civ_id):
-    # Clean up string and check for cosmetic
-    bonus_string_original = bonus_string_original.strip()
-    cosmetic = bonus_string_original.startswith('*')
-    if cosmetic:
-        bonus_string_original = bonus_string_original[1:].strip()
-
-    # Create the tech and effect, set the civilisation and names
-    final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', repeatable=1)]
-    final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string_original}', effect_commands=[])]
-
-    # Check for cosmetic bonus
-    if cosmetic:
-        return final_techs, final_effects
-    
-    # Lowercase the bonus string
-    bonus_string = bonus_string_original.lower()
-
-    # Split the bonus string into words
-    words = bonus_string.lower().split()
-
-    # Stat dictionary
-    stat_dictionary = {'an additional projectile': ['N1', 'S107', 'S102'], 'blast radius': 'S22', 'additional projectiles': ['S107', 'S102'], 'carry': ['S14'], 'hit points': ['S0'], 'hp': ['S0'], 'line of sight': ['S1', 'S23'], 'los': ['S1', 'S23'], 'move': ['S5'], 'pierce armor': ['S8.0768'], 'armor vs. cavalry archers': ['S8.7168'], 'armor vs. elephants': ['S8.128'], 'armor vs. infantry': ['S8.0256'], 'armor vs. cavalry': ['S8.2048'], 'armor vs. archers': ['S8.384'], 'armor vs. ships': ['S8.4096'], 'armor vs. siege': ['S8.512'], 'armor vs. gunpowder': ['S8.5888'], 'armor vs. spearmen': ['S8.6912'], 'armor vs. eagles': ['S8.7424'], 'armor vs. camels': ['S8.768'], 'armor': ['S8.1024'], 'attack': ['S9.1026', 'S9.770'], 'range': ['S1', 'S12', 'S23'], 'minimum range': ['S20'], 'train': ['S101'], 'work': ['S13'], 'heal': ['S13']}
-
-    # Resource dictionary
-    resource_dictionary = {'food': ['R0'], 'wood': ['R1'], 'gold': ['R3'], 'stone': ['R2']}
-
-    # Trigger dictionary
-    trigger_directionary = {'more effective': 'Xmore effective',
-                            'available one age earlier': 'Xone age earlier',
-                            'free relic': 'Xfree relic',
-                            'do not need houses': 'Xdo not need houses',
-                            'does not need houses': 'Xdo not need houses',
-                            'start with': 'Xstart with',
-                            }
-
-    # Declare exception
-    exception = ''
-
-    # Precompute at the start of the function
-    unit_name_map = {}
-    for unit in DATA.civs[1].units:
-        try:
-            name = get_unit_name(unit.id).lower()
-            unit_name_map.setdefault(name, []).append(f"U{unit.id}")
-        except:
-            continue
-
-    # Add extra words to clarify meaning
-    for i, word in enumerate(words):
-        if str(word).endswith('-'):
-            if 'upgrade' in bonus_string or 'upgrades' in bonus_string:
-                words[i] = word + 'line upgrades'
-
-    i = 0
-    while i < len(words):
-        word = words[i]
-
-        # Skip useless words
-        if word in ['and', 'but', 'have', 'has']:
-            i += 1
-            continue
-
-        # Search for exception
-        if '(' in word:
-            exception = '-'
-
-        matched = False
-
-        # === Trigger Phrases ===
-        phrase = ''
-        best_match = ''
-        best_len = 0
-        for j in range(i, len(words)):
-            phrase = f"{phrase} {words[j]}".strip()
-            if phrase in trigger_directionary:
-                best_match = phrase
-                best_len = j - i + 1
-        if best_match:
-            bonus_items.append(trigger_directionary[best_match])
-            i += best_len
-            continue
-
-        # === Unit Categories ===
-        phrase = ''
-        best_match = ''
-
-        # Expand word by word from index i
-        for j in range(i, len(words)):
-            phrase = f"{phrase} {words[j]}".strip()
-            if phrase in UNIT_CATEGORIES:
-                best_match = phrase
-
-        # If a match was found, add its values
-        if best_match:
-            bonus_items.append(UNIT_CATEGORIES[best_match])
-            i += len(best_match.split())
-            continue  # Continue to next word after processing best match
-
-        # === Individual Units ===
-        def normalise_variants(p):
-            variants = {p}
-            if p.endswith('ies'):
-                variants.add(p[:-3] + 'y')
-            if p.endswith('s') and not p.endswith('ss'):
-                variants.add(p[:-1])
-            if 'men' in p:
-                variants.add(p.replace('men', 'man'))
-            return variants
-
-        best_unit_match = []
-        best_unit_match_length = 0
-
-        for j in range(i, len(words)):
-            phrase = ' '.join(words[i:j+1]).strip().lower()
-            variants = normalise_variants(phrase)
-
-            for variant in variants:
-                if variant in unit_name_map:
-                    best_unit_match = unit_name_map[variant]
-                    best_unit_match_length = j - i + 1
-                    break  # take the first good match for performance
-            if best_unit_match:
-                break  # stop expanding once a match is found
-            
-        if best_unit_match:
-            bonus_items.append(best_unit_match)
-            i += best_unit_match_length
-            continue
-
-        # === Numbers ===
-        if any(char.isdigit() for char in word):
-            old_numbers = word.split('/')
-            negative = '-' in word
-            percent = '%' in word
-
-            temp_numbers = []
-            for number in old_numbers:
-                number = number.strip('-+%')
-                number = int(number)
-
-                if percent and not negative:
-                    number = float(number / 100 + 1)
-                elif percent and negative:
-                    number = float((100 - number) / 100)
-                else:
-                    if negative:
-                        number *= -1
-                temp_numbers.append(f'N{number}')
-
-            bonus_items.append(temp_numbers)
-            i += 1
-            continue
-
-        # === Ages ===
-        if any(age in word for age in ('dark', 'feudal', 'castle', 'imperial')):
-            old_ages = word.split('/')
-            temp_ages = []
-            for age in old_ages:
-                if age == 'dark':
-                    temp_ages.append('A104')
-                elif age == 'feudal':
-                    temp_ages.append('A101')
-                elif age == 'castle':
-                    temp_ages.append('A102')
-                elif age == 'imperial':
-                    temp_ages.append('A103')
-            bonus_items.append(temp_ages)
-            i += 1
-            continue
-
-        # === Resources ===
-        try:
-            bonus_items.append(resource_dictionary[word])
-        except:
-            if word == 'cost' or word == 'costs':
-                resources_added = 0
-                for word_ in words[i+1:]:
-                    try:
-                        # If another cost is announced, break up searching for resources
-                        if word_ == 'cost' or word_ == 'costs':
-                            break
-
-                        bonus_items.append(resource_dictionary[word_])
-                        resources_added += 1
-                    except:
-                        pass
-                    
-                # Add all resources if no resource is specified
-                if resources_added == 0:
-                    for val in resource_dictionary.values():
-                        if val not in bonus_items:
-                            bonus_items.append(val)
-
-                i += 1
-                continue
-
-        # === Stats ===
-        for key in stat_dictionary:
-            key_words = key.split()
-            if word == key_words[0]:
-                following = words[i:i+len(key_words)]
-                if following == key_words:
-                    bonus_items.append(stat_dictionary[key])
-                    i += len(key_words)
-                    matched = True
-                    break
-        if matched:
-            continue
-
-        # Reset exception
-        if ')' in word:
-            exception = '-'
-
-        i += 1
-
-    # Flatten bonus items into one array
-    flat_bonus_items = []
-    stack = list(bonus_items)
-    while stack:
-        item = stack.pop(0)
-        if isinstance(item, list):
-            stack = list(item) + stack
-        else:
-            flat_bonus_items.append(item)
-    bonus_items = flat_bonus_items
-
-    # DEBUG: Print bonus items
-    print(f'{colour(Fore.BLUE, (bonus_string_original + ':'))} {bonus_items}')
-
-    # Create bonus lines
-    class Bonus_Line:
-        def __init__(
-            self,
-            category=-1,
-            unit=-1,
-            number=-1,
-            resource=-1,
-            stat=-1,
-            substat=-1,
-            age=-1,
-            trigger=''
-        ):
-            self.category = category
-            self.unit = unit
-            self.number = number
-            self.resource = resource
-            self.stat = stat
-            self.substat = substat
-            self.age = age
-            self.trigger = trigger
-
-    # Convert bonus items into bonus lines
-    bonus_lines = []
-    selected_lines = 0
-
-    for item in bonus_items:
-        # Category
-        if item[0] == 'C':
-            bonus_lines.append(Bonus_Line(category=int(item[1:])))
-            selected_lines += 1
-
-        # Unit
-        elif item[0] == 'U':
-            bonus_lines.append(Bonus_Line(unit=int(item[1:])))
-            selected_lines += 1
-
-        # Age
-        elif item[0] == 'A':
-            # Choose when the age is set
-            start_index = 0
-            for i, line in enumerate(bonus_lines):
-                if line.category == bonus_lines[-1].category and line.unit == bonus_lines[-1].unit and line.age == -1:
-                    start_index = i
-                    break
-
-            # Set the age for the first line
-            bonus_lines[start_index].age = int(item[1:])
-
-        # Stat
-        elif item.startswith('S'):
-            # Parse stat and substat
-            if '.' in item:
-                stat = int(item[1:].split('.')[0])
-                substat = int(item[1:].split('.')[1])
-            else:
-                stat = int(item[1:])
-                substat = -1
-
-            if not bonus_lines:
-                # No lines yet: create a new one
-                bonus_lines.append(Bonus_Line(stat=stat, substat=substat))
-                selected_lines = 1
-
-            else:
-                # Grab the recent group
-                recent = bonus_lines[-selected_lines:]
-
-                # Choose when the stat is set
-                start_index = 0
-                for i, line in enumerate(bonus_lines):
-                    if line.category == bonus_lines[-1].category and line.unit == bonus_lines[-1].unit and line.stat == -1:
-                        start_index = i
-                        break
-
-                # Set the stat for the first line
-                bonus_lines[start_index].stat = int(item[1:])
-
-                any_unset = any(line.stat == -1 for line in recent)
-
-                if any_unset:
-                    # Just set stat/substat on all
-                    for line in recent:
-                        line.stat = stat
-                        line.substat = substat
-                else:
-                    # Clone each with the new stat
-                    clones = []
-                    for line in recent:
-                        new_line = Bonus_Line(
-                            category=line.category,
-                            unit=line.unit,
-                            number=line.number,
-                            resource=line.resource,
-                            stat=stat,
-                            substat=substat,
-                            age=line.age,
-                            trigger=line.trigger
-                        )
-                        clones.append(new_line)
-                    bonus_lines.extend(clones)
-
-        # Unified handler for Resource, Number, Age, and Trigger
-        elif item[0] in {'R', 'N', 'A', 'X'}:
-            kind = item[0]
-            raw = item[1:]
-
-            # Parse the value
-            if kind == 'R':
-                value = int(raw)
-                attr = 'resource'
-                default = -1
-            elif kind == 'N':
-                value = float(raw) if '.' in raw else int(raw)
-                attr = 'number'
-                default = -1
-            elif kind == 'A':
-                value = int(raw)
-                attr = 'age'
-                default = -1
-            elif kind == 'X':
-                value = raw
-                attr = 'trigger'
-                default = ''
-
-            # No previous lines: create new
-            if not bonus_lines:
-                kwargs = {attr: value}
-                bonus_lines.append(Bonus_Line(**kwargs))
-                selected_lines = 1
-            else:
-                recent = bonus_lines[-selected_lines:]
-                any_unset = any(getattr(line, attr) == default for line in recent)
-                if any_unset:
-                    for line in recent:
-                        setattr(line, attr, value)
-                else:
-                    clones = []
-                    for line in recent:
-                        new_line = Bonus_Line(
-                            category=line.category,
-                            unit=line.unit,
-                            number=line.number,
-                            resource=line.resource,
-                            stat=line.stat,
-                            substat=line.substat,
-                            age=line.age,
-                            trigger=line.trigger
-                        )
-                        setattr(new_line, attr, value)
-                        clones.append(new_line)
-                    bonus_lines.extend(clones)
-
-    # DEBUG: Print bonus lines
-    for b in bonus_lines:
-        print(
-            f"Bonus_Line(category={b.category}, "
-            f"unit={b.unit}, "
-            f"number={b.number}, "
-            f"resource={b.resource}, "
-            f"stat={b.stat}, "
-            f"substat={b.substat}, "
-            f"age={b.age}, "
-            f"trigger='{b.trigger}')"
-        )
-
-    # Turn bonus lines into techs and effects
-    for bonus_line in bonus_lines:
-        # Age
-        if bonus_line.age != -1:
-            if final_techs[-1].required_techs != (0, 0, 0, 0, 0, 0):
-                # Create a new tech for the age
-                final_techs.append(copy.deepcopy(final_techs[-1]))
-
-            # Add the age to the tech
-            final_techs[-1].required_techs = (bonus_line.age, 0, 0, 0, 0, 0)
-            final_techs[-1].required_tech_count = 1
-
-        # Triggers
-        if bonus_line.trigger == 'do not need houses' or bonus_line.trigger == 'does not need houses':
-            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(1, 4, 1, -1, 2000))
-            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(2, 70, 0, -1, 0))
-        elif bonus_line.trigger == 'start with':
-            final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(1, bonus_line.resource + 91, 1, -1, bonus_line.number))
-
-        # General edit stat of unit
-        else:
-            if isinstance(bonus_line.number, float):
-                final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(5, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
-            elif isinstance(bonus_line.number, int):
-                final_effects[0].effect_commands.append(genieutils.effect.EffectCommand(4, bonus_line.unit, bonus_line.category, bonus_line.stat, bonus_line.number))
-            pass
-
-    # Pass on the tech and the effect
-    return final_techs, final_effects
-'''
-'''def toggle_unit(unit_index, mode, tech_tree_index, selected_civ_name):
-    # Get unit name or tech name
-    is_tech = '_' in str(unit_index)
-    if is_tech:
-        unit = DATA.techs[int(unit_index[1:])].name.lower()
-    else:
-        unit = get_unit_name(unit_index).lower()
-
-    # Determine whether enabling or disabling
-    if mode == 'toggle' and TECH_TREE[unit] == 0:
-        mode = 'enable'
-    elif mode == 'toggle' and TECH_TREE[unit] == 1:
-        mode = 'disable'
-
-    # Update JSON file
-    trigger_tech_id = -1
-    json_line_start = 0
-    with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r+') as file:
-        if unit in TECH_TREE:
-            lines = file.readlines()
-
-            # Find the line where the current civ starts
-            for i, line in enumerate(lines):
-                if f'"civ_id": "{selected_civ_name.upper()}"' in line:
-                    json_line_start = i
-
-            # Change the lines in the file
-            for i in range(json_line_start, len(lines)):
-                if f'\"Name\": \"{unit.title()}\"' in lines[i]:
-                    if mode == 'enable':
-                        lines[i + 3] = f'          "Node Status": "ResearchedCompleted",\n'
-                    elif mode == 'disable':
-                        lines[i + 3] = f'          "Node Status\": "NotAvailable",\n'
-                    break
-
-            # Save the file
-            file.seek(0)
-            file.writelines(lines)
-            file.truncate()
-
-    # Get tech index
-    if not is_tech:
-        found = False
-        for i, tech in enumerate(DATA.techs):
-            for ec in DATA.effects[tech.effect_id].effect_commands:
-                if (ec.type == 2 and ec.a == unit_index) or (ec.type == 3 and ec.b == unit_index):
-                    tech_index = i
-                    found = True
-                    break
-            if found:
-                break
-    else:
-        tech_index = int(unit_index[1:])
-        
-    # Update .dat file
-    if mode == 'enable':
-        for i, effect_command in enumerate(DATA.effects[tech_tree_index].effect_commands):
-            if effect_command.type == 102 and effect_command.d == tech_index:
-                DATA.effects[tech_tree_index].effect_commands.pop(i)
-    elif mode == 'disable':
-        DATA.effects[tech_tree_index].effect_commands.append(genieutils.effect.EffectCommand(102, 0, 0, 0, tech_index))'''
 
 def open_mod(mod_folder):
     with_real_progress(lambda progress: load_dat(progress, rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat'), 'Loading Mod', total_steps=100)
@@ -3110,78 +2187,132 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         for civ in DATA.civs:
             pickle.dump(civ.units, file)
 
-    '''# Set graphics for civs
-    general_architecture_sets = {'Nomadic': 12,'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1}
-    monk_sets = {'Christian': 0, 'Native American': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40, 'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35}
-    monastery_sets = {'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Nomadic': 12, 'Pagan': 35}
-    trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
-    ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5, "Eastern European": 23, "Mediterranean": 14, "Mesoamerican": 15, "Middle Eastern": 9, "Southeast Asian": 28, "Western European": 1}
-    all_sets = [general_architecture_sets, monk_sets, monastery_sets, trade_cart_sets, ship_sets]
-    civ_presets = {
-        # General, Monk, Monastery, Trade Cart, Ship
-        "Britons": ['', '', '', '', ''],
-        "Franks": ['', 'Catholic', '', '', ''],
-        "Goths": ['', '', '', '', ''],
-        "Teutons": ['', '', '', '', ''],
-        "Japanese": ['', '', '', '', ''],
-        "Chinese": ['', '', '', '', ''],
-        "Byzantines": ['', '', '', '', ''],
-        "Persians": ['Central Asian', '', '', 'Horse', ''],
-        "Saracens": ['', '', '', '', ''],
-        "Turks": ['', '', '', '', ''],
-        "Vikings": ['', '', '', '', ''],
-        "Mongols": ['Nomadic', '', '', 'Horse', ''],
-        "Celts": ['', 'Catholic', '', '', ''],
-        "Spanish": ['', '', '', '', ''],
-        "Aztecs": ['', '', '', '', ''],
-        "Maya": ['', '', '', '', ''],
-        "Huns": ['Nomadic', '', '', 'Horse', ''],
-        "Koreans": ['', '', '', '', ''],
-        "Italians": ['', '', '', '', ''],
-        "Hindustanis": ['', '', '', 'Camel', ''],
-        "Inca": ['', '', '', '', ''],
-        "Magyars": ['', '', '', '', ''],
-        "Slavs": ['', '', '', '', ''],
-        "Portuguese": ['', '', '', '', ''],
-        "Ethiopians": ['', '', '', '', ''],
-        "Malians": ['', '', '', 'Camel', ''],
-        "Berbers": ['', '', '', 'Camel', ''],
-        "Khmer": ['', 'Hindu', '', '', ''],
-        "Malay": ['', 'Muslim', '', '', ''],
-        "Burmese": ['', 'Buddhist', '', '', ''],
-        "Vietnamese": ['', 'Buddhist', '', '', 'Southeast Asian'],
-        "Bulgarians": ['', '', '', '', ''],
-        "Tatars": ['', '', '', 'Camel', ''],
-        "Cumans": ['Nomadic', '', '', 'Horse', ''],
-        "Lithuanians": ['', '', '', '', ''],
-        "Burgundians": ['', '', '', '', ''],
-        "Sicilians": ['', '', '', '', ''],
-        "Poles": ['', '', '', '', ''],
-        "Bohemians": ['', '', '', '', ''],
-        "Dravidians": ['', '', '', 'Ox', ''],
-        "Bengalis": ['', 'Muslim', '', '', ''],
-        "Gurjaras": ['', 'Hindu', '', 'Camel', ''],
-        "Romans": ['', '', '', '', ''],
-        "Armenians": ['', '', '', '', ''],
-        "Georgians": ['', '', '', '', ''],
-        "Shu": ['', '', '', '', ''],
-        "Wu": ['', '', '', '', ''],
-        "Wei": ['', '', '', '', ''],
-        "Jurchens": ['Nomadic', '', '', 'Horse', ''],
-        "Khitans": ['', '', '', 'Horse', '']
+    # --- Graphic set maps (same as your menu version) ---
+    general_architecture_sets = {
+        'Nomadic': 12, 'West African': 26, 'Austronesian': 29, 'Central Asian': 33,
+        'Central European': 4, 'East Asian': 5, 'Eastern European': 23,
+        'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15,
+        'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1
     }
-    
-    unit_bank = {0: range(0, len(DATA.civs[1].units)), 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [128, 204], 6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
-    for i, civ in enumerate(DATA.civs):
-        if civ.name.lower() in ['gaia', 'spartans', 'athenians', 'achaemenids']:
+    monk_sets = {
+        'Christian': 0, 'Native American': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40,
+        'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35
+    }
+    monastery_sets = {
+        'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5,
+        'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15,
+        'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25,
+        'Southeast European': 7, 'Nomadic': 12, 'Pagan': 35
+    }
+    trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
+    ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5,
+                "Eastern European": 23, "Mediterranean": 14, "Mesoamerican": 15, "Middle Eastern": 9,
+                "Southeast Asian": 28, "Western European": 1}
+
+    # Castle/Wonder sets — reuse your menu version (by civ label)
+    castle_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6,
+                "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11,
+                "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17,
+                "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22,
+                "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27,
+                "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32,
+                "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37,
+                "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42,
+                "Romans": 43, "Armenians": 44, "Georgians": 45, "Shu": 49, "Wu": 50,
+                "Wei": 51, "Jurchens": 52, "Khitans": 53}
+    wonder_sets = dict(castle_sets)  # if your template indices align for wonders
+
+    # Keep the order aligned with unit_bank below:
+    graphic_titles = ["General", "Castle", "Wonder", "Monk", "Monastery", "Trade Cart", "Ships"]
+    graphic_sets = [general_architecture_sets, castle_sets, wonder_sets,
+                    monk_sets, monastery_sets, trade_cart_sets, ship_sets]
+
+    # Units affected by each group (same as your menu)
+    unit_banks = {
+        0: range(0, len(DATA.civs[1].units)),            # General (all)
+        1: [82, 1430],                                   # Castle units (building and rubble)
+        2: [276, 1445],                                  # Wonder units
+        3: [125, 286, 922, 1025, 1327],                  # Monk units (variants)
+        4: [30, 31, 32, 104, 1421],                      # Monastery buildings
+        5: [128, 204],                                   # Trade carts
+        6: [1103, 529, 532, 545, 17, 420, 691,           # Ships: fire, galley, demo, transport, fish, CG, etc.
+            1104, 527, 528, 539, 21, 442]
+    }
+
+    # Your presets now need 7 fields (General, Castle, Wonder, Monk, Monastery, Trade Cart, Ships)
+    # Empty string means "no change"
+    civ_presets = {
+        1:  [-1, -1, -1, -1, -1, -1, -1],
+        2:  [-1, -1, -1, 19, -1, -1, -1],
+        3:  [19, -1, -1, -1, 19, -1, 19],
+        4:  [-1, -1, -1, -1, -1, -1, -1],
+        5:  [-1, -1, -1, -1, -1, -1, -1],
+        6:  [-1, -1, -1, -1, -1, -1, -1],
+        7:  [-1, -1, -1, -1, -1, -1, -1],
+        8:  [33, -1, -1, -1, 33, 1, 33],
+        9:  [-1, -1, -1, -1, -1, -1, -1],
+        10: [-1, -1, -1, -1, -1, -1, -1],
+        11: [-1, -1, -1, -1, -1, -1, -1],
+        12: [-1, -1, -1, -1, -1, 1, -1],
+        13: [-1, -1, -1, 19, -1, -1, -1],
+        14: [-1, -1, -1, -1, -1, -1, -1],
+        15: [-1, -1, -1, -1, -1, -1, -1],
+        16: [-1, -1, -1, -1, -1, -1, -1],
+        17: [-1, -1, -1, -1, -1, 1, -1],
+        18: [-1, -1, -1, -1, -1, -1, -1],
+        19: [-1, -1, -1, -1, -1, -1, -1],
+        20: [9, -1, -1, -1, -1, 9, -1],
+        21: [-1, -1, -1, -1, -1, -1, -1],
+        22: [4, -1, -1, -1, 4, -1, 4],
+        23: [-1, -1, -1, -1, -1, -1, -1],
+        24: [-1, -1, -1, -1, -1, -1, -1],
+        25: [-1, -1, -1, -1, -1, -1, -1],
+        26: [-1, -1, -1, -1, -1, 9, -1],
+        27: [26, -1, -1, -1, -1, 9, -1],
+        28: [-1, -1, -1, 20, -1, -1, -1],
+        29: [-1, -1, -1, 9, -1, -1, -1],
+        30: [-1, -1, -1, 5, -1, -1, -1],
+        31: [-1, -1, -1, 5, -1, -1, 28],
+        32: [-1, -1, -1, -1, -1, -1, -1],
+        33: [-1, -1, -1, -1, -1, 1, -1],
+        34: [-1, -1, -1, -1, -1, 1, -1],
+        35: [4, -1, -1, -1, 4, -1, 4],
+        36: [-1, -1, -1, -1, -1, -1, -1],
+        37: [-1, -1, -1, -1, -1, -1, -1],
+        38: [4, -1, -1, -1, -1, -1, -1],
+        39: [-1, -1, -1, -1, -1, -1, -1],
+        40: [-1, -1, -1, -1, -1, 6, -1],
+        41: [-1, -1, -1, 9, -1, -1, -1],
+        42: [-1, -1, -1, 40, -1, 9, -1],
+        43: [-1, -1, -1, -1, -1, -1, -1],
+        44: [-1, -1, -1, -1, -1, -1, -1],
+        45: [-1, -1, -1, -1, -1, -1, -1],
+        49: [-1, -1, -1, -1, -1, -1, -1],
+        50: [-1, -1, -1, -1, -1, -1, -1],
+        51: [-1, -1, -1, -1, -1, -1, -1],
+        52: [-1, -1, -1, -1, -1, 1, -1],
+        53: [-1, -1, -1, -1, -1, 1, -1],
+    }
+
+    # Define the special units
+    special_unit_ids = [uid for key, ids in unit_banks.items() if 1 <= key <= 6 for uid in ids]
+
+    for civ_id, civ in enumerate(DATA.civs):
+        # Skip civs that don't have a preset
+        if civ_id not in civ_presets:
             continue
-            
-        # Get graphical presets
-        for y, preset_value in enumerate(civ_presets[civ.name]):
-            if preset_value == '':
-                continue
-            for unit_id in unit_bank[y]:
-                DATA.civs[i].units[unit_id] = DATA.civs[all_sets[y][preset_value]].units[unit_id]'''
+
+        # Define the presets
+        presets = civ_presets[civ_id]
+
+        for key, unit_bank in unit_banks.items():
+            for unit_id in unit_bank:
+                if presets[key] == -1:
+                    break
+
+                if (key == 0 and unit_id not in special_unit_ids) or key > 0:
+                    # General units: apply to all except special units
+                    DATA.civs[civ_id].units[unit_id] = DATA.civs[presets[key]].units[unit_id]
 
     # Save changes
     with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Formatting Mod', total_steps=100)
@@ -3995,7 +3126,7 @@ def main():
                             trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
                             ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5, "Eastern European": 23, "Mediterranean": 14, "Mesoamerican": 15, "Middle Eastern": 9, "Southeast Asian": 28, "Western European": 1}
                             castle_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6, "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11, "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17, "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22, "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27, "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32, "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37, "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42, "Romans": 43, "Armenians": 44, "Georgians": 45, "Shu": 49, "Wu": 50, "Wei": 51, "Jurchens": 52, "Khitans": 53}
-                            wonder_sets = copy.deepcopy(castle_sets)
+                            wonder_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6, "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11, "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17, "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22, "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27, "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32, "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37, "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42, "Romans": 43, "Armenians": 44, "Georgians": 45, "Shu": 49, "Wu": 50, "Wei": 51, "Jurchens": 52, "Khitans": 53}
                             
                             # Custom Castles
                             for custom_castle in ['Poenari Castle']:
@@ -4020,14 +3151,20 @@ def main():
                                 # Scan the units for their graphics
                                 try:
                                     for i, graphic_set in enumerate(graphic_sets):
-                                        test_unit = unit_bank[i][0] if i > 0 else 463
+                                        try:
+                                            test_unit = unit_bank[i][0] if i > 0 else 463
 
-                                        for key, value in graphic_set.items():
-                                            if DATA.civs[selected_civ_index + 1].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
-                                                current_graphics[i] = key
-                                                break
-                                except Exception as e:
-                                    print(str(e))
+                                            for key, value in graphic_set.items():
+                                                if DATA.civs[selected_civ_index + 1].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
+                                                    current_graphics[i] = key
+                                                    break
+                                        except Exception as e:
+                                            etype, evalue, etb = sys.exc_info()
+                                            print(f"[ERROR] {etype.__name__}: {e}")
+                                            print("Traceback:")
+                                            print("".join(traceback.format_exception(etype, evalue, etb)))
+                                except:
+                                    pass
 
                                 # Show graphics menu
                                 print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Graphics{save} {title_emoji}'))
