@@ -24,21 +24,4 @@ time.sleep(1)
 
 # Edit code after here
 
-for i, civ in enumerate(DATA.civs):
-    tech_tree = None
-    if i not in [0, 46, 47, 48]:
-        for y, effect in enumerate(DATA.effects):
-            if effect.name.lower() == f'{civ.name.lower()} tech tree':
-                tech_tree = y
-
-    if not tech_tree:
-        continue
-
-    disabled_techs = []
-    for ec in DATA.effects[tech_tree].effect_commands:
-        if ec.type == 102 and ec.d > 0:
-            disabled_techs.append(int(ec.d))
-
-    print(f"{civ.name.title()}: {', '.join(str(x) for x in disabled_techs)}")
-
-        
+print(DATA.techs[360])    

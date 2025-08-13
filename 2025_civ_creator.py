@@ -236,17 +236,7 @@ def get_unit_id(name, list_ids):
     return list(set(final_ids))
 
 def update_tech_tree_graphic(current_civ_name):
-    """
-    Rebuilds the selected civ's tech tree in civTechTrees.json:
-    - Starts with ALL nodes (buildings + units) from the reference JSON.
-    - Sets all to Available by default.
-    - Disables nodes based on the civ's 'Tech Tree' effect (EffectCommand.type == 102).
-    - Propagates unavailability to nodes requiring disabled Techs.
-    """
-    import json
-    from copy import deepcopy
-
-    # 1) Find the tech-tree effect for this civ
+    # Find the tech-tree effect for this civ
     tech_tree_id = -1
     target_name = f'{current_civ_name.lower()} tech tree'
     for i, effect in enumerate(DATA.effects):
@@ -255,12 +245,20 @@ def update_tech_tree_graphic(current_civ_name):
             break
     if tech_tree_id == -1:
         raise ValueError(f"Tech tree effect not found for civ '{current_civ_name}'")
+    
+    # Collect every ec.d into a set
+    disabled_triggers = set()
+    for ec in DATA.effects[tech_tree_id].effect_commands:
+        # guard against missing attribute / non-int
+        d = getattr(ec, "d", None)
+        if isinstance(d, int):
+            disabled_triggers.add(d)
 
-    # 2) Load the reference JSON
+    # Load the reference JSON
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r', encoding="utf-8") as file:
         json_tree = json.load(file)
 
-    # 3) Build an entry bank of all unique nodes
+    # Build an entry bank of all unique nodes
     entry_bank = {}
     entry_section = {}
     for civ in json_tree.get("civs", []):
@@ -269,70 +267,37 @@ def update_tech_tree_graphic(current_civ_name):
                 nid = entry.get("Node ID")
                 if nid is None or nid in entry_bank:
                     continue
-                entry_bank[nid] = deepcopy(entry)
+                entry_bank[nid] = copy.deepcopy(entry)
                 entry_section[nid] = section
 
-    # 4) Create a fresh civ block with all entries marked Available
+    # Create a fresh civ block with all entries present
     new_civ_block = {
         "civ_id": current_civ_name.upper(),
         "civ_techs_buildings": [],
         "civ_techs_units": [],
     }
+    print(disabled_triggers)
     for nid, base_entry in entry_bank.items():
-        e = deepcopy(base_entry)
-        e["Node Status"] = "ResearchedCompleted"
+        e = copy.deepcopy(base_entry)
         e.setdefault("Prerequisite IDs", [])
         e.setdefault("Prerequisite Types", [])
-        new_civ_block[entry_section[nid]].append(e)
 
-    # 5) Disable nodes from civ's tech-tree effect (type == 102)
-    disables = set()
-    for cmd in DATA.effects[tech_tree_id].effect_commands:
-        try:
-            if cmd.type == 102:
-                disables.add(cmd.d)
-        except Exception:
-            pass
+        if e.get("Trigger Tech ID") not in disabled_triggers:
+            new_civ_block[entry_section[nid]].append(e)
+        else:
+            print(e.get("Trigger Tech ID"))
 
-    trig_to_entries = {}
+    # For every JSON node: if Trigger Tech ID in disabled_triggers -> NotAvailable, else ResearchedCompleted
     for section in ("civ_techs_buildings", "civ_techs_units"):
         for e in new_civ_block[section]:
             trig = e.get("Trigger Tech ID")
-            if trig is None:
-                continue
-            trig_to_entries.setdefault(trig, []).append(e)
+            if isinstance(trig, int) and trig in disabled_triggers:
+                e["Node Status"] = "NotAvailable"
+            else:
+                e["Node Status"] = "ResearchedCompleted"
+    # --- END NEW LOGIC ---
 
-    for trig in disables:
-        for e in trig_to_entries.get(trig, []):
-            e["Node Status"] = "NotAvailable"
-
-    # 6) Propagate unavailability to nodes that require disabled Techs
-    id_to_entry = {
-        "civ_techs_buildings": {e["Node ID"]: e for e in new_civ_block["civ_techs_buildings"]},
-        "civ_techs_units":     {e["Node ID"]: e for e in new_civ_block["civ_techs_units"]},
-    }
-
-    def prereq_blocked(entry, lookup):
-        for pid, ptype in zip(entry.get("Prerequisite IDs", []), entry.get("Prerequisite Types", [])):
-            if ptype != "Tech":
-                continue
-            dep = lookup["civ_techs_buildings"].get(pid) or lookup["civ_techs_units"].get(pid)
-            if dep and dep.get("Node Status") == "NotAvailable":
-                return True
-        return False
-
-    changed = True
-    while changed:
-        changed = False
-        for section in ("civ_techs_buildings", "civ_techs_units"):
-            for e in new_civ_block[section]:
-                if e.get("Node Status") == "NotAvailable":
-                    continue
-                if prereq_blocked(e, id_to_entry):
-                    e["Node Status"] = "NotAvailable"
-                    changed = True
-
-    # 7) Replace civ in JSON and save
+    # Replace civ in JSON and save
     replaced = False
     for i, civ in enumerate(json_tree.get("civs", [])):
         if civ.get("civ_id") == current_civ_name.upper():
@@ -345,6 +310,7 @@ def update_tech_tree_graphic(current_civ_name):
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'w', encoding="utf-8") as file:
         json.dump(json_tree, file, ensure_ascii=False, indent=2)
 
+    print(f'Changed tech tree graphic for {current_civ_name}')
     return new_civ_block
 
 '''def get_unit_categories(name):
@@ -417,18 +383,18 @@ def update_tech_tree_graphic(current_civ_name):
     return categories'''
         
 def get_tech_id(name):
-    # Search with internal_name
-    for i, tech in enumerate(DATA.techs):
-        if tech.name.lower() == name.lower():
-            return i
-
-    # As a backup, search for name elsewhere
+    # Search with external name
     string_id = None
     with open(ORIGINAL_STRINGS, 'r', encoding='utf-8') as file:
         for line in file:
             if name.lower() in line.lower():
                 string_id = re.sub(r'^\d+\s+', '', line)
                 break
+
+    # Search with internal name
+    for i, tech in enumerate(DATA.techs):
+        if tech.name.lower() == name.lower():
+            return i
 
     if string_id:
         for i, tech in enumerate(DATA.techs):
@@ -572,10 +538,11 @@ def create_bonus(bonus_string, civ_id):
             'camel riders': [1755, 329, 330, 207],
             'battle elephants': [1132, 1134],
             'hei guang cavalry': [1944, 1946],
-            'battering rams': [35, 422, 548, 12582],
+            'battering rams': [35, 422, 548, 1258],
             'armored elephants': [1744, 1746],
             'mangonel-line': [280, 550, 588],
             'rocket carts': [1904, 1907],
+            'bombard cannons': [36, 1709],
             'fire ships': [1103, 529, 532],
             'demolition ships': [1104, 527, 528],
             'galleys': [539, 21, 442],
@@ -587,10 +554,13 @@ def create_bonus(bonus_string, civ_id):
             'camel units': [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263, 1923],
             'elephant units': [239, 558, 873, 875, 1120, 1122, 1132, 1134, 1744, 1746, 1923],
             'gunpowder units': [5, 36, 420, 46, 691, 771, 773, 557, 1001, 1003, 831, 832, 1709, 1704, 1706, 1904, 1907, 1901, 1903, 1911],
-            'mounted archers': [39, 474, 1231, 1233, 1260],
             'shock infantry': [751, 752, 753, 1901, 1903, 1974, 1976],
             'mule carts': [1808],
             'warrior priests': [1811, 1831],
+            'archery range units': [4, 24, 492, 7, 6, 1155, 39, 474, 873, 875, get_unit_id('imperial elephant archer', False), 583, 596],
+            'barracks units': [74, 75, 77, 473, 567, 1793, 93, 358, 359, 751, 753, 752, 1901, 1903],
+            'stable units': [448, 546, 441, 1707, 1751, 1753, 38, 283, 569, 1813, 1370, 1372, 1755, 329, 330, 207, 1132, 1134, 1944, 1946],
+            'siege workshop units': [35, 422, 548, 1258, 280, 550, 588, 1904, 1907, 1744, 1746, 36, 1709, 1105],
         }
         import re
         from collections import defaultdict
@@ -659,6 +629,7 @@ def create_bonus(bonus_string, civ_id):
             'warships': [22],
             'all ships': [2, 21, 22, 20, 53],
             'walls': [27],
+            'mounted archers': [36],
             'towers': [52],
             'livestock': [58],
             'military units': [0, 35, 6, 36, 47, 12, 44, 23],
@@ -681,7 +652,9 @@ def create_bonus(bonus_string, civ_id):
             'lumber camp technologies': [202, 203, 221],
             'mule cart technologies': [55, 182, 278, 279, 202, 203, 221],
             'economic technologies': [55, 182, 278, 279, 202, 203, 221, 12, 13, 14, 1012, 1013, 1014, 22, 213, 85],
-            'technologies': [85]
+            'technologies': [85],
+            'pasture upgrades': [1014, 1013, 1012],
+            'farm upgrades': [14, 13, 12],
         }
         '''for i, tech in enumerate(DATA.techs):
             if tech.research_locations[0].location_id in [87, 12, 101, 103, 84, 82, 109, 65, 209, 49, 104, 562, 68, 584] and tech.effect_id != -1 and (tech.civ < 46 or tech.civ > 48):
@@ -710,6 +683,8 @@ def create_bonus(bonus_string, civ_id):
             (re.compile(r'cost\s+([-+]?\d+%?)\s+stone', re.IGNORECASE), [106]),
             (re.compile(r'cost\s+([-+]?\d+)', re.IGNORECASE), [103, 104, 105, 106]),
             (re.compile(r'regenerate\s+([-+]?\d+%?)\s+HP per minute', re.IGNORECASE), [109]),
+            (re.compile(r'([-+]?\d+%?)\s+pierce armor', re.IGNORECASE), [8.768]),
+            (re.compile(r'([-+]?\d+%?)\s+armor', re.IGNORECASE), [8.1024]),
         ]
 
         def parse_number(text):
@@ -750,9 +725,10 @@ def create_bonus(bonus_string, civ_id):
                     num, is_percent = parse_number(number_str)
 
                     for stat_id in stat_ids:
-                        # Special handling for attack speed (stat 10): +25% faster -> 0.75
-                        if stat_id == 10 and isinstance(num, float):
+                        if stat_id in [10] and isinstance(num, float): # Invert the number
                             final_value = round(1 - (num - 1), 2)
+                        elif not is_percent and isinstance(num, float):
+                            final_value = stat_id - int(stat_id) + num
                         else:
                             final_value = num
 
@@ -762,7 +738,7 @@ def create_bonus(bonus_string, civ_id):
                             for tid in ids:
                                 unit_id = tid if ttype == "unit" else -1
                                 category_id = tid if ttype == "category" else -1
-                                output.append(f"{marker}~{unit_id}~{category_id}~{stat_id}~{final_value}")
+                                output.append(f"{marker}~{unit_id}~{category_id}~{int(stat_id)}~{final_value}")
 
             return "|".join(output)
 
@@ -1081,8 +1057,42 @@ def open_mod(mod_folder):
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
-    update_tech_tree_graphic('Britons')
-    #print(get_unit_line(473))
+
+    '''unique_unit_techs = []
+    for unit_name in ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer']:
+        unit_one = get_unit_id(unit_name, False)
+        unit_two = get_unit_id(f'elite {unit_name}', False)
+
+        if unit_one == -1 or unit_two == -1:
+            print(f'Cannot find {unit_name}')
+            continue
+
+        tech_castle = -1
+        tech_imperial = -1
+        for tech_id, tech in enumerate(DATA.techs):
+            try:
+                effect_type = DATA.effects[tech.effect_id].effect_commands[0].type
+                effect_a = DATA.effects[tech.effect_id].effect_commands[0].a
+                effect_b = DATA.effects[tech.effect_id].effect_commands[0].b
+                if effect_type == 2 and effect_a == unit_one:
+                    tech_castle = tech_id
+                elif effect_type == 3 and effect_a == unit_one and effect_b == unit_two:
+                    tech_imperial = tech_id
+
+                if tech_castle != -1 and tech_imperial != -1:
+                    unique_unit_techs.append(tech_castle)
+                    unique_unit_techs.append(tech_imperial)
+                    break
+            except:
+                continue
+
+        if tech_castle == -1 or tech_imperial == -1:
+            print(f'No tech found for {unit_name}')
+            continue
+
+    print(unique_unit_techs)'''
+
+    
 
     # DEBUG: Print attributes of the unit
     #unit = DATA.civs[1].units[8].creatable.train_location_id
@@ -1510,6 +1520,14 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     for tech_id in [788, 789, 791]:
         DATA.techs[tech_id].effect_id = -1
 
+    # Make the Imperial Skirmisher potentially available to all civs
+    DATA.techs[656].effect_id = -1
+    DATA.techs[655].research_locations[0].button_id = 7
+    for civ in DATA.civs:
+        for effect in DATA.effects:
+            if effect.name.lower() == f'{civ.name.lower()} tech tree' and 'vietnamese' not in effect.name.lower():
+                effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 655))
+
     # Make other unique units potentially available to all civs
     '''tech_tree_indexes = [254, 258, 259, 262, 255, 257, 256, 260, 261, 263, 275, 277, 276, 446, 447, 449, 448, 504, 20, 1, 3, 5, 7, 31, 28, 42, 27, 646, 648, 650, 652, 706, 708, 710, 712, 782, 784, 801, 803, 808, 840, 842, 890, 923, 927, 1101, 1107, 1129, 1030, 1031, 1028, 986, 988]
     unique_techs_indexes = [521, 858, 655, 598, 599, 528, 992, 1037, 522, 773, 885, 1075, 272, 447, 448, 948, 84, 703, 787, 1005, 1065, 790, 842, 843, 526]
@@ -1658,7 +1676,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             if unit.dying_graphic != -1 and dying_graphic_id != -1:
                 unit.dying_graphic = dying_graphic_id
 
-
     # Enable the pasture for Mongols, Berbers, Huns, and Cumans
     DATA.techs[1008].civ = -1
     DATA.techs[1014].civ = -1
@@ -1682,10 +1699,33 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
     # Remove the Dragon Ship upgrade for the Chinese
     DATA.techs[1010].effect_id = -1
+    DATA.techs[1010].civ = 0
     for i, ec in enumerate(DATA.effects[257].effect_commands):
         if ec.type == 102 and ec.d == 246:
             DATA.effects[257].effect_commands.pop(i)
             break
+
+    # Correct name mistakes
+    DATA.civs[1].name = 'Britons'
+    DATA.civs[2].name = 'Franks'
+    DATA.civs[7].name = 'Byzantines'
+    DATA.civs[16].name = 'Maya'
+    DATA.effects[449].name = 'Maya Tech Tree'
+    DATA.effects[489].name = 'Maya Team Bonus'
+    DATA.civs[21].name = 'Inca'
+    DATA.effects[3].name = 'Inca Tech Tree'
+    DATA.effects[4].name = 'Inca Team Bonus'
+
+    # Uncouple the older, existing, unique Castle unit techs
+    '''old_tech_costs = []
+    old_tech_research_locations = []
+    for tech_id in [263, 360, 275, 363, 399, 398, 276, 364, 262, 366, 268, 362, 267, 361, 274, 367, 269, 368, 271, 369, 446, 365, 273, 371, 277, 370, 58, 60, 431, 432, 26, 27, 1, 2, 449, 450, 467, 468, 839, 840, 508, 509, 471, 472, 503, 504, 562, 563, 568, 569, 566, 567, 564, 565, 614, 615, 616, 617, 618, 619, 620, 621, 677, 678, 679, 680, 681, 682, 683, 684, 750, 751, 752, 753, 778, 779, 780, 781, 825, 826, 827, 828, 829, 830, 881, 882, 917, 918, 919, 920, 990, 991, 1001, 1002, 1063, 1064, 1035, 1036, 1073, 1074]:
+        DATA.techs[tech_id].effect_id = -1
+        DATA.techs[tech_id].required_tech_count = 6
+
+        if DATA.techs[tech_id].resource_costs[0].type != -1:
+            old_tech_costs.append(DATA.techs[tech_id].resource_costs)
+            old_tech_research_locations.append(DATA.techs[tech_id].research_locations)'''
 
     # Create techs unique to Talofa
     imperial_elephant_archer_tech = copy.deepcopy(DATA.techs[481])
@@ -1972,6 +2012,15 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         imperial_elephant_archer.creatable.train_locations[0].button_id = civ.units[875].creatable.train_locations[0].button_id
         civ.units.append(imperial_elephant_archer)
 
+    # Create new unique Castle unit techs and effects
+    for i, tech_id in enumerate([263, 360, 275, 363, 399, 398, 276, 364, 262, 366, 268, 362, 267, 361, 274, 367, 269, 368, 271, 369, 446, 365, 273, 371, 277, 370, 58, 60, 431, 432, 26, 27, 1, 2, 449, 450, 467, 468, 839, 840, 508, 509, 471, 472, 503, 504, 562, 563, 568, 569, 566, 567, 564, 565, 614, 615, 616, 617, 618, 619, 620, 621, 677, 678, 679, 680, 681, 682, 683, 684, 750, 751, 752, 753, 778, 779, 780, 781, 825, 826, 827, 828, 829, 830, 881, 882, 917, 918, 919, 920, 990, 991, 1001, 1002, 1063, 1064, 1035, 1036, 1073, 1074]):
+        if i % 2 == 0: # Castle unit techs
+            DATA.techs[tech_id].name = f'{DATA.civs[DATA.techs[tech_id].civ].name.upper()}: (Castle Unit)'
+            DATA.effects[DATA.techs[tech_id].effect_id].name = f'{DATA.civs[DATA.techs[tech_id].civ].name.upper()}: (Castle Unit)'
+        else: # Imperial unit techs
+            DATA.techs[tech_id].name = f'{DATA.civs[DATA.techs[tech_id].civ].name.upper()}: (Imperial Unit)'
+            DATA.effects[DATA.techs[tech_id].effect_id].name = f'{DATA.civs[DATA.techs[tech_id].civ].name.upper()}: (Imperial Unit)'
+
     # Set civilisations to canoe docks by disabling all other warships
     for effect_id in [447, 489, 3, 648, 42, 710, 448, 227, 708, 652, 646]:
         # Disable the warships
@@ -2000,17 +2049,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         #DATA.effects[174].effect_commands.append(genieutils.effect.EffectCommand(0, canoe_id+i, -1, 65, 380))
         #DATA.effects[174].effect_commands.append(genieutils.effect.EffectCommand(0, canoe_id+i, -1, 10, 3.45))
         #DATA.effects[174].effect_commands.append(genieutils.effect.EffectCommand(0, canoe_id+i, -1, 9, 785))
-
-    # Correct name mistakes
-    DATA.civs[1].name = 'Britons'
-    DATA.civs[2].name = 'Franks'
-    DATA.civs[7].name = 'Byzantines'
-    DATA.civs[16].name = 'Maya'
-    DATA.effects[449].name = 'Maya Tech Tree'
-    DATA.effects[489].name = 'Maya Team Bonus'
-    DATA.civs[21].name = 'Inca'
-    DATA.effects[3].name = 'Inca Tech Tree'
-    DATA.effects[4].name = 'Inca Team Bonus'
 
     # Group existing civ bonuses into age-based techs and effects
     base_tech = genieutils.tech.Tech(
@@ -2261,7 +2299,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         17: [-1, -1, -1, -1, -1, 1, -1],
         18: [-1, -1, -1, -1, -1, -1, -1],
         19: [-1, -1, -1, -1, -1, -1, -1],
-        20: [9, -1, -1, -1, -1, 9, -1],
+        20: [9, -1, -1, -1, 9, 9, 9],
         21: [-1, -1, -1, -1, -1, -1, -1],
         22: [4, -1, -1, -1, 4, -1, 4],
         23: [-1, -1, -1, -1, -1, -1, -1],
@@ -2269,14 +2307,14 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         25: [-1, -1, -1, -1, -1, -1, -1],
         26: [-1, -1, -1, -1, -1, 9, -1],
         27: [26, -1, -1, -1, -1, 9, -1],
-        28: [-1, -1, -1, 20, -1, -1, -1],
+        28: [-1, -1, -1, 40, -1, -1, -1],
         29: [-1, -1, -1, 9, -1, -1, -1],
         30: [-1, -1, -1, 5, -1, -1, -1],
         31: [-1, -1, -1, 5, -1, -1, 28],
         32: [-1, -1, -1, -1, -1, -1, -1],
         33: [-1, -1, -1, -1, -1, 1, -1],
         34: [-1, -1, -1, -1, -1, 1, -1],
-        35: [4, -1, -1, -1, 4, -1, 4],
+        35: [4, -1, -1, -1, -1, -1, 4],
         36: [-1, -1, -1, -1, -1, -1, -1],
         37: [-1, -1, -1, -1, -1, -1, -1],
         38: [4, -1, -1, -1, -1, -1, -1],
@@ -2448,7 +2486,7 @@ def main():
 
                         # Back
                         elif selection == '':
-                            break
+                            continue
 
                         else:
                             # Catch error
@@ -2602,7 +2640,7 @@ def main():
                                     file.seek(0)  # Move to the beginning of the file
                                     file.writelines(lines)  # Write all lines back
 
-                                # Change name of tech tree, team bonus, and civilization bonus effects
+                                # Change name of tech tree, team bonus, civilization bonus effects, and unique units
                                 for i, effect in enumerate(DATA.effects):
                                     if effect.name == f'{old_name.title()} Tech Tree':
                                         effect.name = f'{selected_civ_name.title()} Tech Tree'
@@ -2613,7 +2651,7 @@ def main():
                                         name_list[0] = new_name.upper()
                                         effect.name = ':'.join(name_list)
 
-                                # Change the name of the bonus techs
+                                # Change the name of the bonus techs and unique units
                                 for i, tech in enumerate(DATA.techs):
                                     if f'{old_name.upper()}' in tech.name:
                                         name_list = tech.name.split(':')
@@ -2621,7 +2659,7 @@ def main():
                                         tech.name = ':'.join(name_list)
 
                                 # Update the name
-                                #with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                 print(f'Civilization name changed from {old_name} to {selected_civ_name}.')
                             elif not name_exists:
                                 # Do not update the name
@@ -2851,7 +2889,7 @@ def main():
                         # Unique Unit
                         elif selection == '3':
                             # Populate all castle units
-                            ALL_CASTLE_UNITS = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer', "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel", 'naasiri', 'elephant gunner', 'flamethrower', 'weichafe']
+                            ALL_CASTLE_UNITS = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer', "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel", 'naasiri', 'elephant gunner', 'flamethrower', 'weichafe']
 
                             # Get user input
                             while True:
@@ -2864,17 +2902,15 @@ def main():
                                 else:
                                     break
 
-                            # Get elite upgrade tech and effect
-                            elite_upgrade_tech = None
-                            for tech in DATA.techs:
-                                if tech.civ == selected_civ_index + 1 and 'elite' in tech.name.lower():
-                                    elite_upgrade_tech = tech
-                                    elite_upgrade_effect = DATA.effects[tech.effect_id]
-                                    break
+                            # Get castle unit and imperial unit (upgrade) techs and effects
+                            castle_unit_tech = DATA.techs[get_tech_id(f'{selected_civ_name}: (Castle Unit)')]
+                            castle_unit_effect = DATA.effects[castle_unit_tech.effect_id]
+                            imperial_unit_tech = DATA.techs[get_tech_id(f'{selected_civ_name}: (Imperial Unit)')]
+                            imperial_unit_effect = DATA.effects[imperial_unit_tech.effect_id]
 
                             # Get the original costs from the .dat file
                             elite_upgrade_cost = [0, 0, 0] # Food, Wood, Gold
-                            for resource_cost in elite_upgrade_tech.resource_costs:
+                            for resource_cost in imperial_unit_tech.resource_costs:
                                 # Correct for gold index
                                 resource_index = resource_cost.type
                                 if resource_index == -1:
@@ -2885,12 +2921,11 @@ def main():
                                 elite_upgrade_cost[resource_index] = resource_cost.amount
 
                             # Rename the upgrade tech and effect
-                            #change_string(elite_upgrade_tech.language_dll_name, f'Elite {new_castle_unit.title()}')
-                            #change_string(elite_upgrade_tech.language_dll_name + 1000, f'Upgrade to Elite {new_castle_unit.title()}')
-                            #change_string(elite_upgrade_tech.language_dll_name + 10000, rf'Upgrade to <b>Elite Tarkan<b> (<cost>)\nUpgrades your {new_castle_unit.title()} and lets you create Elite {new_castle_unit.title()}, which are stronger.')
-                            #elite_upgrade_effect.name = f'Elite {new_castle_unit.title()}'
+                            change_string(imperial_unit_tech.language_dll_name, f'Elite {new_castle_unit.title()}')
+                            change_string(imperial_unit_tech.language_dll_description, f'Upgrade to Elite {new_castle_unit.title()}')
+                            change_string(imperial_unit_tech.language_dll_help, rf'Upgrade to <b>Elite {new_castle_unit.title()}<b> (<cost>)\nUpgrades your {new_castle_unit.title()} and lets you create Elite {new_castle_unit.title()}, which are stronger and better armored.')
 
-                            # Get user input
+                            # Get user input for cost
                             def get_resource_cost(resource_name: str, default: int) -> int:
                                 while True:
                                     value = prompt(f"Change {resource_name} cost for elite upgrade: ", default=str(default))
@@ -2913,7 +2948,7 @@ def main():
                             elite_upgrade_cost[2] = get_resource_cost("gold", elite_upgrade_cost[2])
 
                             # Clear the previous costs
-                            for resource_cost in elite_upgrade_tech.resource_costs:
+                            for resource_cost in imperial_unit_tech.resource_costs:
                                 resource_cost.type = -1
                                 resource_cost.amount = 0
                                 resource_cost.flag = 0
@@ -2926,82 +2961,53 @@ def main():
                                     if i == 2:
                                         gold_correction = 1
 
-                                    elite_upgrade_tech.resource_costs[i].type = i + gold_correction
-                                    elite_upgrade_tech.resource_costs[i].amount = cost
-                                    elite_upgrade_tech.resource_costs[i].flag = 1
+                                    imperial_unit_tech.resource_costs[i].type = i + gold_correction
+                                    imperial_unit_tech.resource_costs[i].amount = cost
+                                    imperial_unit_tech.resource_costs[i].flag = 1
                                     resource_cost_index += 1
 
                             # Change research time
                             while True:
                                 try:
-                                    new_time = int(prompt(f"Enter research time in seconds for elite upgrade: ", default=str(elite_upgrade_tech.research_time)))
+                                    new_time = int(prompt(f"Enter research time in seconds for elite upgrade: ", default=str(imperial_unit_tech.research_time)))
                                     if new_time == '':
-                                        new_time = elite_upgrade_tech.research_locations[0].research_time
-                                    elite_upgrade_tech.research_locations[0].research_time = new_time
+                                        new_time = imperial_unit_tech.research_locations[0].research_time
+                                    imperial_unit_tech.research_locations[0].research_time = new_time
                                     break
                                 except:
                                     print(f'\033[31mERROR: Invalid research time entry.\n\033[0m\n')
 
                             # Get unit indexes
-                            castle_unit_indexes = [
-                                get_unit_id(ALL_CASTLE_UNITS[selected_civ_index], False),
-                                get_unit_id(f'elite {ALL_CASTLE_UNITS[selected_civ_index]}', False),
-                                get_unit_id(new_castle_unit, False),
-                                get_unit_id(f'elite {new_castle_unit}', False)
-                            ]
+                            castle_unit_id = get_unit_id(new_castle_unit, False)
+                            imperial_unit_id = get_unit_id(f'elite {new_castle_unit}', False)
 
-                            # Change values for mistake units
-                            for i in range(4):
-                                if castle_unit_indexes[i] == 886:
-                                    castle_unit_indexes[i] = 755
-                                elif castle_unit_indexes[i] == 887:
-                                    castle_unit_indexes[i] = 757
-                                elif castle_unit_indexes[i] == 188:
-                                    castle_unit_indexes[i] = 2389
+                            # Correct for inccorect unit ID assignment
+                            if castle_unit_id == 886:
+                                castle_unit_id = 755
+                            elif castle_unit_id == 188:
+                                castle_unit_id = 2389
+                            elif imperial_unit_id == 887:
+                                imperial_unit_id = 757
 
-                            # Change Castle Unit
-                            effect_commands = [
-                                genieutils.effect.EffectCommand(3, castle_unit_indexes[0], castle_unit_indexes[2], -1, 0),
-                                genieutils.effect.EffectCommand(3, castle_unit_indexes[1], castle_unit_indexes[3], -1, 0)
-                            ]
-
-                            effect_found = False
-                            effect_name = selected_civ_name + " (Castle Unit)"
-
-                            for i, effect in enumerate(DATA.effects):
-                                if effect.name == effect_name:
-                                    effect.effect_commands = effect_commands
-                                    effect_found = True
-                                    effect_index = i
-                                    break
-                                
-                            if not effect_found:
-                                new_effect = genieutils.effect.Effect(effect_name, effect_commands)
-                                DATA.effects.append(new_effect)
-                                effect_index = len(DATA.effects) - 1
-
-                            # Create the tech that replaces the old unit
-                            new_tech = DATA.techs[1101]
-                            new_tech.effect_id = effect_index
-                            new_tech.name = effect_name
-                            new_tech.civ = selected_civ_index + 1
-
-                            for tech in DATA.techs:
-                                if tech.name == effect_name:
-                                    DATA.techs.remove(tech)
-                            DATA.techs.append(new_tech)
+                            # Change the effect commands
+                            for effect in DATA.effects:
+                                if effect.name == f'{selected_civ_name.upper()}: (Castle Unit)':
+                                    castle_unit_effect.effect_commands[0].a = castle_unit_id
+                                elif effect.name == f'{selected_civ_name.upper()}: (Imperial Unit)':
+                                    imperial_unit_effect.effect_commands[0].a = castle_unit_id
+                                    imperial_unit_effect.effect_commands[0].b = imperial_unit_id
 
                             # Change units in elite upgrade effect
                             #elite_upgrade_effect.effect_commands.clear()
                             #elite_upgrade_effect.effect_commands.append(genieutils.effect.EffectCommand(3, castle_unit_indexes[2], castle_unit_indexes[3], -1, 0))
 
                             # Assemble unit classes
-                            classes = {0: 'archer', 6: 'infantry', 12: 'cavalry', 13: 'siege', 18: 'monk', 23: 'mounted gunner', 36: 'cavalry archer', 38: 'archer', 44: 'hand cannoneer', 55: 'siege weapon'}
+                            classes = {0: 'archer', 6: 'infantry', 12: 'cavalry', 13: 'siege', 18: 'monk', 23: 'mounted gunner', 36: 'mounted archer', 38: 'archer', 44: 'hand cannoneer', 55: 'siege weapon'}
                             try:
-                                unit_class = classes[DATA.civs[1].units[castle_unit_indexes[2]].class_]
+                                unit_class = classes[DATA.civs[1].units[castle_unit_id].class_]
                             except:
                                 unit_class = 'unknown'
-                                print(DATA.civs[1].units[castle_unit_indexes[2]].class_)
+                                print(DATA.civs[1].units[castle_unit_id].class_)
 
                             # Update description
                             new_unit_description = f'{new_castle_unit.title()} ({unit_class})'
@@ -3304,6 +3310,9 @@ def main():
 
                                     # React to responses
                                     if tech_tree_action == '':
+                                        # Upgrade the tech tree JSON file
+                                        #update_tech_tree_graphic(selected_civ_name)
+
                                         # Save data
                                         with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                         print('Tech tree saved.')
