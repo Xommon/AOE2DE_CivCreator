@@ -613,8 +613,8 @@ def create_bonus(bonus_string, civ_id):
             except Exception:
                 pass
 
-        '''for key, value in unit_lines.items():
-            print(f"{key}: {value}")'''
+        for key, value in unit_lines.items():
+            print(f"{key}: {value}")
 
         #print(unit_lines)
         categories = {
@@ -627,7 +627,7 @@ def create_bonus(bonus_string, civ_id):
             'monks': [18],
             'trade units': [2, 19],
             'warships': [22],
-            'all ships': [2, 21, 22, 20, 53],
+            'ships': [2, 21, 22, 20, 53],
             'walls': [27],
             'mounted archers': [36],
             'towers': [52],
@@ -2889,7 +2889,7 @@ def main():
                         # Unique Unit
                         elif selection == '3':
                             # Populate all castle units
-                            ALL_CASTLE_UNITS = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer', "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel", 'naasiri', 'elephant gunner', 'flamethrower', 'weichafe']
+                            ALL_CASTLE_UNITS = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer', "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", 'genitour', 'naasiri', 'elephant gunner', 'flamethrower', 'weichafe']
 
                             # Get user input
                             while True:
@@ -3300,8 +3300,86 @@ def main():
                         # Tech Tree
                         elif selection == '7':
                             # Import the tech tree
+                            save = ''
                             while True:
-                                try:
+
+                                # Get current values
+                                scout_bank = {'Scout Cavalry': 448, 'Eagle Scout': 751, 'Camel Scout': 1755}
+                                current_scout = ''
+                                for key, value in scout_bank.items():
+                                    if value == DATA.civs[selected_civ_index + 1].resources[263]:
+                                        current_scout = key
+                                        break
+                                
+                                # Prompt user for tech tree selection
+                                print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Tech Tree Menu{save} {title_emoji}'))
+                                print(colour(Fore.WHITE, "0️⃣  Edit Tree"))
+                                print(colour(Fore.WHITE, f"1️⃣  Set Scout") + f" -- {colour(Fore.BLUE, current_scout)}")
+                                #print(colour(Fore.WHITE, "2️⃣  Stable"))
+                                #print(colour(Fore.WHITE, "3️⃣  Blacksmith"))
+                                #print(colour(Fore.WHITE, "4️⃣  Market"))
+                                #print(colour(Fore.WHITE, "5️⃣  Dock"))
+                                #print(colour(Fore.WHITE, "6️⃣  Siege Workshop"))
+                                #print(colour(Fore.WHITE, "7️⃣  University"))
+                                #print(colour(Fore.WHITE, "8️⃣  Monastery"))
+                                #print(colour(Fore.WHITE, "9️⃣  Castle and Defensive"))
+                                #print(colour(Fore.WHITE, "🔟 Economic"))
+                                tech_tree_selection = input(colour(Fore.BLUE, "Selection: "))
+
+                                if tech_tree_selection == '':
+                                    if save == '*':
+                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                        print('Tech tree saved.')
+                                        time.sleep(1)
+                                    break
+                                elif tech_tree_selection == '0':
+                                    # Edit the tech tree
+                                    pass
+
+                                elif tech_tree_selection == '1':
+                                    while True:
+                                        # Set the scout unit
+                                        scout_input = input(f"\nEnter scout unit for {selected_civ_name}: ")
+
+                                        if scout_input == '':
+                                            print(f"Scout unit for {selected_civ_name} not changed.")
+                                            time.sleep(1)
+                                            break
+                                        elif scout_input == '?':
+                                            for i, key in enumerate(scout_bank):
+                                                print(f"{i}: {key}")
+                                        else:
+                                            # Normalize input
+                                            scout_input = scout_input.lower().strip()
+                                            # Check if input is a number
+                                            try:
+                                                scout_id = int(scout_input)
+                                                if scout_id < 0 or scout_id >= len(scout_bank):
+                                                    print(f'\033[31mERROR: Invalid scout selection.\n\033[0m')
+                                                    continue
+                                                else:
+                                                    # Set the scout name
+                                                    scout_name = list(scout_bank.keys())[scout_input]
+                                            except ValueError:
+                                                # Normalize dictionary for case-insensitive key lookup
+                                                normalized_dict = {k.lower(): v for k, v in scout_bank.items()}
+                                                if scout_input in normalized_dict:
+                                                    scout_id = normalized_dict[scout_input]
+
+                                                    # Set the scout name
+                                                    scout_name = list(scout_bank.keys())[list(scout_bank.values()).index(scout_id)]
+                                                else:
+                                                    print(f'\033[31mERROR: Invalid scout selection.\n\033[0m')
+                                                    continue
+                                                
+                                            # Set the scout
+                                            DATA.civs[selected_civ_index + 1].resources[263] = scout_id
+                                            print(f"Scout unit for {selected_civ_name} set to {scout_name}.")
+                                            save = '*'
+                                            time.sleep(1)
+                                            break
+
+                                '''try:
                                     # Prompt user for action
                                     tech_tree_action = input('\nSpecify units (start line with * to enable units): ').lower()
 
@@ -3430,7 +3508,7 @@ def main():
                                         # Print results
                                         print('Units enabled.' if enable else 'Units disabled.')
                                 except Exception as e:
-                                    print(str(e))
+                                    print(str(e))'''
 
                             '''while True:
                                 # Tech tree main menu
