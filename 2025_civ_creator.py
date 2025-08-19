@@ -3369,302 +3369,343 @@ def main():
                                         time.sleep(1)
                                     break
                                 elif tech_tree_selection == '0':
-                                    # Get the tech tree effect
-                                    tech_tree_effect_id = -1
-                                    for i, effect in enumerate(DATA.effects):
-                                        if effect.name.lower() == f'{selected_civ_name.lower()} tech tree':
-                                            tech_tree_effect_id = i
-                                            break
-                                    if tech_tree_effect_id == -1:
-                                        print(colour(Fore.RED, f'ERROR: Cannot find tech tree effect for {selected_civ_name}'))
-                                        break
-
-                                    # Collect disabled IDs
-                                    disabled_ids = [ec.d for ec in DATA.effects[tech_tree_effect_id].effect_commands]
-
-                                    # Build the display
-                                    branch_text = ''
-
-                                    branches = {
-                                        'ARCHERY RANGE': [-1],
-                                        'Archer/Crossbowman/Arbalester': [151, 100, 237],
-                                        'Skirmisher/Elite Skirmisher/Imperial Skirmisher': [99, 98, 655],
-                                        'Slinger*0': [185],
-                                        'Hand Cannoneer*0': [5],
-                                        'Xianbei Raider*1': [1037],
-                                        'Elephant Archer*1/Elite Elephant Archer*1': [480, 481],
-                                        'Cavalry Archer*1/Heavy Cavalry Archer*1': [192, 218],
-                                        'Grenadier': [992],
-                                        'Genitour/Elite Genitour': [598, 599],
-                                        'Parthian Tactics': [436],
-                                        'Thumb Ring': [437],
-
-                                        'BARRACKS': [-1],
-                                        #'Militia/Man-at-Arms/Long Swordsman/Two-Handed Swordsman*2A/Champion*2A/Legionary*2B': [-1, 222, 207, 217, 264],
-                                        'Militia/Man-at-Arms/Long Swordsman/Two-Handed Swordsman/Champion': [-1, 222, 207, 217, 264], # Legionary 1793
-                                        'Spearman/Pikeman/Halberdier': [87, 197, 429],
-                                        'Eagle Scout/Eagle Warrior/Elite Eagle Warrior': [433, 384, 434],
-                                        'Fire Lancer*2/Elite Fire Lancer*2': [981, 982],
-                                        'Jian Swordsman*2': [1075],
-                                        'Condottiero*2': [522],
-                                        'Arson': [602],
-                                        'Gambesons': [875],
-                                        'Squires': [215],
-
-                                        'STABLE': [25],
-                                        'Scout Cavalry/Light Cavalry/Hussar*3': [204, 254, 428],
-                                        'Scout Cavalry/Light Cavalry/Winged Hussar*3': [204, 254, 786],
-                                        'Xolotl Warrior*3': [318],
-                                        'Knight*4/Cavalier*4/Paladin*4': [166, 209, 265],
-                                        'Knight*4/Cavalier*4/Savar*4': [166, 209, 526],
-                                        'Hei Guang Cavalry*4/Heavy Hei Guang Cavalry*4': [1032, 1033],
-                                        'Camel Rider/Heavy Camel Rider/Imperial Camel Rider': [235, 236, 521],
-                                        'Steppe Lancer*5/Elite Steppe Lancer*5': [714, 715],
-                                        'Battle Elephant*5/Elite Battle Elephant*5': [630, 631],
-                                        'Bloodlines': [435],
-                                        'Husbandry': [39],
-
-                                        'SIEGE WORKSHOP': [-1],
-                                        'Battering Ram*6/Capped Ram*6/Siege Ram*6': [162, 96, 255],
-                                        'Armored Elephant*6/Siege Elephant*6': [837, 838],
-                                        'Mangonel*7/Onager*7/Siege Onager*7': [358, 257, 320],
-                                        'Rocket Cart*7/Heavy Rocket Cart*7': [979, 980],
-                                        'Scorpion*8/Heavy Scorpion*8': [94, 239],
-                                        'War Chariot*8/Elite War Charior*8': [1065, 1171],
-                                        'Siege Tower': [603],
-                                        'Bombard Cannon*9/Houfnice*9': [188, 787],
-                                        'Flaming Camel*9': [703],
-                                        'Traction Trebuchet*9': [1025],
-                                        'Mounted Trebuchet*9': [1005],
-
-                                        'BLACKSMITH': [281],
-                                        'Padded Archer Armor/Leather Archer Armor/Ring Archer Armor': [211, 212, 219],
-                                        'Fletching/Bodkin Arrow/Bracer': [199, 200, 201],
-                                        'Forging/Iron Casting/Blast Furnace': [67, 68, 75],
-                                        'Scale Barding Armor/Chain Barding Armor/Plate Barding Armor': [81, 82, 80],
-                                        'Scale Mail Armor/Chain Mail Armor/Plate Mail Armor': [74, 76, 77],
-
-                                        'DOCK': [-1],
-                                        #'Fishing Ship': [112],
-                                        #'Transport Ship': [-1],
-                                        #'Trade Cog': [-1],
-                                        'Galley*10/War Galley*10/Galleon*10': [240, 34, 35],
-                                        'Canoe*10/War Canoe*10/Elite War Canoe*10': [],
-                                        'Fire Galley/Fire Ship/Fast Fire Ship': [604, 243, 246],
-                                        'Demolition Galley/Demolition Ship/Heavy Demolition Ship': [605, -1, 244],
-                                        'Cannon Galleon*11/Elite Cannon Galleon*11': [37, 376],
-                                        'Dromon*11': [886],
-                                        'Lou Chuan*11': [1034],
-                                        'Turtle Ship*12/Elite Turtle Ship*12': [447, 448],
-                                        'Thirisadai*12': [841],
-                                        'Longboat*12/Elite Longboat*12': [272, 372],
-                                        'Caravel*12/Elite Caravel*12': [596, 597],
-                                        'Gillnets': [65],
-                                        'Careening/Dry Dock': [374, 375],
-                                        'Shipwright': [373],
-
-                                        'UNIVERSITY': [-1],
-                                        'Masonry/Architecture': [50, 51],
-                                        'Palisade Wall/Stone Wall/Fortified Wall': [523, 189, 194],
-                                        'Ballistics': [93],
-                                        'Watch Tower/Guard Tower/Keep': [127, 140, 63],
-                                        'Heated Shot': [380],
-                                        'Murder Holes': [322],
-                                        'Treadmill Crane': [54],
-                                        'Chemistry/Bombard Tower': [47, 64],
-                                        'Siege Engineers': [377],
-                                        'Arrowslits': [608],
-                                        'Krepost*13': [695],
-                                        'Donjon*13': [775],
-
-                                        'CASTLE': [-1],
-                                        'Trebuchet': [256],
-                                        'Petard': [426],
-                                        'Hoardings': [379],
-                                        'Sappers': [321],
-                                        'Conscription': [315],
-
-                                        'FORTIFIED CHURCH*14': [930],
-                                        'MONASTERY*14': [-1],
-                                        'Monk': [157],
-                                        'Missionary*15': [84],
-                                        'Warrior Priest*15': [948],
-                                        'Devotion/Faith': [46, 45],
-                                        'Redemption': [316],
-                                        'Atonement': [319],
-                                        'Herbal Medicine': [441],
-                                        'Heresy': [439],
-                                        'Sanctity': [231],
-                                        'Fervor': [252],
-                                        'Illumination': [233],
-                                        'Block Printing': [230],
-                                        'Theocracy': [438],
-
-                                        'TOWN CENTER': [-1],
-                                        'Loom': [22],
-                                        'Town Watch/Town Patrol': [8, 280],
-                                        'Wheelbarrow/Hand Cart': [213, 249],
-
-                                        'House': [-1],
-                                        'Caravanserai*16': [518],
-                                        'Feitoria*16': [570],
-                                        'Mining and Lumber Camp*17': [-1],
-                                        'Mule Cart*17': [932],
-                                        'Mule Cart*17': [940],
-                                        'Mill*18': [-1],
-                                        'Folwark*18': [793],
-                                        'Farm*19': [216],
-                                        'Pasture*19': [1008],
-                                        'Gold Mining/Gold Shaft Mining': [55, 182],
-                                        'Stone Mining/Stone Shaft Mining': [278, 279],
-                                        'Double-Bit Axe/Bow Saw/Two-Man Saw': [202, 203, 221],
-                                        'Horse Collar*20/Heavy Plow*20/Crop Rotation*20': [14, 13, 12],
-                                        'Domestication*20/Pastoralism*20/Transhumance*20': [1014, 1013, 1012],
-
-                                        'MARKET': [-1],
-                                        'Coinage/Banking': [23, 17],
-                                        'Caravan': [48],
-                                        'Guilds': [15]
-                                    }
-
-                                    keys = list(branches.keys())
-                                    building_items = []
-
-                                    def branch_progress(ids):
-                                        # Return (branch_length, total) based on disabled_ids.
-                                        length = 0
-                                        for u in ids:
-                                            if u == -1:
-                                                length += 1
-                                                continue
-                                            if u in disabled_ids:
+                                    while True:
+                                        # Get the tech tree effect
+                                        tech_tree_effect_id = -1
+                                        for i, effect in enumerate(DATA.effects):
+                                            if effect.name.lower() == f'{selected_civ_name.lower()} tech tree':
+                                                tech_tree_effect_id = i
                                                 break
-                                            length += 1
-                                        return length, len(ids)
+                                        if tech_tree_effect_id == -1:
+                                            print(colour(Fore.RED, f'ERROR: Cannot find tech tree effect for {selected_civ_name}'))
+                                            break
 
-                                    def pretty_item(items, length, total):
-                                        # Green last available, or red first with [0/total].
-                                        if length == 0:
-                                            return colour(Fore.RED, items[length - 1]) + f'[{length}/{total}]' if total > 1 else colour(Fore.RED, items[length - 1])
-                                        return colour(Fore.GREEN, items[length - 1]) + f'[{length}/{total}]' if total > 1 else colour(Fore.GREEN, items[length - 1])
+                                        # Collect disabled IDs
+                                        disabled_ids = [ec.d for ec in DATA.effects[tech_tree_effect_id].effect_commands]
 
-                                    def base_labels(branch_key):
-                                        # Split names and normalise star labels to keep a trailing * when present.
-                                        items = branch_key.split('/')
-                                        if '*' in branch_key:
-                                            items = [it.split('*')[0] + '*' for it in items]
-                                        return items
+                                        # Build the display
+                                        branch_text = ''
 
-                                    def star_index(branch_key):
-                                        # Return integer star index if present (e.g., '*0'), else None.
-                                        if '*' not in branch_key:
-                                            return None
-                                        tail = branch_key.rsplit('*', 1)[-1]
-                                        return int(tail) if tail.isdigit() else None
+                                        branches = {
+                                            'ARCHERY RANGE': [-1],
+                                            'Archer/Crossbowman/Arbalester': [151, 100, 237],
+                                            'Skirmisher/Elite Skirmisher/Imperial Skirmisher': [99, 98, 655],
+                                            'Slinger*0': [185],
+                                            'Hand Cannoneer*0': [5],
+                                            'Xianbei Raider*1': [1037],
+                                            'Elephant Archer*1/Elite Elephant Archer*1': [480, 481],
+                                            'Cavalry Archer*1/Heavy Cavalry Archer*1': [192, 218],
+                                            'Grenadier': [992],
+                                            'Genitour/Elite Genitour': [598, 599],
+                                            'Parthian Tactics': [436],
+                                            'Thumb Ring': [437],
 
-                                    i = 0
-                                    while i < len(keys):
-                                        name = keys[i]
-                                        ids = branches[name]
+                                            'BARRACKS': [-1],
+                                            #'Militia/Man-at-Arms/Long Swordsman/Two-Handed Swordsman*2A/Champion*2A/Legionary*2B': [-1, 222, 207, 217, 264],
+                                            'Militia/Man-at-Arms/Long Swordsman/Two-Handed Swordsman/Champion': [-1, 222, 207, 217, 264], # Legionary 1793
+                                            'Spearman/Pikeman/Halberdier': [87, 197, 429],
+                                            'Eagle Scout/Eagle Warrior/Elite Eagle Warrior': [433, 384, 434],
+                                            'Fire Lancer*2/Elite Fire Lancer*2': [981, 982],
+                                            'Jian Swordsman*2': [1075],
+                                            'Condottiero*2': [522],
+                                            'Arson': [602],
+                                            'Gambesons': [875],
+                                            'Squires': [215],
 
-                                        # Building header
-                                        if name.isupper():
-                                            # flush previous building items (no trailing comma)
-                                            if building_items:
-                                                branch_text += ', '.join(building_items)
-                                                building_items = []
-                                            # new line if not the very first building printed
-                                            if branch_text:
-                                                branch_text += '\n'
+                                            'STABLE': [25],
+                                            'Scout Cavalry/Light Cavalry/Hussar*3': [204, 254, 428],
+                                            'Scout Cavalry/Light Cavalry/Winged Hussar*3': [204, 254, 786],
+                                            'Xolotl Warrior*3': [318],
+                                            'Knight*4/Cavalier*4/Paladin*4': [166, 209, 265],
+                                            'Knight*4/Cavalier*4/Savar*4': [166, 209, 526],
+                                            'Hei Guang Cavalry*4/Heavy Hei Guang Cavalry*4': [1032, 1033],
+                                            'Camel Rider/Heavy Camel Rider/Imperial Camel Rider': [235, 236, 521],
+                                            'Steppe Lancer*5/Elite Steppe Lancer*5': [714, 715],
+                                            'Battle Elephant*5/Elite Battle Elephant*5': [630, 631],
+                                            'Bloodlines': [435],
+                                            'Husbandry': [39],
 
+                                            'SIEGE WORKSHOP': [-1],
+                                            'Battering Ram*6/Capped Ram*6/Siege Ram*6': [162, 96, 255],
+                                            'Armored Elephant*6/Siege Elephant*6': [837, 838],
+                                            'Mangonel*7/Onager*7/Siege Onager*7': [358, 257, 320],
+                                            'Rocket Cart*7/Heavy Rocket Cart*7': [979, 980],
+                                            'Scorpion*8/Heavy Scorpion*8': [94, 239],
+                                            'War Chariot*8/Elite War Charior*8': [1065, 1171],
+                                            'Siege Tower': [603],
+                                            'Bombard Cannon*9/Houfnice*9': [188, 787],
+                                            'Flaming Camel*9': [703],
+                                            'Traction Trebuchet*9': [1025],
+                                            'Mounted Trebuchet*9': [1005],
+
+                                            'BLACKSMITH': [281],
+                                            'Padded Archer Armor/Leather Archer Armor/Ring Archer Armor': [211, 212, 219],
+                                            'Fletching/Bodkin Arrow/Bracer': [199, 200, 201],
+                                            'Forging/Iron Casting/Blast Furnace': [67, 68, 75],
+                                            'Scale Barding Armor/Chain Barding Armor/Plate Barding Armor': [81, 82, 80],
+                                            'Scale Mail Armor/Chain Mail Armor/Plate Mail Armor': [74, 76, 77],
+
+                                            'DOCK': [-1],
+                                            #'Fishing Ship': [112],
+                                            #'Transport Ship': [-1],
+                                            #'Trade Cog': [-1],
+                                            'Galley*10/War Galley*10/Galleon*10': [240, 34, 35],
+                                            'Canoe*10/War Canoe*10/Elite War Canoe*10': [],
+                                            'Fire Galley/Fire Ship/Fast Fire Ship': [604, 243, 246],
+                                            'Demolition Galley/Demolition Ship/Heavy Demolition Ship': [605, -1, 244],
+                                            'Cannon Galleon*11/Elite Cannon Galleon*11': [37, 376],
+                                            'Dromon*11': [886],
+                                            'Lou Chuan*11': [1034],
+                                            'Turtle Ship*12/Elite Turtle Ship*12': [447, 448],
+                                            'Thirisadai*12': [841],
+                                            'Longboat*12/Elite Longboat*12': [272, 372],
+                                            'Caravel*12/Elite Caravel*12': [596, 597],
+                                            'Gillnets': [65],
+                                            'Careening/Dry Dock': [374, 375],
+                                            'Shipwright': [373],
+
+                                            'UNIVERSITY': [-1],
+                                            'Masonry/Architecture': [50, 51],
+                                            'Palisade Wall/Stone Wall/Fortified Wall': [523, 189, 194],
+                                            'Ballistics': [93],
+                                            'Watch Tower/Guard Tower/Keep': [127, 140, 63],
+                                            'Heated Shot': [380],
+                                            'Murder Holes': [322],
+                                            'Treadmill Crane': [54],
+                                            'Chemistry/Bombard Tower': [47, 64],
+                                            'Siege Engineers': [377],
+                                            'Arrowslits': [608],
+                                            'Krepost*13': [695],
+                                            'Donjon*13': [775],
+
+                                            'CASTLE': [-1],
+                                            'Trebuchet': [256],
+                                            'Petard': [426],
+                                            'Hoardings': [379],
+                                            'Sappers': [321],
+                                            'Conscription': [315],
+
+                                            'FORTIFIED CHURCH*14': [930],
+                                            'MONASTERY*14': [-1],
+                                            'Monk': [157],
+                                            'Missionary*15': [84],
+                                            'Warrior Priest*15': [948],
+                                            'Devotion/Faith': [46, 45],
+                                            'Redemption': [316],
+                                            'Atonement': [319],
+                                            'Herbal Medicine': [441],
+                                            'Heresy': [439],
+                                            'Sanctity': [231],
+                                            'Fervor': [252],
+                                            'Illumination': [233],
+                                            'Block Printing': [230],
+                                            'Theocracy': [438],
+
+                                            'TOWN CENTER': [-1],
+                                            'Loom': [22],
+                                            'Town Watch/Town Patrol': [8, 280],
+                                            'Wheelbarrow/Hand Cart': [213, 249],
+
+                                            'House': [-1],
+                                            'Caravanserai*16': [518],
+                                            'Feitoria*16': [570],
+                                            'Mining and Lumber Camp*17': [-1],
+                                            'Mule Cart*17': [932],
+                                            'Mule Cart*17': [940],
+                                            'Mill*18': [-1],
+                                            'Folwark*18': [793],
+                                            'Farm*19': [216],
+                                            'Pasture*19': [1008],
+                                            'Gold Mining/Gold Shaft Mining': [55, 182],
+                                            'Stone Mining/Stone Shaft Mining': [278, 279],
+                                            'Double-Bit Axe/Bow Saw/Two-Man Saw': [202, 203, 221],
+                                            'Horse Collar*20/Heavy Plow*20/Crop Rotation*20': [14, 13, 12],
+                                            'Domestication*20/Pastoralism*20/Transhumance*20': [1014, 1013, 1012],
+
+                                            'MARKET': [-1],
+                                            'Coinage/Banking': [23, 17],
+                                            'Caravan': [48],
+                                            'Guilds': [15]
+                                        }
+
+                                        keys = list(branches.keys())
+                                        building_items = []
+
+                                        def branch_progress(ids):
+                                            # Return (branch_length, total) based on disabled_ids.
+                                            length = 0
+                                            for u in ids:
+                                                if u == -1:
+                                                    length += 1
+                                                    continue
+                                                if u in disabled_ids:
+                                                    break
+                                                length += 1
+                                            return length, len(ids)
+
+                                        def pretty_item(items, length, total):
+                                            # Green last available, or red first with [0/total].
+                                            if length == 0:
+                                                return colour(Fore.RED, items[length - 1]) + f'[{length}/{total}]' if total > 1 else colour(Fore.RED, items[length - 1])
+                                            return colour(Fore.GREEN, items[length - 1]) + f'[{length}/{total}]' if total > 1 else colour(Fore.GREEN, items[length - 1])
+
+                                        def base_labels(branch_key):
+                                            # Split names and normalise star labels to keep a trailing * when present.
+                                            items = branch_key.split('/')
+                                            if '*' in branch_key:
+                                                items = [it.split('*')[0] + '*' for it in items]
+                                            return items
+
+                                        def star_index(branch_key):
+                                            # Return integer star index if present (e.g., '*0'), else None.
+                                            if '*' not in branch_key:
+                                                return None
+                                            tail = branch_key.rsplit('*', 1)[-1]
+                                            return int(tail) if tail.isdigit() else None
+
+                                        i = 0
+                                        while i < len(keys):
+                                            name = keys[i]
+                                            ids = branches[name]
+
+                                            # Building header
+                                            if name.isupper():
+                                                # flush previous building items (no trailing comma)
+                                                if building_items:
+                                                    branch_text += ', '.join(building_items)
+                                                    building_items = []
+                                                # new line if not the very first building printed
+                                                if branch_text:
+                                                    branch_text += '\n'
+
+                                                sidx = star_index(name)
+                                                if sidx is None:
+                                                    # simple (non-starred) header
+                                                    hdr_disabled = any(u in disabled_ids for u in ids if u != -1)
+                                                    hdr_color = Fore.RED if hdr_disabled else Fore.GREEN
+                                                    branch_text += (colour(hdr_color, name.split('*')[0]) + ': ')
+                                                    i += 1
+                                                    continue
+
+                                                # starred headers group: gather consecutive UPPERCASE entries with same star index
+                                                group_keys = [name]
+                                                j = i + 1
+                                                while j < len(keys):
+                                                    nxt = keys[j]
+                                                    if not nxt.isupper():
+                                                        break
+                                                    if star_index(nxt) != sidx:
+                                                        break
+                                                    group_keys.append(nxt)
+                                                    j += 1
+
+                                                # choose first with progress (>0), else fallback to last
+                                                chosen_key = group_keys[-1]
+                                                for k in group_keys:
+                                                    blen, _ = branch_progress(branches[k])
+                                                    if blen > 0:
+                                                        chosen_key = k
+                                                        break
+
+                                                chosen_ids = branches[chosen_key]
+                                                hdr_disabled = any(u in disabled_ids for u in chosen_ids if u != -1)
+                                                hdr_color = Fore.RED if hdr_disabled else Fore.GREEN
+                                                branch_text += (colour(hdr_color, chosen_key.split('*')[0]) + ': ')
+
+                                                # advance past the whole starred header group
+                                                i = j
+                                                continue
+
+                                            # Non-star branch group (single)
                                             sidx = star_index(name)
                                             if sidx is None:
-                                                # simple (non-starred) header
-                                                hdr_disabled = any(u in disabled_ids for u in ids if u != -1)
-                                                hdr_color = Fore.RED if hdr_disabled else Fore.GREEN
-                                                branch_text += (colour(hdr_color, name.split('*')[0]) + ': ')
+                                                labels = base_labels(name)
+                                                length, total = branch_progress(ids)
+                                                building_items.append(pretty_item(labels, length, total))
                                                 i += 1
                                                 continue
 
-                                            # starred headers group: gather consecutive UPPERCASE entries with same star index
+                                            # Starred group: gather consecutive entries sharing the same star index
                                             group_keys = [name]
                                             j = i + 1
                                             while j < len(keys):
                                                 nxt = keys[j]
-                                                if not nxt.isupper():
+                                                if nxt.isupper():
                                                     break
                                                 if star_index(nxt) != sidx:
                                                     break
                                                 group_keys.append(nxt)
                                                 j += 1
 
-                                            # choose first with progress (>0), else fallback to last
-                                            chosen_key = group_keys[-1]
+                                            # Evaluate subbranches in order; pick first with progress, else fallback to last
+                                            chosen_label = None
+                                            chosen_len = 0
+                                            chosen_tot = 0
+
+                                            found_progress = False
                                             for k in group_keys:
-                                                blen, _ = branch_progress(branches[k])
-                                                if blen > 0:
-                                                    chosen_key = k
-                                                    break
+                                                lbls = base_labels(k)
+                                                blen, btot = branch_progress(branches[k])
+                                                if blen > 0 and not found_progress:
+                                                    chosen_label, chosen_len, chosen_tot = lbls, blen, btot
+                                                    found_progress = True
 
-                                            chosen_ids = branches[chosen_key]
-                                            hdr_disabled = any(u in disabled_ids for u in chosen_ids if u != -1)
-                                            hdr_color = Fore.RED if hdr_disabled else Fore.GREEN
-                                            branch_text += (colour(hdr_color, chosen_key.split('*')[0]) + ': ')
+                                            if not found_progress:
+                                                # fallback: last subbranch in series, red [0/len]
+                                                last_key = group_keys[-1]
+                                                chosen_label = base_labels(last_key)
+                                                chosen_len, chosen_tot = 0, len(branches[last_key])
 
-                                            # advance past the whole starred header group
+                                            building_items.append(pretty_item(chosen_label, chosen_len, chosen_tot))
+
+                                            # advance past the whole group
                                             i = j
-                                            continue
 
-                                        # Non-star branch group (single)
-                                        sidx = star_index(name)
-                                        if sidx is None:
-                                            labels = base_labels(name)
-                                            length, total = branch_progress(ids)
-                                            building_items.append(pretty_item(labels, length, total))
-                                            i += 1
-                                            continue
+                                        # flush the final building's items
+                                        if building_items:
+                                            branch_text += ', '.join(building_items)
 
-                                        # Starred group: gather consecutive entries sharing the same star index
-                                        group_keys = [name]
-                                        j = i + 1
-                                        while j < len(keys):
-                                            nxt = keys[j]
-                                            if nxt.isupper():
-                                                break
-                                            if star_index(nxt) != sidx:
-                                                break
-                                            group_keys.append(nxt)
-                                            j += 1
+                                        # Print the whole tech tree
+                                        print(branch_text)
 
-                                        # Evaluate subbranches in order; pick first with progress, else fallback to last
-                                        chosen_label = None
-                                        chosen_len = 0
-                                        chosen_tot = 0
+                                        # Get the user prompt
+                                        tech_tree_actions = input('Tech tree action: ')
 
-                                        found_progress = False
-                                        for k in group_keys:
-                                            lbls = base_labels(k)
-                                            blen, btot = branch_progress(branches[k])
-                                            if blen > 0 and not found_progress:
-                                                chosen_label, chosen_len, chosen_tot = lbls, blen, btot
-                                                found_progress = True
+                                        if tech_tree_actions == '':
+                                            # Exit
+                                            break
 
-                                        if not found_progress:
-                                            # fallback: last subbranch in series, red [0/len]
-                                            last_key = group_keys[-1]
-                                            chosen_label = base_labels(last_key)
-                                            chosen_len, chosen_tot = 0, len(branches[last_key])
+                                        # Separate the actions into a list
+                                        for action in tech_tree_actions.split(','):
+                                            if action.lower() == 'default':
+                                                # Set tech tree to default
+                                                DATA.effects[tech_tree_effect_id].effect_commands.clear()
+                                                for tech_id in [84, 272, 447, 448, 521, 522, 526, 528, 570, 598, 599, 655, 695, 703, 773, 775, 787, 790, 793, 842, 843, 885, 930, 932, 940, 941, 948, 992, 1005, 1037, 1065, 1075, 1136, 1142, 1065, 1167, 1168, 1169]:
+                                                    DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
+                                                print('Tech tree set to default.')
+                                                time.sleep(1)
+                                            else:
+                                                # Check to see if there's a tech mentioned
+                                                for branch_key, branch_value in branches.items():
+                                                    if action.lower() in branch_key.lower():
+                                                        for index, tech in enumerate(branch_key.split('/')):
+                                                            tech_name = tech.split('*')[0]
 
-                                        building_items.append(pretty_item(chosen_label, chosen_len, chosen_tot))
+                                                            # Find the index that matches
+                                                            if action.lower() == tech_name.lower():
+                                                                golden_index = index
+                                                                break
 
-                                        # advance past the whole group
-                                        i = j
-
-                                    # flush the final building's items
-                                    if building_items:
-                                        branch_text += ', '.join(building_items)
-
-                                    print(branch_text)
+                                                        # Enable everything at and before the golden index, disable the rest
+                                                        for tech_index, tech_id in enumerate(branch_value):
+                                                            if tech_index <= golden_index:
+                                                                for ec in DATA.effects[tech_tree_effect_id].effect_commands[::-1]:
+                                                                    if ec.d == tech_id:
+                                                                        DATA.effects[tech_tree_effect_id].effect_commands.remove(ec)
+                                                                save = '*'
+                                                            else:
+                                                                DATA.effects[tech_tree_effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
+                                                                save = '*'
 
                                 elif tech_tree_selection == '1':
                                     while True:
