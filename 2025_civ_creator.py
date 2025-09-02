@@ -1,8 +1,22 @@
 # Micheal Quentin
 # 02. March 2025
 # 2025 Civilisation Creator
-# DEBUG: wine /home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/Tools_Builds/AdvancedGenieEditor3.exe
-# DEBUG: /home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test/resources/_common/dat/empires2_x2_p1.dat
+'''
+# Advanced Genie Editor
+wine /home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/Tools_Builds/AdvancedGenieEditor3.exe
+
+# .DAT File
+/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test/resources/_common/dat/empires2_x2_p1.dat
+
+# Real World Map Folder
+/home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/resources/_common/drs/gamedata_x2
+
+# Scenario Folder
+/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/resources/_common/scenario
+
+# Custom Map .RMS
+/home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/resources/_common/random-map-scripts
+'''
 
 import os
 import shutil
@@ -41,6 +55,7 @@ from genieutils.versions import Version
 import ollama
 import traceback
 import sys
+import unicodedata
 
 class Civ:
     def __init__(self, civ_id, buildings, units):
@@ -236,66 +251,79 @@ def get_unit_id(name, list_ids):
     return list(set(final_ids))
 
 def update_tech_tree_graphic(current_civ_name):
-    # Find the tech-tree effect for this civ
-    tech_tree_id = -1
-    target_name = f'{current_civ_name.lower()} tech tree'
-    for i, effect in enumerate(DATA.effects):
-        if getattr(effect, "name", "").lower() == target_name:
-            tech_tree_id = i
-            break
-    if tech_tree_id == -1:
-        raise ValueError(f"Tech tree effect not found for civ '{current_civ_name}'")
-    
-    # Collect every ec.d into a set
-    disabled_triggers = set()
-    for ec in DATA.effects[tech_tree_id].effect_commands:
-        # guard against missing attribute / non-int
-        d = getattr(ec, "d", None)
-        if isinstance(d, int):
-            disabled_triggers.add(d)
-
     # Load the reference JSON
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r', encoding="utf-8") as file:
         json_tree = json.load(file)
 
-    # Build an entry bank of all unique nodes
-    entry_bank = {}
-    entry_section = {}
-    for civ in json_tree.get("civs", []):
+    # Build an entry bank of all unique nodes across civs
+    entry_bank = {}      # Node ID (int/str) -> entry dict
+    entry_section = {}   # Node ID -> "civ_techs_buildings" | "civ_techs_units"
+    for i, civ in enumerate(json_tree.get("civs", [])):
+        # Skip Chronicles civs if you still want that behavior
+        if i in [45, 46, 47]:
+            continue
+
         for section in ("civ_techs_buildings", "civ_techs_units"):
             for entry in civ.get(section, []):
                 nid = entry.get("Node ID")
-                if nid is None or nid in entry_bank:
+                if nid is None:
                     continue
-                entry_bank[nid] = copy.deepcopy(entry)
-                entry_section[nid] = section
+                try:
+                    nid_key = int(nid)
+                except Exception:
+                    nid_key = nid
+                if nid_key in entry_bank:
+                    continue
+                entry_bank[nid_key] = copy.deepcopy(entry)
+                entry_section[nid_key] = section
 
-    # Create a fresh civ block with all entries present
+    # Find the tech-tree effect for this civ 
+    tech_tree_id = -1 
+    target_name = f'{current_civ_name.lower()} tech tree' 
+    for i, effect in enumerate(DATA.effects): 
+        if effect.name.lower() == target_name: 
+            tech_tree_id = i 
+            break 
+    if tech_tree_id == -1: 
+        print(f"Tech tree effect not found for civ '{current_civ_name}'")
+        return
+
+    # Collect disabled tech triggers and disabled unit IDs 
+    disabled_triggers = set() 
+    #disabled_units = set() 
+    for ec in DATA.effects[tech_tree_id].effect_commands: 
+        try: 
+            d_val = int(ec.d) 
+        except Exception: 
+            # Fall back to string if needed, but prefer ints everywhere 
+            d_val = ec.d 
+        disabled_triggers.add(d_val)
+    print('disabled triggers', disabled_triggers)
+
+    # Helpers
+    def get_section(node_id):
+        return entry_section.get(node_id, "civ_techs_buildings")
+
+    # Create a fresh civ block and populate with ALL bank items
     new_civ_block = {
         "civ_id": current_civ_name.upper(),
         "civ_techs_buildings": [],
         "civ_techs_units": [],
     }
-    print(disabled_triggers)
-    for nid, base_entry in entry_bank.items():
-        e = copy.deepcopy(base_entry)
-        e.setdefault("Prerequisite IDs", [])
-        e.setdefault("Prerequisite Types", [])
 
-        if e.get("Trigger Tech ID") not in disabled_triggers:
-            new_civ_block[entry_section[nid]].append(e)
-        else:
-            print(e.get("Trigger Tech ID"))
+    # Optionally sort by Node ID for stable output; remove sorted(...) to keep discovery order
+    for nid in sorted(entry_bank, key=lambda x: (isinstance(x, str), x)):
+        block = copy.deepcopy(entry_bank[nid])
 
-    # For every JSON node: if Trigger Tech ID in disabled_triggers -> NotAvailable, else ResearchedCompleted
-    for section in ("civ_techs_buildings", "civ_techs_units"):
-        for e in new_civ_block[section]:
-            trig = e.get("Trigger Tech ID")
-            if isinstance(trig, int) and trig in disabled_triggers:
-                e["Node Status"] = "NotAvailable"
-            else:
-                e["Node Status"] = "ResearchedCompleted"
-    # --- END NEW LOGIC ---
+        # Enable or Disable block
+        block['Node Status'] == 'ResearchedCompleted'
+        if block['Trigger Tech ID'] in disabled_triggers:
+            block['Node Status'] == 'NotAvailable'
+
+            # Skip unique units if they're not available
+            
+        if block['Node Status'] == 'ResearchedComplated' or ('Unique' not in block['Node Type'] and 'Regoinal' not in block['Node Type'] and block['Node Status'] == 'NotAvailable'):
+            new_civ_block[get_section(nid)].append(block)
 
     # Replace civ in JSON and save
     replaced = False
@@ -309,78 +337,7 @@ def update_tech_tree_graphic(current_civ_name):
 
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'w', encoding="utf-8") as file:
         json.dump(json_tree, file, ensure_ascii=False, indent=2)
-
-    print(f'Changed tech tree graphic for {current_civ_name}')
-    return new_civ_block
-
-'''def get_unit_categories(name):
-    # Switch name to id
-    if int(name) != name:
-        unit_index = get_unit_id(name)
-    else:
-        unit_index = name
-
-    # Grab the unit
-    unit_object = DATA.civs[1].units[unit_index]
-
-    # Create the empty categories list
-    categories = []
-
-    # Add categories from description
-    try:
-        description_categories = ["Foot Archer", "Skirmisher", "Mounted Archer", "Mounted", "Trade", "Infantry", "Cavalry", "Light Horseman", "Heavy Cavalry", "Warship", "Gunpowder", "Siege"]
-
-        # Separate the first sentence of the second line
-        description_line = get_string(unit_object.language_dll_name + 21000)
-        description_line = ''.join(description_line.split(rf'\n')[1]).split('.')
-        description_line = description_line[0]
-
-        # Get the categories from the description
-        for desc_cat in description_categories:
-            if desc_cat in description_line:
-                categories.append(desc_cat)
-
-                if desc_cat == 'Light Horseman':
-                    categories.append('Cavalry')
-    except Exception as e:
-        pass
-
-    # Add category for creation location
-    creation_locations = {87: 'Archery Range', 12: 'Barracks', 101: 'Stable', 49: 'Siege Workshop', 82: 'Castle', 45: 'Dock'}
-    try:
-        if unit_object.creatable.train_location_id in creation_locations:
-            categories.append(creation_locations[unit_object.creatable.train_location_id])
-    except:
-        pass
-
-    # Add category for lines
-    if get_unit_line(unit_index):
-        categories.append(get_unit_line(unit_index))
-
-    # Add category for ranged units
-    try:
-        if unit_object.type_50.max_range > 1:
-            categories.append('Ranged')
-    except:
-        pass
-
-    # Add category for elephant units
-    try:
-        if 'elephant' in get_unit_name(unit_index).lower():
-            categories.append('Elephant')
-
-        # Add category for camel units
-        if 'camel' in get_unit_name(unit_index).lower():
-            categories.append('Camel')
-
-        # Add category for siege units
-        if 'siege' in get_unit_name(unit_index).lower():
-            categories.append('Siege')
-    except:
-        pass
-
-    # Return the categories
-    return categories'''
+        print('Tech tree graphic updated with full bank contents')
         
 def get_tech_id(name):
     # Search with external name
@@ -402,6 +359,12 @@ def get_tech_id(name):
                 return i
 
     return -1
+
+def remove_accents(s: str) -> str:
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', s)
+        if unicodedata.category(c) != 'Mn'
+    )
         
 def get_string(code):
     with open(ORIGINAL_STRINGS, 'r', encoding='utf-8') as original_file:
@@ -542,6 +505,8 @@ def create_bonus(bonus_string, civ_id):
             'armored elephants': [1744, 1746],
             'mangonel-line': [280, 550, 588],
             'rocket carts': [1904, 1907],
+            'scorpions': [279, 542],
+            'fishing ships': [13],
             'bombard cannons': [36, 1709],
             'fire ships': [1103, 529, 532],
             'demolition ships': [1104, 527, 528],
@@ -551,8 +516,8 @@ def create_bonus(bonus_string, civ_id):
             'turtle ships': [831, 832],
             'longboats': [250, 533],
             'caravels': [1004, 1006],
-            'camel units': [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263, 1923],
-            'elephant units': [239, 558, 873, 875, 1120, 1122, 1132, 1134, 1744, 1746, 1923],
+            'camel units': [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263, 1923, get_unit_id('naasiri', False), get_unit_id('elite naasiri', False)],
+            'elephant units': [239, 558, 873, 875, 1120, 1122, 1132, 1134, 1744, 1746, 1923, get_unit_id('imperial elephant archer', False)],
             'gunpowder units': [5, 36, 420, 46, 691, 771, 773, 557, 1001, 1003, 831, 832, 1709, 1704, 1706, 1904, 1907, 1901, 1903, 1911],
             'shock infantry': [751, 752, 753, 1901, 1903, 1974, 1976],
             'mule carts': [1808],
@@ -561,9 +526,8 @@ def create_bonus(bonus_string, civ_id):
             'barracks units': [74, 75, 77, 473, 567, 1793, 93, 358, 359, 751, 753, 752, 1901, 1903],
             'stable units': [448, 546, 441, 1707, 1751, 1753, 38, 283, 569, 1813, 1370, 1372, 1755, 329, 330, 207, 1132, 1134, 1944, 1946],
             'siege workshop units': [35, 422, 548, 1258, 280, 550, 588, 1904, 1907, 1744, 1746, 36, 1709, 1105],
+            'town centers': [109, 71, 141, 142]
         }
-        import re
-        from collections import defaultdict
 
         # If you need to keep your existing unit_lines contents, don't recreate it.
         # But make sure every value will be treated as a list.
@@ -685,6 +649,7 @@ def create_bonus(bonus_string, civ_id):
             (re.compile(r'regenerate\s+([-+]?\d+%?)\s+HP per minute', re.IGNORECASE), [109]),
             (re.compile(r'([-+]?\d+%?)\s+pierce armor', re.IGNORECASE), [8.768]),
             (re.compile(r'([-+]?\d+%?)\s+armor', re.IGNORECASE), [8.1024]),
+            (re.compile(r'receive\s+([-+]?\d+%?)\s+friendly fire damage', re.IGNORECASE), [119]),
         ]
 
         def parse_number(text):
@@ -716,7 +681,7 @@ def create_bonus(bonus_string, civ_id):
                     unique_targets.append((ttype, ids))
 
             if not unique_targets:
-                return ""  # No valid target found
+                return ''  # No valid target found
 
             # 2) Walk all stat patterns and apply to ALL collected targets
             for pattern, stat_ids in stat_patterns:
@@ -760,7 +725,25 @@ def create_bonus(bonus_string, civ_id):
 
             for tech_id in tech_ids:
                 bonus_response += f'E101~{tech_id}~0~0~0|E101~{tech_id}~1~0~0|E101~{tech_id}~2~0~0|E101~{tech_id}~3~0~0|E103~{tech_id}~0~0~0|'
+        elif re.search(r'^(.*?)\s+available one age earlier\b', bonus_string, re.IGNORECASE):
+            # Units available one age earlier
+            tech_names = [
+                t.strip()
+                for t in re.search(r'^(.*?)\s+available one age earlier', bonus_string, re.IGNORECASE).group(1).replace('and', ',').split(',')]
+            
+            tech_ids = []
+            for tech_name in tech_names:
+                tech_ids.append(get_tech_id(tech_name))
+
+            for tech_id in tech_ids:
+                required_techs = []
+                for rt in DATA.techs[tech_id].required_techs:
+                    required_techs.append(rt)
+            
+            bonus_response += f'T({required_techs[0]}, {required_techs[1]}, {required_techs[2]}, {required_techs[3]}, {required_techs[4]}, {required_techs[5]}'
+            #bonus_response += f'E101~{tech_id}~0~0~0|E101~{tech_id}~1~0~0|E101~{tech_id}~2~0~0|E101~{tech_id}~3~0~0|E103~{tech_id}~0~0~0|'
         else:
+            # Edit unit/building attribute
             bonus_response = build_modifiers(bonus_string, unit_lines, categories)
         
         print(bonus_response)
@@ -998,21 +981,6 @@ def open_mod(mod_folder):
                     UNIT_CATEGORIES[k] = [old, v]
         else:
             UNIT_CATEGORIES[k] = v
-
-    # Send the unit categories to the LLM
-    '''with open(f'{os.path.dirname(os.path.abspath(__file__))}/Modelfile', 'r+', encoding='utf-8') as LLM_file:
-        # Read all lines
-        LLM_lines = LLM_file.readlines()
-        if len(LLM_lines) > 1:
-            # Modify the second-to-last line
-            LLM_lines[-2] = f'{LLM_lines[-2].strip()} {UNIT_CATEGORIES}\n'
-
-            # Go back to the start
-            LLM_file.seek(0)
-            # Write back all lines
-            LLM_file.writelines(LLM_lines)
-            # Truncate to remove any leftover content
-            LLM_file.truncate()'''
     
     # Load all languages
     global ALL_LANGUAGES
@@ -1037,18 +1005,58 @@ def open_mod(mod_folder):
     ALL_LANGUAGES.sort()
     
     # Assemble all castle units
+    def collect_castle_units(DATA, civ_id=1):
+        units = DATA.civs[civ_id].units
+
+        # Precompute names once
+        idx_to_name = {}
+        name_set = set()
+        for i, _u in enumerate(units):
+            try:
+                nm = get_unit_name(i)
+                if not nm:
+                    continue
+                nm_l = nm.lower()
+                idx_to_name[i] = nm_l
+                name_set.add(nm_l)
+            except Exception:
+                continue
+
+        # Build a quick lookup of which base names have an Elite variant
+        # (i.e., "elite {base}" exists)
+        has_elite = set()
+        for nm in name_set:
+            if nm.startswith("elite "):
+                base = nm[6:].strip()
+                if base:
+                    has_elite.add(base)
+
+        # Helper: is trainable at Castle?
+        def trainable_at_castle(u):
+            creatable = getattr(u, "creatable", None)
+            if not creatable:
+                return False
+            locs = getattr(creatable, "train_locations", None)
+            if not locs:
+                return False
+            # Castle: unit_id == 82, button_id == 1
+            return any(getattr(loc, "unit_id", None) == 82 and getattr(loc, "button_id", None) == 1
+                    for loc in locs)
+
+        # Collect base (non-elite) castle-trainable units that have an elite
+        result = []
+        for i, u in enumerate(units):
+            base_name = idx_to_name.get(i)
+            if not base_name or base_name.startswith("elite "):
+                continue
+            if base_name in has_elite and trainable_at_castle(u):
+                result.append(base_name.title())
+
+        return sorted(set(result))
+
+    # If you still want the global filled:
     global ALL_CASTLE_UNITS
-    ALL_CASTLE_UNITS = []
-    for i, unit in enumerate(DATA.civs[1].units):
-        try:
-            for location in unit.creatable.train_locations:
-                if location.unit_id == 82 and location.button_id == 1:
-                    # Check if there is a regular version and an elite version
-                    if 'elite' in get_unit_name(i).lower():
-                        ALL_CASTLE_UNITS.append(get_unit_name(i).lower().replace('elite', '').strip().title())
-        except:
-            pass
-    ALL_CASTLE_UNITS.sort()
+    ALL_CASTLE_UNITS = collect_castle_units(DATA, civ_id=1)
 
     # DEBUG: Print dictionary
     #for key, value in UNIT_CATEGORIES.items():
@@ -1057,6 +1065,7 @@ def open_mod(mod_folder):
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
+    update_tech_tree_graphic("Britons")
 
     '''unique_unit_techs = []
     for unit_name in ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer']:
@@ -1092,8 +1101,6 @@ def open_mod(mod_folder):
 
     print(unique_unit_techs)'''
 
-    
-
     # DEBUG: Print attributes of the unit
     #unit = DATA.civs[1].units[8].creatable.train_location_id
     #attributes = [attr for attr in dir(unit) if not attr.startswith('_') and not callable(getattr(unit, attr))]
@@ -1105,6 +1112,7 @@ def open_mod(mod_folder):
 def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # Announce revert
     if revert:
+        _mod_name = _mod_name.split('/')[-1]
         print(f'Reverting {_mod_name}...')
 
         os.chdir(_mod_folder)
@@ -1324,7 +1332,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
     # Add the graphics to the .dat file
     starting_graphic_index = len(DATA.graphics)
-    DATA.graphics.append(Graphic(name='SEE_Dock2', file_name='None', particle_effect_name='', slp=6067, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=60, angle_count=1, speed_multiplier=0.0, frame_duration=0.15000000596046448, replay_delay=0.0, sequence_type=5, id=12733, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=220, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12734, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=4411, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=-120, display_angle=-1, padding_2=0)], angle_sounds=[]))
+    DATA.graphics.append(Graphic(name='SEE_Dock2', file_name='b_byzantinedock_x1', particle_effect_name='', slp=6067, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=60, angle_count=1, speed_multiplier=0.0, frame_duration=0.15000000596046448, replay_delay=0.0, sequence_type=5, id=12733, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=220, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12734, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=4411, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=-120, display_angle=-1, padding_2=0)], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_Dock2(Base)', file_name='b_byzantinedock_x1', particle_effect_name='', slp=6067, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12734, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_ArcheryRange2', file_name='b_feudalarcherybyz_x1', particle_effect_name='', slp=6064, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12735, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_ArcheryRange3', file_name='b_castlearcherybyz_x1', particle_effect_name='', slp=6019, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12736, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
@@ -1352,7 +1360,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     DATA.graphics.append(Graphic(name='SEE_FortifiedWall', file_name='b_fortifiedwall_x1', particle_effect_name='', slp=7126, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=5, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12758, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_StoneWall(Construction)', file_name='b_stonewallconstruction_x1', particle_effect_name='', slp=7129, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=4, angle_count=5, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12759, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12211, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_FortifiedWall(Construction)', file_name='b_fortifiedwallconstruction_x1', particle_effect_name='', slp=7131, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=4, angle_count=5, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12760, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12211, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Dock3', file_name='None', particle_effect_name='', slp=2260, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=60, angle_count=1, speed_multiplier=0.0, frame_duration=0.15000000596046448, replay_delay=0.0, sequence_type=5, id=12761, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=241, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12762, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=4411, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=-120, display_angle=-1, padding_2=0)], angle_sounds=[]))
+    DATA.graphics.append(Graphic(name='SEE_Dock3', file_name='b_castledockbyz_x1', particle_effect_name='', slp=2260, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=60, angle_count=1, speed_multiplier=0.0, frame_duration=0.15000000596046448, replay_delay=0.0, sequence_type=5, id=12761, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=241, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12762, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=4411, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=-120, display_angle=-1, padding_2=0)], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_Dock3(Base)', file_name='b_castledockbyz_x1', particle_effect_name='', slp=6012, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12762, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_House3(Rubble)', file_name='b_medi_house_age3_rubble_x1', particle_effect_name='', slp=2238, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=3, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12763, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12180, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12181, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_House2(Rubble)', file_name='b_medi_house_age2_rubble_x1', particle_effect_name='', slp=2238, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=3, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12764, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12180, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12181, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
@@ -1379,31 +1387,103 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     DATA.graphics.append(Graphic(name='SEE_Tower4(Rubble)', file_name='b_medi_tower_age4_rubble_x1', particle_effect_name='', slp=6032, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12785, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12178, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12179, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_BombardTower(Rubble)', file_name='b_medi_tower_bombard_rubble_x1', particle_effect_name='', slp=6034, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12786, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12178, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12179, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_Castle', file_name='b_byzantinecastle_x1', particle_effect_name='', slp=6021, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12732, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
+    
+    # Damage Graphics
+    base_see_graphics = []
+    for graphic in base_see_graphics:
+        pass
 
     # Change the Byzantines to this new architecture style
     southeast_european_graphics = {
-        87:[2,37], 10:[3,36], 14:[3,36], # Archery Range
-        20:[5,35], 132:[5,35], 498:[6,34], # Barracks
-        86:[11,33], 101:[10,32], 153:[11,33], # Stable
-        49:[9,38], 150:[9,38], # Siege Workshop
-        103:[7,43], 105:[7,43], 18:[8,42], 19:[8,42], # Blacksmith
-        133:[0,-1], 806:[0,-1], 807:[0,-1], 47:[28,-1], 51:[28,-1], 808:[28,-1], # Dock
-        209:[12,48], 210:[13,47], # University
-        79:[16,50], 234:[17,51], 235:[18,52], 236: [4,53], # Towers
-        117:[24,-1], 115:[25,-1], 99117:26, 99115:27, # Walls
-        82:[54,49], # Castles
-        30:[15,46], 31:[15,46], 32:[15,46], 104:[15,46], # Monasteries
-        463:[20,31], 191:[21,30], 192:[21,30], 464:[21,30], 465:[21,30], # Houses
-        129:[22,45], 130:[23,44], 131:[23,44], # Mills
-        84:[14,40], 116:[19,39], 137:[19,41], # Markets
+        # Archery Range
+        87: [2, 37],   # AR2, AR2 rubble
+        10: [3, 36],   # AR3, AR3 rubble
+        14: [3, 36],
+
+        # Barracks
+        20:  [5, 34],
+        132: [5, 34],
+        498: [6, 35],
+
+        # Stable
+        86:  [11, 32],
+        101: [10, 33],
+        153: [11, 32],
+
+        # Siege Workshop
+        49:  [9, 38],
+        150: [9, 38],
+
+        # Blacksmith
+        103: [7, 43],  # BS2, BS2 rubble
+        105: [8, 42],  # BS3, BS3 rubble
+        18:  [8, 42],
+        19:  [8, 42],
+
+        # Dock (animated standing; no rubble)
+        133: [1, -1],   # Age 2
+        806: [1, -1],   # Age 2
+        2120: [1, -1],  # Age 2
+        2144: [1, -1],  # Age 2
+        47:  [29, -1],  # Age 3
+        51:  [29, -1],  # Age 3
+        807: [29, -1],  # Age 3
+        808: [29, -1],  # Age 3
+        2121: [29, -1], # Age 3
+        2122: [29, -1], # Age 3
+        2145: [29, -1], # Age 3
+        2146: [29, -1], # Age 3
+
+        # University (fixed)
+        209: [12, 47], # Uni3, Uni3 rubble
+        210: [13, 48], # Uni4, Uni4 rubble
+
+        # Towers (fixed)
+        79:  [16, 51], # Watch → Tower2 rubble
+        234: [17, 50], # Guard → Tower3 rubble
+        235: [18, 52], # Keep → Tower4 rubble
+        236: [4,  53], # Bombard → Bombard rubble
+
+        # Walls (standing only)
+        117: [24, -1], # Stone Wall frames
+        115: [25, -1], # Fortified Wall
+
+        # Castle
+        82:  [54, 49], # Castle, Castle rubble
+
+        # Monastery
+        30:  [15, 46],
+        31:  [15, 46],
+        32:  [15, 46],
+        104: [15, 46],
+
+        # House
+        191: [21, 30],
+        192: [21, 30],
+        463: [20, 31],
+        464: [21, 30],
+        465: [21, 30],
+
+        # Mill
+        129: [22, 45], # Mill2, Mill2 rubble
+        130: [23, 44], # Mill3, Mill3 rubble
+        131: [23, 44],
+
+        # Market
+        84:  [14, 40], # Market2, Market2 rubble
+        116: [14, 39],  # Market3 needs a standing SEE_Market3
+        137: [19, 41], # Market4, Market4 rubble
     }
+
     for i, unit in enumerate(DATA.civs[7].units):
         if i in southeast_european_graphics:
-            #graphics = southeast_european_graphics[i]
-            #unit.standing_graphic = set([graphics[0] + starting_graphic_index, -1])
-            #unit.dying_graphic = graphics[1] + starting_graphic_index
-            # DEBUG
-            pass
+            g0, g1 = southeast_european_graphics[i]
+
+            if g0 > -1:
+                unit.standing_graphic = (g0 + starting_graphic_index, -1)  # ordered tuple
+
+            if g1 > -1:
+                unit.dying_graphic = g1 + starting_graphic_index
 
     # Add new strings for unit names
     ORIGINAL_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-strings-utf8.txt'
@@ -1617,6 +1697,65 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 except:
                     pass
 
+    '''# Create an Islander architecture from the feudal African buildings and temporarily assign it to the Ethiopians
+    islander_changes = {
+        #Archery Range
+        87: [10, 14],
+        1415: [1416],
+
+        #Barracks
+        498: [20, 132],
+        1413: [1414],
+
+        #Stable
+        101: [86, 153],
+        1417: [1418],
+
+        #Blacksmith
+        103: [18, 19, 105],
+        1419: [1420],
+
+        #Dock
+        133: [47, 51, 133, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146],
+
+        # University
+        209: [210],
+        1427: [1428],
+
+        # Town Centre Back
+        71: [141, 142],
+
+        # Town Centre Main
+        614: [481, 611],
+
+        # Town Centre Centre
+        615: [482, 612],
+
+        # Town Centre Front
+        616: [483, 613],
+
+        # Town Centre Preview
+        617: [484, 497],
+
+        # House
+        1082: [191, 192, 463, 464, 465],
+        1455: [1434, 1435],
+
+        # Mill
+        1081: [129, 130, 131],
+        1484: [1411, 1412],
+
+        # Market
+        84: [116, 137],
+        1422: [1423, 1424]
+    }
+
+    for change_key, change_value in islander_changes.items():
+        for unit_id in change_value:
+            DATA.civs[25].units[unit_id].standing_graphic = DATA.civs[25].units[change_key].standing_graphic
+            DATA.civs[25].units[unit_id].dying_graphic = DATA.civs[25].units[change_key].dying_graphic
+            DATA.civs[25].units[unit_id].damage_graphics = DATA.civs[25].units[change_key].damage_graphics'''
+
     # Split the architecture sets for Southeast Asians
     for civ in DATA.civs:
         if civ.name not in ['Khmer', 'Burmese', 'Malay']:
@@ -1820,6 +1959,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         naasiri.creatable.train_locations[0].unit_id = 82
         naasiri.creatable.train_locations[0].button_id = 1
         naasiri.creatable.train_locations[0].train_time = 24
+        naasiri.creatable.train_locations[0].hot_key_id = 16107
         naasiri.type_50.attacks[0].amount = 7
         naasiri.type_50.displayed_attack = 7
         naasiri.creatable.train_time = 22
@@ -1859,6 +1999,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elephant_gunner.creatable.train_time = 28
         elephant_gunner.creatable.resource_costs = (ResourceCost(type=0, amount=80, flag=1), ResourceCost(type=3, amount=100, flag=1), ResourceCost(type=4, amount=1, flag=0))
         elephant_gunner.type_50.projectile_unit_id = 380
+        elephant_gunner.creatable.train_locations[0].hot_key_id = 16107
         elephant_gunner.class_ = 23
         civ.units.append(elephant_gunner)
 
@@ -1881,6 +2022,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         flamethrower.creatable.train_locations[0].button_id = 1
         flamethrower.type_50.attacks[1].amount = 6
         flamethrower.type_50.displayed_attack = 6
+        flamethrower.creatable.train_locations[0].hot_key_id = 16107
         civ.units.append(flamethrower)
 
         # Elite Flamethrower
@@ -1917,6 +2059,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         for i in range(6, 20):
             weichafe.bird.tasks[i].work_value_1 = -0.25
         weichafe.name = 'Weichafe'
+        weichafe.creatable.train_locations[0].hot_key_id = 16107
         civ.units.append(weichafe)
 
         # Elite Weichafe
@@ -1943,9 +2086,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         crusader.language_dll_creation = 109000
         crusader.type_50.attacks[0].amount = 13
         crusader.type_50.displayed_attack = 13
-        crusader.speed = 1.1
+        crusader.speed = 1.2
         crusader.creatable.train_locations[0].button_id = 1
         crusader.name = 'Crusader'
+        crusader.creatable.train_locations[0].hot_key_id = 16107
         civ.units.append(crusader)
 
         # Elite Crusader
@@ -1968,6 +2112,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         tomahawk_warrior.language_dll_creation = 113000
         tomahawk_warrior.type_50.attacks[3].amount = 10
         tomahawk_warrior.name = 'Tomahawk Warrior'
+        tomahawk_warrior.creatable.train_locations[0].hot_key_id = 16107
         civ.units.append(tomahawk_warrior)
 
         # Elite Tomahawk Warrior
@@ -2010,8 +2155,112 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         imperial_elephant_archer.creatable.train_locations[0].button_id = civ.units[875].creatable.train_locations[0].button_id
         civ.units.append(imperial_elephant_archer)
 
+        # Lightning Warrior
+        lightning_warrior = copy.deepcopy(DATA.civs[1].units[749])
+        change_string(118000, 'Lightning Warrior')
+        change_string(119000, 'Create Lightning Warrior')
+        lightning_warrior.language_dll_name = 118000
+        lightning_warrior.language_dll_creation = 119000
+        #lightning_warrior.type_50.attacks.clear()
+        #lightning_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(4, 5))
+        #lightning_warrior.type_50.displayed_attack = 5
+        lightning_warrior.hit_points = 40
+        lightning_warrior.name = 'Lightning Warrior'
+        lightning_warrior.speed = 1.35
+        lightning_warrior.type_50.reload_time = 1
+        lightning_warrior.creatable.hero_mode = 0
+        lightning_warrior.creatable.train_locations[0].unit_id = 82
+        lightning_warrior.creatable.train_locations[0].train_time = 14
+        lightning_warrior.creatable.train_locations[0].button_id = 1
+        lightning_warrior.creatable.train_locations[0].hot_key_id = 16107
+        civ.units.append(lightning_warrior)
+
+        # Elite Lightning Warrior
+        elite_lightning_warrior = copy.deepcopy(lightning_warrior)
+        change_string(120000, 'Elite Lightning Warrior')
+        change_string(121000, 'Create Elite Lightning Warrior')
+        elite_lightning_warrior.language_dll_name = 120000
+        elite_lightning_warrior.language_dll_creation = 121000
+        #elite_lightning_warrior.type_50.attacks[0] = 6
+        elite_lightning_warrior.type_50.displayed_attack = 6
+        elite_lightning_warrior.type_50.reload_time = 0.85
+        elite_lightning_warrior.hit_points = 45
+        elite_lightning_warrior.name = 'Elite Lightning Warrior'
+        civ.units.append(elite_lightning_warrior)
+
+        # Destroyer
+        destroyer = copy.deepcopy(DATA.civs[1].units[1074])
+        change_string(122000, 'Destroyer')
+        change_string(123000, 'Create Destroyer')
+        destroyer.language_dll_name = 122000
+        destroyer.language_dll_creation = 123000
+        #destroyer.type_50.attacks = copy.deepcopy(civ.units[755].type_50.attacks)
+        #destroyer.type_50.attacks[1].amount = 14
+        #destroyer.type_50.displayed_attack = 8
+        destroyer.hit_points = 80
+        destroyer.name = 'Destroyer'
+        destroyer.speed = 0.9
+        destroyer.type_50.reload_time = 3
+        destroyer.creatable.hero_mode = 0
+        destroyer.creatable.train_locations[0].unit_id = 82
+        destroyer.creatable.train_locations[0].train_time = 14
+        destroyer.creatable.train_locations[0].button_id = 1
+        destroyer.creatable.train_locations[0].hot_key_id = 16107
+        civ.units.append(destroyer)
+
+        # Elite Destroyer
+        elite_destroyer = copy.deepcopy(destroyer)
+        change_string(124000, 'Elite Destroyer')
+        change_string(125000, 'Create Elite Destroyer')
+        elite_destroyer.language_dll_name = 124000
+        elite_destroyer.language_dll_creation = 125000
+        #elite_destroyer.type_50.attacks[1].amount = 16
+        #elite_destroyer.type_50.attacks[2].amount = 9
+        #elite_destroyer.type_50.displayed_attack = 9
+        elite_destroyer.hit_points = 90
+        elite_destroyer.name = 'Elite Destroyer'
+        civ.units.append(elite_destroyer)
+
+        # Cossack
+        cossack = copy.deepcopy(DATA.civs[1].units[1186])
+        change_string(126000, 'Cossack')
+        change_string(127000, 'Create Cossack')
+        cossack.language_dll_name = 126000
+        cossack.language_dll_creation = 127000
+        cossack.creatable.resource_costs[1].type = 3
+        cossack.creatable.resource_costs[1].amount = 40
+        cossack.creatable.resource_costs[1].flag = 1
+        cossack.type_50.displayed_melee_armour = 1
+        cossack.creatable.charge_type = 3
+        cossack.creatable.charge_event = 1
+        cossack.creatable.charge_target = 511
+        cossack.creatable.max_charge = 15
+        cossack.creatable.recharge_rate = 0.5
+        cossack.creatable.hero_mode = 0
+        cossack.creatable.train_locations[0].unit_id = 82
+        cossack.creatable.train_locations[0].train_time = 14
+        cossack.creatable.train_locations[0].button_id = 1
+        cossack.creatable.train_locations[0].hot_key_id = 16107
+        cossack.name = 'Cossack'
+        civ.units.append(cossack)
+
+        # Elite Cossack
+        elite_cossack = copy.deepcopy(cossack)
+        change_string(128000, 'Elite Cossack')
+        change_string(129000, 'Create Elite Cossack')
+        elite_cossack.language_dll_name = 128000
+        elite_cossack.language_dll_creation = 129000
+        elite_cossack.creatable.recharge_rate = 1
+        elite_cossack.type_50.attacks[1].amount = 14
+        elite_cossack.type_50.displayed_attack = 14
+        elite_cossack.type_50.armours[0].amount = 2
+        elite_cossack.type_50.armours[2].amount = 2
+        elite_cossack.type_50.displayed_melee_armour = 2
+        elite_cossack.name = 'Elite Cossack'
+        civ.units.append(elite_cossack)
+
         # Yurt
-        yurt = copy.deepcopy(DATA.civs[1].units[1835])
+        '''yurt = copy.deepcopy(DATA.civs[1].units[1835])
         change_string(118000, 'Yurt')
         change_string(119000, 'Build Yurt')
         change_string(120000, r'Build <b>Yurt<b> (<cost>)\nNomadic house that can be packed and unpacked. Provides 15 population. Your current/supportable population is shown at the top of the screen.\n<GREY><i>Upgrades: line of sight (Town Center); HP, armor (University); more resistant to Monks (Monastery).<i><DEFAULT>')
@@ -2020,13 +2269,13 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         yurt.language_dll_help = 120000 + 79000
         yurt.hit_points = 250
         yurt.resource_storages[0].amount = 15
-        '''yurt.standing_graphic = civ.units[712].standing_graphic
+        yurt.standing_graphic = civ.units[712].standing_graphic
         yurt.dying_graphic = civ.units[712].dying_graphic
         yurt.undead_graphic = civ.units[712].undead_graphic
         yurt.dead_fish.walking_graphic = civ.units[712].dead_fish.walking_graphic
         yurt.dead_fish.running_graphic = civ.units[712].dead_fish.running_graphic
         yurt.type_50.attack_graphic = civ.units[712].type_50.attack_graphic
-        yurt.type_50.attack_graphic_2 = civ.units[712].type_50.attack_graphic_2'''
+        yurt.type_50.attack_graphic_2 = civ.units[712].type_50.attack_graphic_2
         yurt.name = 'Yurt'
         yurt.class_ = 54
         yurt.creatable.train_locations[0].unit_id = 118
@@ -2046,7 +2295,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         yurt_packed.name = 'Yurt (Packed)'
         yurt_packed.class_ = 51
         yurt_packed.creatable.train_locations[0].train_time = 8
-        civ.units.append(yurt_packed)
+        civ.units.append(yurt_packed)'''
 
     # Create new unique Castle unit techs and effects
     for i, tech_id in enumerate([263, 360, 275, 363, 399, 398, 276, 364, 262, 366, 268, 362, 267, 361, 274, 367, 269, 368, 271, 369, 446, 365, 273, 371, 277, 370, 58, 60, 431, 432, 26, 27, 1, 2, 449, 450, 467, 468, 839, 840, 508, 509, 471, 472, 503, 504, 562, 563, 568, 569, 566, 567, 564, 565, 614, 615, 616, 617, 618, 619, 620, 621, 677, 678, 679, 680, 681, 682, 683, 684, 750, 751, 752, 753, 778, 779, 780, 781, 825, 826, 827, 828, 829, 830, 881, 882, 917, 918, 919, 920, 990, 991, 1001, 1002, 1063, 1064, 1035, 1036, 1073, 1074]):
@@ -2264,12 +2513,12 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # --- Graphic set maps (same as your menu version) ---
     general_architecture_sets = {
         'West African': 26, 'Austronesian': 29, 'Central Asian': 33,
-        'Central European': 4, 'East Asian': 5, 'Eastern European': 23,
+        'Central European': 4, 'East Asian': 5, 'Eastern European': 23,# 'Islander': 25,
         'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15,
-        'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1
+        'South Asian': 20, 'Southeast Asian': 28, 'Southeast European': 7, 'Western European': 1
     }
     monk_sets = {
-        'Christian': 0, 'Native American': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40,
+        'Christian': 0, 'Mesoamerican': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40,
         'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35
     }
     monastery_sets = {
@@ -2340,7 +2589,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         22: [4, -1, -1, -1, 4, -1, 4],
         23: [-1, -1, -1, -1, -1, -1, -1],
         24: [-1, -1, -1, -1, -1, -1, -1],
-        25: [-1, -1, -1, -1, -1, -1, -1],
+        25: [26, -1, -1, -1, -1, -1, -1],
         26: [-1, -1, -1, -1, -1, 9, -1],
         27: [26, -1, -1, -1, -1, 9, -1],
         28: [-1, -1, -1, 40, -1, -1, -1],
@@ -2387,6 +2636,18 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 if (key == 0 and unit_id not in special_unit_ids) or key > 0:
                     # General units: apply to all except special units
                     DATA.civs[civ_id].units[unit_id] = DATA.civs[presets[key]].units[unit_id]
+
+    # Reorder tech trees
+    for civ in DATA.civs:
+        civ_tech_tree_index = -1
+        for i, effect in enumerate(DATA.effects):
+            if effect.name.lower() == f'{civ.name} tech tree'.lower():
+                civ_tech_tree_index = i
+
+        if civ_tech_tree_index == -1:
+            continue
+
+        DATA.effects[civ_tech_tree_index].effect_commands.sort(key=lambda ec: ec.d)
 
     # Save changes
     with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Formatting Mod', total_steps=100)
@@ -2597,7 +2858,7 @@ def main():
 
                             # Determine which architecture set is currently being used
                             # KEY: (house: 463)
-                            architecture_sets = {8916: 'West African', 10909: 'Austronesian', 11909: 'Central Asian', 2206: 'Central European', 2207: 'East Asian', 7909: 'Eastern European', 9202: 'Mediterranean', 2208: 'Middle Eastern', 6909: 'Mesoamerican', 9909: 'South Asian', 10916: 'Southeast Asian', -1: 'Southeast European', 2209: 'Western European'}
+                            architecture_sets = {8916: 'West African', 10909: 'Austronesian', 11909: 'Central Asian', 2206: 'Central European', 2207: 'East Asian', 7909: 'Eastern European', 9202: 'Mediterranean', 2208: 'Middle Eastern', 6909: 'Mesoamerican', 9909: 'South Asian', 10916: 'Southeast Asian', 15814: 'Southeast European', 2209: 'Western European'}
                             try:
                                 if DATA.civs[selected_civ_index + 1].units[463].standing_graphic[0] in architecture_sets:
                                     return architecture_sets[DATA.civs[selected_civ_index + 1].units[463].standing_graphic[0]]
@@ -2660,7 +2921,7 @@ def main():
                             # Check to see if name already exists
                             name_exists = False
                             for civ in DATA.civs:
-                                if civ.name.lower() == new_name.lower():
+                                if remove_accents(civ.name.lower()) == remove_accents(new_name.lower()):
                                     print("\033[31mERROR: Civilization name already assigned to another civilization.\033[0m")
                                     name_exists = True
                                     break
@@ -2671,7 +2932,7 @@ def main():
                                 with open(MOD_STRINGS, 'r+', encoding='utf-8') as file:
                                     lines = file.readlines()  # Read all lines
                                     lines[selected_civ_index] = lines[selected_civ_index][:5] + f' "{new_name}"\n'  # Modify the specific line
-                                    selected_civ_name = new_name  # Update the selected civ name
+                                    selected_civ_name = remove_accents(new_name)  # Update the selected civ name
 
                                     file.seek(0)  # Move to the beginning of the file
                                     file.writelines(lines)  # Write all lines back
@@ -2712,7 +2973,7 @@ def main():
                                 continue
 
                             # Replace the title
-                            if new_title.endswith('civilization') or new_title.endswith('civilisation'):
+                            if new_title.lower().endswith('civilization') or new_title.lower().endswith('civilisation'):
                                 new_title = new_title[:-12].strip()
 
                             # Apply the Civilization ending
@@ -2925,7 +3186,7 @@ def main():
                         # Unique Unit
                         elif selection == '3':
                             # Populate all castle units
-                            ALL_CASTLE_UNITS = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer', "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", 'genitour', 'naasiri', 'elephant gunner', 'flamethrower', 'weichafe']
+                            ALL_CASTLE_UNITS = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer', "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", 'genitour', 'naasiri', 'elephant gunner', 'flamethrower', 'weichafe', 'destroyer', 'lightning warrior', 'cossack']
 
                             # Get user input
                             while True:
@@ -3082,7 +3343,7 @@ def main():
                             DATA.techs[unique_techs_ids[1]].effect_id = imperial_effect_id
 
                             # Prompt the user for Castle Age tech
-                            new_castle_tech_name = prompt(f"\nChange Castle Age tech name: ", default=unique_techs_names[0].strip())
+                            new_castle_tech_name = input(f"\nChange Castle Age tech name: ")#, default=unique_techs_names[0].strip())
                             if new_castle_tech_name == '':
                                 new_castle_tech_name = unique_techs_names[0]
 
@@ -3090,10 +3351,10 @@ def main():
                             prompt_default_text_castle = description_lines[-5].split('(')[1].strip(')')
 
                             while True:
-                                new_castle_tech_description = prompt(
-                                    f"Change Castle Age tech description: ",
-                                    default=prompt_default_text_castle.strip()
-                                )
+                                new_castle_tech_description = input(
+                                    f"Change Castle Age tech description: ")#,
+                                    #default=prompt_default_text_castle.strip()
+                                #)
                                 new_castle_tech, new_castle_effect = create_bonus(new_castle_tech_description, selected_civ_index)
                                 if len(new_castle_effect[0].effect_commands) == 0 and '*' not in new_castle_tech_description:
                                     print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
@@ -3105,7 +3366,7 @@ def main():
                                     break
 
                             # Prompt the user for Imperial Age tech
-                            new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ", default=unique_techs_names[1].strip())
+                            new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ")#, default=unique_techs_names[1].strip())
                             if new_imperial_tech_name == '':
                                 new_imperial_tech_name = unique_techs_names[1]
 
@@ -3113,10 +3374,7 @@ def main():
                             prompt_default_text_imperial = description_lines[-4].split('(')[1].strip(')')
 
                             while True:
-                                new_imperial_tech_description = prompt(
-                                    f"Change Imperial Age tech description: ",
-                                    default=prompt_default_text_imperial.strip()
-                                )
+                                new_imperial_tech_description = input(f"Change Imperial Age tech description: ")#, default=prompt_default_text_imperial.strip())
                                 new_imperial_tech, new_imperial_effect = create_bonus(new_imperial_tech_description, selected_civ_index)
                                 if len(new_imperial_effect[0].effect_commands) == 0 and '*' not in new_imperial_tech_description:
                                     print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
@@ -3162,8 +3420,8 @@ def main():
                         elif selection == '5':
                             save = ''
                             # Gather all graphics
-                            general_architecture_sets = {'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1}
-                            monk_sets = {'Christian': 0, 'Native American': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40, 'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35}
+                            general_architecture_sets = {'Southeast European': 7, 'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1}
+                            monk_sets = {'Christian': 0, 'Mesoamerican': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40, 'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35}
                             monastery_sets = {'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Tengri': 12, 'Pagan': 35}
                             trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
                             ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5, "Eastern European": 23, "Mediterranean": 14, "Mesoamerican": 15, "Middle Eastern": 9, "Southeast Asian": 28, "Western European": 1}
@@ -3351,20 +3609,12 @@ def main():
                                 print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Tech Tree Menu{save} {title_emoji}'))
                                 print(colour(Fore.WHITE, "0️⃣  Edit Tree"))
                                 print(colour(Fore.WHITE, f"1️⃣  Set Scout") + f" -- {colour(Fore.BLUE, current_scout)}")
-                                #print(colour(Fore.WHITE, "2️⃣  Stable"))
-                                #print(colour(Fore.WHITE, "3️⃣  Blacksmith"))
-                                #print(colour(Fore.WHITE, "4️⃣  Market"))
-                                #print(colour(Fore.WHITE, "5️⃣  Dock"))
-                                #print(colour(Fore.WHITE, "6️⃣  Siege Workshop"))
-                                #print(colour(Fore.WHITE, "7️⃣  University"))
-                                #print(colour(Fore.WHITE, "8️⃣  Monastery"))
-                                #print(colour(Fore.WHITE, "9️⃣  Castle and Defensive"))
-                                #print(colour(Fore.WHITE, "🔟 Economic"))
                                 tech_tree_selection = input(colour(Fore.BLUE, "Selection: "))
 
                                 if tech_tree_selection == '':
                                     if save == '*':
                                         with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                        update_tech_tree_graphic(selected_civ_name)
                                         print('Tech tree saved.')
                                         time.sleep(1)
                                     break
@@ -3390,8 +3640,8 @@ def main():
                                             'ARCHERY RANGE': [-1],
                                             'Archer/Crossbowman/Arbalester': [151, 100, 237],
                                             'Skirmisher/Elite Skirmisher/Imperial Skirmisher': [99, 98, 655],
-                                            'Slinger*0': [185],
-                                            'Hand Cannoneer*0': [5],
+                                            'Slinger*0': [528],
+                                            'Hand Cannoneer*0': [85],
                                             'Xianbei Raider*1': [1037],
                                             'Elephant Archer*1/Elite Elephant Archer*1': [480, 481],
                                             'Cavalry Archer*1/Heavy Cavalry Archer*1': [192, 218],
@@ -3401,8 +3651,8 @@ def main():
                                             'Thumb Ring': [437],
 
                                             'BARRACKS': [-1],
-                                            #'Militia/Man-at-Arms/Long Swordsman/Two-Handed Swordsman*2A/Champion*2A/Legionary*2B': [-1, 222, 207, 217, 264],
-                                            'Militia/Man-at-Arms/Long Swordsman/Two-Handed Swordsman/Champion': [-1, 222, 207, 217, 264], # Legionary 1793
+                                            'Militia/Man-at-Arms/Long Swordsman/Two-Handed Swordsman*1/Champion*1': [-1, 222, 207, 217, 264],
+                                            'Militia/Man-at-Arms/Long Swordsman/Legionary*1': [-1, 222, 207, 885],
                                             'Spearman/Pikeman/Halberdier': [87, 197, 429],
                                             'Eagle Scout/Eagle Warrior/Elite Eagle Warrior': [433, 384, 434],
                                             'Fire Lancer*2/Elite Fire Lancer*2': [981, 982],
@@ -3416,9 +3666,9 @@ def main():
                                             'Scout Cavalry/Light Cavalry/Hussar*3': [204, 254, 428],
                                             'Scout Cavalry/Light Cavalry/Winged Hussar*3': [204, 254, 786],
                                             'Xolotl Warrior*3': [318],
-                                            'Knight*4/Cavalier*4/Paladin*4': [166, 209, 265],
-                                            'Knight*4/Cavalier*4/Savar*4': [166, 209, 526],
                                             'Hei Guang Cavalry*4/Heavy Hei Guang Cavalry*4': [1032, 1033],
+                                            'Knight*4/Cavalier*4/Savar*4': [166, 209, 526],
+                                            'Knight*4/Cavalier*4/Paladin*4': [166, 209, 265],
                                             'Camel Rider/Heavy Camel Rider/Imperial Camel Rider': [235, 236, 521],
                                             'Steppe Lancer*5/Elite Steppe Lancer*5': [714, 715],
                                             'Battle Elephant*5/Elite Battle Elephant*5': [630, 631],
@@ -3433,10 +3683,10 @@ def main():
                                             'Scorpion*8/Heavy Scorpion*8': [94, 239],
                                             'War Chariot*8/Elite War Charior*8': [1065, 1171],
                                             'Siege Tower': [603],
-                                            'Bombard Cannon*9/Houfnice*9': [188, 787],
                                             'Flaming Camel*9': [703],
                                             'Traction Trebuchet*9': [1025],
                                             'Mounted Trebuchet*9': [1005],
+                                            'Bombard Cannon*9/Houfnice*9': [188, 787],
 
                                             'BLACKSMITH': [281],
                                             'Padded Archer Armor/Leather Archer Armor/Ring Archer Armor': [211, 212, 219],
@@ -3509,9 +3759,9 @@ def main():
                                             'House': [-1],
                                             'Caravanserai*16': [518],
                                             'Feitoria*16': [570],
-                                            'Mining and Lumber Camp*17': [-1],
-                                            'Mule Cart*17': [932],
-                                            'Mule Cart*17': [940],
+                                            'Mining Camp': [-1],
+                                            'Lumber Camp': [-1],
+                                            'Mule Cart': [932],
                                             'Mill*18': [-1],
                                             'Folwark*18': [793],
                                             'Farm*19': [216],
@@ -3637,26 +3887,16 @@ def main():
                                                 group_keys.append(nxt)
                                                 j += 1
 
-                                            # Evaluate subbranches in order; pick first with progress, else fallback to last
-                                            chosen_label = None
-                                            chosen_len = 0
-                                            chosen_tot = 0
-
-                                            found_progress = False
-                                            for k in group_keys:
-                                                lbls = base_labels(k)
+                                            # Choose the sub-branch with the greatest progress length
+                                            best_key = group_keys[0]
+                                            best_len, best_tot = branch_progress(branches[best_key])
+                                            for k in group_keys[1:]:
                                                 blen, btot = branch_progress(branches[k])
-                                                if blen > 0 and not found_progress:
-                                                    chosen_label, chosen_len, chosen_tot = lbls, blen, btot
-                                                    found_progress = True
+                                                if blen > best_len or (blen == best_len and btot >= best_tot):
+                                                    best_key, best_len, best_tot = k, blen, btot
 
-                                            if not found_progress:
-                                                # fallback: last subbranch in series, red [0/len]
-                                                last_key = group_keys[-1]
-                                                chosen_label = base_labels(last_key)
-                                                chosen_len, chosen_tot = 0, len(branches[last_key])
-
-                                            building_items.append(pretty_item(chosen_label, chosen_len, chosen_tot))
+                                            labels = base_labels(best_key)
+                                            building_items.append(pretty_item(labels, best_len, best_tot))
 
                                             # advance past the whole group
                                             i = j
@@ -3686,26 +3926,90 @@ def main():
                                                 time.sleep(1)
                                             else:
                                                 # Check to see if there's a tech mentioned
-                                                for branch_key, branch_value in branches.items():
-                                                    if action.lower() in branch_key.lower():
-                                                        for index, tech in enumerate(branch_key.split('/')):
-                                                            tech_name = tech.split('*')[0]
+                                                for branch_key, ids in branches.items():
+                                                    target = action.strip().lower().replace('*', '')
+                                                    labels = [t.split('*')[0].strip().lower() for t in branch_key.split('/')]
+                                                    if target not in labels:
+                                                        continue
 
-                                                            # Find the index that matches
-                                                            if action.lower() == tech_name.lower():
-                                                                golden_index = index
-                                                                break
+                                                    golden_index = labels.index(target)
 
-                                                        # Enable everything at and before the golden index, disable the rest
-                                                        for tech_index, tech_id in enumerate(branch_value):
-                                                            if tech_index <= golden_index:
-                                                                for ec in DATA.effects[tech_tree_effect_id].effect_commands[::-1]:
-                                                                    if ec.d == tech_id:
-                                                                        DATA.effects[tech_tree_effect_id].effect_commands.remove(ec)
-                                                                save = '*'
-                                                            else:
-                                                                DATA.effects[tech_tree_effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
-                                                                save = '*'
+                                                    ec_list = DATA.effects[tech_tree_effect_id].effect_commands
+                                                    disabled_set = {ec.d for ec in ec_list if getattr(ec, "type", None) == 102}
+
+                                                    # Compute current progress on this line
+                                                    length = 0
+                                                    for u in ids:
+                                                        if u == -1:
+                                                            length += 1
+                                                            continue
+                                                        if u in disabled_set:
+                                                            break
+                                                        length += 1
+                                                    fully_disabled = (length == 0)
+                                                    current_enabled_index = (length - 1) if length > 0 else None
+
+                                                    if (not fully_disabled) and (current_enabled_index == golden_index):
+                                                        # Chosen unit is already the green one -> disable the whole line
+                                                        for tid in ids:
+                                                            if tid == -1:
+                                                                continue
+                                                            if tid not in disabled_set:
+                                                                ec_list.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tid))
+                                                        save = '*'
+                                                    else:
+                                                        # Make the chosen unit (and all predecessors) enabled; disable everything after
+                                                        # 1) Enable <= golden: remove existing disables for those ids
+                                                        to_enable = {tid for idx, tid in enumerate(ids) if tid != -1 and idx <= golden_index}
+                                                        if to_enable:
+                                                            for ec in ec_list[::-1]:
+                                                                if getattr(ec, "type", None) == 102 and ec.d in to_enable:
+                                                                    ec_list.remove(ec)
+
+                                                        # 2) Disable > golden: ensure disables exist
+                                                        disabled_set = {ec.d for ec in ec_list if getattr(ec, "type", None) == 102}  # refresh
+                                                        for idx, tid in enumerate(ids):
+                                                            if tid == -1 or idx <= golden_index:
+                                                                continue
+                                                            if tid not in disabled_set:
+                                                                ec_list.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tid))
+                                                        save = '*'
+
+                                                        # 3) If this branch is part of a starred group, disable conflicting units in sibling branches
+                                                        sidx = star_index(branch_key)
+                                                        if sidx is not None:
+                                                            # Gather sibling keys in the same starred group (non-headers)
+                                                            group_keys = []
+                                                            # We need the ordered key list 'keys' already built earlier
+                                                            # Find the span containing this group's entries
+                                                            # (Re-scan locally: cheap and robust)
+                                                            started = False
+                                                            for kname in keys:
+                                                                if kname.isupper():
+                                                                    started = False
+                                                                if star_index(kname) == sidx and not kname.isupper():
+                                                                    if not started:
+                                                                        started = True
+                                                                    group_keys.append(kname)
+                                                                elif started:
+                                                                    # we passed the block for this star group
+                                                                    break
+
+                                                            # Disable all units from sibling branches that aren't part of our enabled set
+                                                            to_enable = {tid for idx, tid in enumerate(ids) if tid != -1 and idx <= golden_index}
+                                                            ec_list = DATA.effects[tech_tree_effect_id].effect_commands
+                                                            disabled_set = {ec.d for ec in ec_list if getattr(ec, "type", None) == 102}
+
+                                                            for sib in group_keys:
+                                                                if sib == branch_key:
+                                                                    continue
+                                                                for tid in branches[sib]:
+                                                                    if tid == -1 or tid in to_enable:
+                                                                        continue
+                                                                    if tid not in disabled_set:
+                                                                        ec_list.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tid))
+                                                                        disabled_set.add(tid)
+                                                    break  # handled this action once; move to next action
 
                                 elif tech_tree_selection == '1':
                                     while True:
