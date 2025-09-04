@@ -3608,8 +3608,10 @@ def main():
 
                         # Language
                         elif selection == '6':
-                            # Change language
                             while True:
+                                # Get input
+                                readline.set_completer(make_completer(ALL_LANGUAGES))
+                                readline.parse_and_bind("tab: complete")
                                 new_language = input(f"\nEnter new language for {selected_civ_name}: ").title()
 
                                 if new_language == '':
