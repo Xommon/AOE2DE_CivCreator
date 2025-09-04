@@ -298,7 +298,7 @@ def update_tech_tree_graphic(current_civ_name):
             # Fall back to string if needed, but prefer ints everywhere 
             d_val = ec.d 
         disabled_triggers.add(d_val)
-    print('disabled triggers', disabled_triggers)
+    #print('disabled triggers', disabled_triggers)
 
     # Helpers
     def get_section(node_id):
@@ -526,7 +526,17 @@ def create_bonus(bonus_string, civ_id):
             'barracks units': [74, 75, 77, 473, 567, 1793, 93, 358, 359, 751, 753, 752, 1901, 1903],
             'stable units': [448, 546, 441, 1707, 1751, 1753, 38, 283, 569, 1813, 1370, 1372, 1755, 329, 330, 207, 1132, 1134, 1944, 1946],
             'siege workshop units': [35, 422, 548, 1258, 280, 550, 588, 1904, 1907, 1744, 1746, 36, 1709, 1105],
-            'town centers': [109, 71, 141, 142]
+            'town centers': [109, 71, 141, 142],
+            'builders': get_unit_id('builder', True),
+            'shepherds': get_unit_id('shepherd', True),
+            'hunters': get_unit_id('hunter', True),
+            'fishermen': get_unit_id('fisherman', True),
+            'farmers': get_unit_id('farmer', True) + get_unit_id('herder', True),
+            'lumberjacks': get_unit_id('lumberjack', True),
+            'gold miners': get_unit_id('gold miner', True),
+            'stone miners': get_unit_id('stone miner', True),
+            'miners': get_unit_id('gold miner', True) + get_unit_id('stone miner', True),
+            'repairers': get_unit_id('repairer', True),
         }
 
         # If you need to keep your existing unit_lines contents, don't recreate it.
@@ -577,8 +587,8 @@ def create_bonus(bonus_string, civ_id):
             except Exception:
                 pass
 
-        for key, value in unit_lines.items():
-            print(f"{key}: {value}")
+        '''for key, value in unit_lines.items():
+            print(f"{key}: {value}")'''
 
         #print(unit_lines)
         categories = {
@@ -745,12 +755,15 @@ def create_bonus(bonus_string, civ_id):
         else:
             # Edit unit/building attribute
             bonus_response = build_modifiers(bonus_string, unit_lines, categories)
-        
-        print(bonus_response)
 
         # Create the final techs and the final effects
         final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), research_locations=[ResearchLocation(0, 0, 0, 0)], resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=len(DATA.effects), type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', repeatable=1)]
         final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', effect_commands=[])]
+
+        # Error out if bonus text is invalid
+        if bonus_response == '':
+            print(colour(Fore.RED, 'ERROR: Bonus text invalid.'))
+            return final_techs, final_effects
 
         # Split the response into parts
         bonus_parts = bonus_response.split('|')
@@ -1865,6 +1878,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             old_tech_research_locations.append(DATA.techs[tech_id].research_locations)'''
 
     # Create techs unique to Talofa
+    # Imperial Elephant Archer
     imperial_elephant_archer_tech = copy.deepcopy(DATA.techs[481])
     change_string(87000, 'Imperial Elephant Archer')
     change_string(88000, 'Upgrade to Imperial Elephant Archer')
@@ -2259,6 +2273,16 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_cossack.name = 'Elite Cossack'
         civ.units.append(elite_cossack)
 
+        # Fire Tower
+        fire_tower = copy.deepcopy(DATA.civs[1].units[190])
+        fire_tower.line_of_sight = 10
+        fire_tower.bird.search_radius = 10
+        fire_tower.type_50.attacks.append(AttackOrArmor(20, 15))
+        fire_tower.creatable.train_locations[0].button_id = 10
+        fire_tower.creatable.train_locations[0].hot_key_id = 16156
+        fire_tower.name = 'Fire Tower'
+        civ.units.append(fire_tower)
+
         # Yurt
         '''yurt = copy.deepcopy(DATA.civs[1].units[1835])
         change_string(118000, 'Yurt')
@@ -2296,6 +2320,18 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         yurt_packed.class_ = 51
         yurt_packed.creatable.train_locations[0].train_time = 8
         civ.units.append(yurt_packed)'''
+
+    # Create more techs/effects
+    '''fire_tower_tech = copy.deepcopy(DATA.techs[64])
+    change_string(84000, 'Fire Tower')
+    change_string(85000, 'Upgrade to Fire Tower')
+    change_string(86000, r'Build <b>Fire Tower<b> (<cost>)\Fire tower with a powerful ranged attack. Units can garrison inside for protection. Strong vs. everything in range. Weak vs. long range Siege Weapons.')
+    fire_tower_tech.language_dll_name = 84000
+    fire_tower_tech.language_dll_description = 85000
+    fire_tower_effect = genieutils.effect.Effect(name='Fire Tower', effect_commands=[genieutils.effect.EffectCommand(2, get_unit_id('Canoe')+22, 1, -1, -1)])
+    DATA.effects.append(fire_tower_effect)
+    fire_tower_tech.effect_id = len(DATA.effects)-1
+    DATA.techs.append(fire_tower_tech)'''
 
     # Create new unique Castle unit techs and effects
     for i, tech_id in enumerate([263, 360, 275, 363, 399, 398, 276, 364, 262, 366, 268, 362, 267, 361, 274, 367, 269, 368, 271, 369, 446, 365, 273, 371, 277, 370, 58, 60, 431, 432, 26, 27, 1, 2, 449, 450, 467, 468, 839, 840, 508, 509, 471, 472, 503, 504, 562, 563, 568, 569, 566, 567, 564, 565, 614, 615, 616, 617, 618, 619, 620, 621, 677, 678, 679, 680, 681, 682, 683, 684, 750, 751, 752, 753, 778, 779, 780, 781, 825, 826, 827, 828, 829, 830, 881, 882, 917, 918, 919, 920, 990, 991, 1001, 1002, 1063, 1064, 1035, 1036, 1073, 1074]):
@@ -2987,199 +3023,216 @@ def main():
                         # Bonuses
                         elif selection == '2':
                             save = ''
+
+                            # Make a working copy of the description lines for live preview/editing
+                            # (assumes description_code and description_lines are already defined above)
+                            original_description = list(description_lines)
+                            working_description = list(description_lines)
+
                             while True:
                                 with open(MOD_STRINGS, 'r+', encoding='utf-8') as file:
-                                    # Read and separate the lines
-                                    lines = file.readlines()
-                                    line_index = selected_civ_index + len(DATA.civs) - 1
-                                    line = lines[line_index]
-                                    line_code = line[:6]
-                                    split_lines = line.split(r'\n')
-
-                                    # Show the bonuses menu
+                                    # Build the visible menu from the working copy (not from disk)
+                                    # working_description is already a list of lines like:
+                                    # [<civ name>, '', '• bonus 0', '• bonus 1', ..., '', 'Team Bonus', 'Team bonus text']
                                     print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Bonuses Menu{save} {title_emoji}'))
-                                    bonus_count = 0
+
+                                    # Render current bonuses from working_description
+                                    # Bonuses start at index 2 until we hit an empty line / "Unique" / "Team Bonus"
+                                    bonus_indices = []
                                     searching_for_dots = True
-                                    next_line = False
-                                    for line in split_lines:
+                                    next_line_is_team = False
+                                    for i, line in enumerate(working_description):
                                         if 'Unique' in line:
                                             searching_for_dots = False
-                                        elif '•' in line and searching_for_dots:
-                                            print(f"\033[33m{str(bonus_count)}: {line[2:]}\033[0m")
-                                            bonus_count += 1
+                                        elif line.startswith('•') and searching_for_dots:
+                                            print(f"\033[33m{len(bonus_indices)}: {line[2:]}\033[0m")
+                                            bonus_indices.append(i)
                                         elif 'Team Bonus' in line:
-                                            next_line = True
-                                        elif next_line:
-                                            print(f"\033[33mTeam Bonus: {line[:-2]}\033[0m")
+                                            next_line_is_team = True
+                                        elif next_line_is_team:
+                                            # Show current team bonus
+                                            print(f"\033[33mTeam Bonus: {line}\033[0m")
+                                            next_line_is_team = False
+
                                     bonus_selection = input("Bonus action: ")
 
-                                    # Show instructions
+                                    # Help
                                     if bonus_selection == '?':
                                         print('\n\x1b[35mEnter bonus description to add a new bonus.\x1b[0m')
                                         print('\x1b[35mEnter existing bonus index number to remove that bonus.\x1b[0m')
                                         print('\x1b[35mEnter existing bonus index, a colon (:), and then the bonus description to change an existing bonus.\x1b[0m')
-                                        print('\x1b[35mEnter "t:" followed by the bonus description to change the team bonus.\x1b[0m')
+                                        print('\x1b[35mEnter \"t:\" followed by the bonus description to change the team bonus.\x1b[0m')
                                         time.sleep(1)
                                         continue
-                                    
-                                    # Quit menu
+
+                                    # Quit — only persist if we have pending changes
                                     if bonus_selection == '':
                                         if save == '*':
-                                            with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                            # Persist description text once, now
+                                            save_description(description_code, working_description)
+
+                                            # Persist .dat
+                                            with_real_progress(
+                                                lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'),
+                                                'Saving Mod',
+                                                total_steps=100
+                                            )
                                             print('Tech tree updated.')
                                             time.sleep(1)
+
+                                            # Update the in-memory baseline to match file
+                                            description_lines[:] = working_description
+                                        else:
+                                            # Revert in-memory description if user quits without saving
+                                            working_description = list(original_description)
                                         break
 
-                                    # Remove bonus
+                                    # Remove bonus by index
                                     elif bonus_selection.isdigit():
-                                        # Check to make sure
-                                        remove_check = input(f'\nAre you sure you want to remove bonus {int(bonus_selection)}: {description_lines[2 + int(bonus_selection)][2:]}? (y/n): ')
+                                        if len(bonus_indices) <= 1:
+                                            print(colour(Fore.RED, 'ERROR: Civilization must have at least 1 civilization bonus.'))
+                                            time.sleep(1)
+                                            continue
 
-                                        if remove_check.lower() == 'y' or remove_check.lower() == 'yes' or remove_check.lower() == 'ye':
-                                            # Get current bonuses
-                                            bonus_count = 0
-                                            searching_for_dots = True
-                                            options = []
-                                            for line in split_lines:
-                                                if 'Unique' in line:
-                                                    searching_for_dots = False
-                                                elif '•' in line and searching_for_dots:
-                                                    options.append(line[2:])
-                                                    bonus_count += 1
+                                        idx_num = int(bonus_selection)
+                                        if idx_num < 0 or idx_num >= len(bonus_indices):
+                                            print(colour(Fore.RED, 'ERROR: Invalid bonus index.'))
+                                            time.sleep(1)
+                                            continue
 
-                                            # Unpair the effect from the tech to disable it
-                                            remove_bonus_selection = int(bonus_selection)
-                                            if remove_bonus_selection != '':
-                                                for tech in DATA.techs:
-                                                    if tech.name.lower() == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}'.lower():
-                                                        tech.effect_id = -1
+                                        # Resolve the actual line index inside working_description
+                                        line_idx = bonus_indices[idx_num]
+                                        bonus_text = working_description[line_idx][2:]  # strip "• "
 
-                                                # Remove from the description
-                                                for line in description_lines:
-                                                    if options[int(remove_bonus_selection)] in line:
-                                                        description_lines.remove(line)
-                                                        save_description(description_code, description_lines)
+                                        remove_check = input(f'\nAre you sure you want to remove bonus {idx_num}: {bonus_text}? (y/n): ')
+                                        if remove_check.lower() in ('y', 'yes', 'ye'):
+                                            # Unpair effect from tech
+                                            for tech in DATA.techs:
+                                                if tech.name.lower() == f'{selected_civ_name.upper()}: {bonus_text}'.lower():
+                                                    tech.effect_id = -1
 
-                                                # Save changes
-                                                print(f'Bonus removed for {selected_civ_name}: {options[int(remove_bonus_selection)]}')
-                                                save = '*'
-                                                time.sleep(1)
+                                            # Remove from working description (visual preview)
+                                            working_description.pop(line_idx)
 
-                                    # Team bonus
-                                    elif bonus_selection.lower().startswith('team bonus:') or bonus_selection.lower().startswith('t:') or bonus_selection.lower().startswith('team:'):
-                                        # Get user prompt
-                                        bonus_to_add_ORIGINAL = bonus_selection.split(':')[1].strip().capitalize()
-                                        bonus_to_add = bonus_to_add_ORIGINAL.lower()
+                                            print(f'Bonus removed for {selected_civ_name}: {bonus_text}')
+                                            save = '*'
+                                            time.sleep(1)
 
-                                        # Generate the bonus
-                                        bonus_tech, bonus_effect = create_bonus(bonus_to_add, selected_civ_index)
+                                    # Team bonus: t:<desc> / team bonus:<desc> / team:<desc>
+                                    elif bonus_selection.lower().startswith(('team bonus:', 't:', 'team:')):
+                                        team_text_original = bonus_selection.split(':', 1)[1].strip().capitalize()
+                                        team_text = team_text_original.lower()
 
-                                        # Exit if nothing was found
-                                        if bonus_effect[0].effect_commands == []:
+                                        # Generate team bonus effect
+                                        bonus_tech, bonus_effect = create_bonus(team_text, selected_civ_index)
+
+                                        if bonus_effect and bonus_effect[0].effect_commands == []:
                                             break
-                                        elif ' age' in bonus_to_add_ORIGINAL.lower():
+                                        if ' age' in team_text_original.lower():
                                             print(colour(Fore.RED, 'ERROR: Team Bonus cannot contain Age parameters.'))
                                             break
 
-                                        # Find the previous team effect
+                                        # Find the existing team effect
                                         team_bonus_effect = None
-                                        for i, effect in enumerate(DATA.effects):
+                                        for effect in DATA.effects:
                                             if effect.name == f'{selected_civ_name.title()} Team Bonus':
                                                 team_bonus_effect = effect
+                                                break
 
-                                        # Update the team bonus
-                                        team_bonus_effect.effect_commands = bonus_effect[0].effect_commands
+                                        # Update effect in memory
+                                        if team_bonus_effect:
+                                            team_bonus_effect.effect_commands = bonus_effect[0].effect_commands
 
-                                        # Change team bonus in description
-                                        bonus_found = False
-                                        description_lines[-1] = bonus_to_add_ORIGINAL
-#   
-                                        # Update the description
-                                        save_description(description_code, description_lines)
+                                        # Update team bonus text in working_description
+                                        team_label_idx = None
+                                        for i, line in enumerate(working_description):
+                                            if line.strip().lower() == 'team bonus':
+                                                team_label_idx = i
+                                                break
+                                        if team_label_idx is not None and team_label_idx + 1 < len(working_description):
+                                            working_description[team_label_idx + 1] = team_text_original
 
-                                        # Save changes
                                         print(f'Team bonus changed for {selected_civ_name}.')
                                         save = '*'
                                         time.sleep(1)
 
-                                    # Change bonus
-                                    elif bonus_selection[0].isdigit() and bonus_selection[1] == ':':
-                                        # Get starting variables
-                                        bonus_change_index = int(bonus_selection[0])
-                                        bonus_change_from = description_lines[2 + bonus_change_index][2:]
-                                        bonus_change_to = bonus_selection[2:].strip()
+                                    # Change existing bonus: "<index>:<new text>"
+                                    elif len(bonus_selection) > 2 and bonus_selection[0].isdigit() and bonus_selection[1] == ':':
+                                        idx_num = int(bonus_selection[0])
+                                        if idx_num < 0 or idx_num >= len(bonus_indices):
+                                            print(colour(Fore.RED, 'ERROR: Invalid bonus index.'))
+                                            time.sleep(1)
+                                            continue
+
+                                        new_text = bonus_selection[2:].strip()
+                                        line_idx = bonus_indices[idx_num]
+                                        old_text = working_description[line_idx][2:]  # strip "• "
 
                                         # Generate the new bonus
-                                        bonus_tech, bonus_effect = create_bonus(bonus_change_to, selected_civ_index)
-
-                                        # Exit if nothing was found
+                                        bonus_tech, bonus_effect = create_bonus(new_text.lower(), selected_civ_index)
                                         if bonus_effect == []:
                                             break
 
-                                        # Unpair the effect from the original tech to disable it
-                                        remove_bonus_selection = int(bonus_selection[0])
-                                        if remove_bonus_selection != '':
-                                            for tech in DATA.techs:
-                                                if tech.name == f'{selected_civ_name.upper()}: {options[int(remove_bonus_selection)]}':
-                                                    tech.effect_id = -1
+                                        # Disable old effect
+                                        for tech in DATA.techs:
+                                            if tech.name == f'{selected_civ_name.UPPER()}: {old_text}':
+                                                tech.effect_id = -1
 
-                                        # Find the existing bonus effect and give it the new bonus effect commands
+                                        # Replace effect
+                                        effect_index = None
                                         for i, effect in enumerate(DATA.effects):
-                                            if selected_civ_name.lower() in effect.name.lower() and bonus_change_from in effect.name:
-                                                DATA.effects[i] = bonus_effect
-                                                DATA.effects[i].name = f'{selected_civ_name.upper()}: {bonus_change_to}'
+                                            if selected_civ_name.lower() in effect.name.lower() and old_text in effect.name:
+                                                effect_index = i
                                                 break
+                                        if effect_index is not None:
+                                            DATA.effects[effect_index] = bonus_effect
+                                            DATA.effects[effect_index].name = f'{selected_civ_name.upper()}: {new_text}'
 
-                                        # Find the existing bonus tech
+                                        # Replace tech
                                         for j, tech in enumerate(DATA.techs):
-                                            if tech.civ == selected_civ_index + 1 and bonus_change_from in tech.name:
+                                            if tech.civ == selected_civ_index + 1 and old_text in tech.name:
                                                 DATA.techs[j] = bonus_tech[0]
-                                                DATA.techs[j].name = f'{selected_civ_name.upper()}: {bonus_change_to}'
-                                                DATA.techs[j].effect_id = i
+                                                DATA.techs[j].name = f'{selected_civ_name.upper()}: {new_text}'
+                                                if effect_index is not None:
+                                                    DATA.techs[j].effect_id = effect_index
                                                 break
 
-                                        # Update the description
-                                        description_lines[2 + bonus_change_index] = f'• {bonus_change_to}'
-                                        save_description(description_code, description_lines)
+                                        # Update preview text
+                                        working_description[line_idx] = f'• {new_text}'
 
-                                        # Save changes
-                                        print(f'Bonus {bonus_change_index} changed for {selected_civ_name}.')
+                                        print(f'Bonus {idx_num} changed for {selected_civ_name}.')
                                         save = '*'
                                         time.sleep(1)
 
-                                    # Add bonus
+                                    # Add new bonus (free text)
                                     else:
-                                        # Get user prompt
-                                        bonus_to_add_ORIGINAL = bonus_selection
-                                        bonus_to_add = bonus_to_add_ORIGINAL.lower()
+                                        bonus_text_original = bonus_selection
+                                        bonus_text = bonus_text_original.lower()
 
-                                        # Generate the bonus
-                                        bonus_techs, bonus_effects = create_bonus(bonus_to_add, selected_civ_index)
+                                        # Generate bonus
+                                        bonus_techs, bonus_effects = create_bonus(bonus_text, selected_civ_index)
 
-                                        # Add the techs and effects to the .dat
+                                        # Add tech/effects in memory
                                         for effect in bonus_effects:
                                             DATA.effects.append(effect)
                                         for tech in bonus_techs:
-                                            #tech.effect_id = len(DATA.effects) - 1
                                             DATA.techs.append(tech)
 
-                                        # Append bonus to description
-                                        bonus_found = False
-                                        for i, line in enumerate(description_lines):
-                                            # Add new bonus to the end of the bonuses list
-                                            if bonus_to_add_ORIGINAL.lower() in description_lines[i].lower():
+                                        # Insert new bullet line into bonuses block in preview
+                                        inserted = False
+                                        seen_bullets = False
+                                        for i, line in enumerate(working_description):
+                                            if line.startswith('•'):
+                                                seen_bullets = True
+                                            elif line == '' and seen_bullets:
+                                                working_description.insert(i, f'• {bonus_text_original}')
+                                                inserted = True
                                                 break
-                                            if '•' in description_lines[i]:
-                                                bonus_found = True
-                                            elif description_lines[i] == '' and bonus_found:
-                                                description_lines.insert(i, f'• {bonus_to_add_ORIGINAL}')
-                                                break
-#      
-                                        # Update the description
-                                        save_description(description_code, description_lines)
+                                        if not inserted:
+                                            # Fallback: append near top if structure is unexpected
+                                            working_description.insert(2, f'• {bonus_text_original}')
 
-                                        # Save changes
-                                        print(f'Bonus added.')
+                                        print('Bonus added.')
                                         save = '*'
                                         time.sleep(1)
 
