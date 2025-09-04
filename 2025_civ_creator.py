@@ -338,6 +338,12 @@ def update_tech_tree_graphic(current_civ_name):
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'w', encoding="utf-8") as file:
         json.dump(json_tree, file, ensure_ascii=False, indent=2)
         print('Tech tree graphic updated with full bank contents')
+
+def get_effect_id(name):
+    for i, effect in enumerate(DATA.effects):
+        if effect.name.lower() == name.lower():
+            return i
+    return -1
         
 def get_tech_id(name):
     # Search with external name
@@ -2673,6 +2679,29 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                     # General units: apply to all except special units
                     DATA.civs[civ_id].units[unit_id] = DATA.civs[presets[key]].units[unit_id]
 
+    # Edit tech trees for rebalancing/realism
+    def edit_tech_tree(tech_tree_id, effect_ids):
+        if tech_tree_id == -1:
+            print('No tech tree found')
+            return
+        
+        for effect_id in effect_ids:
+            if effect_id < 0 and genieutils.effect.EffectCommand(102, -1, -1, -1, abs(effect_id)) not in DATA.effects[tech_tree_id].effect_commands:
+                # Disable unit
+                DATA.effects[tech_tree_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, abs(effect_id)))
+            else:
+                # Enable unit
+                for y, ec in enumerate(DATA.effects[tech_tree_id].effect_commands):
+                    if ec.type == 102 and ec.d == effect_id:
+                        DATA.effects[tech_tree_id].effect_commands.pop(y)
+    
+    # Make specific edits to the tech tree
+    edit_tech_tree(get_effect_id('Malay Tech Tree'), [-192, -218, 480, 481, -162, -96, -255, 837, 838])
+    edit_tech_tree(get_effect_id('Burmese Tech Tree'), [-192, -218, 480, 481, -162, -96, -255, 837, -838])
+    edit_tech_tree(get_effect_id('Khmer Tech Tree'), [-192, -218, 480, 481, -162, -96, -255, 837, -838])
+    edit_tech_tree(get_effect_id('Vietnamese Tech Tree'), [-162, -96, -255, 837, 838])
+    edit_tech_tree(get_effect_id('Persians Tech Tree'), [630, 631])
+
     # Reorder tech trees
     for civ in DATA.civs:
         civ_tech_tree_index = -1
@@ -3650,804 +3679,441 @@ def main():
                         elif selection == '7':
                             # Import the tech tree
                             save = ''
-                            while True:
 
-                                # Get current values
+                            def clear_console():
+                                # ANSI clear + home. Works on most terminals.
+                                print('\033[2J\033[H', end='')
+
+                            def current_scout_name():
                                 scout_bank = {'Scout Cavalry': 448, 'Eagle Scout': 751, 'Camel Scout': 1755}
-                                current_scout = ''
-                                for key, value in scout_bank.items():
-                                    if value == DATA.civs[selected_civ_index + 1].resources[263]:
-                                        current_scout = key
-                                        break
-                                
-                                # Prompt user for tech tree selection
-                                print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Tech Tree Menu{save} {title_emoji}'))
-                                print(colour(Fore.WHITE, "0️⃣  Edit Tree"))
-                                print(colour(Fore.WHITE, f"1️⃣  Set Scout") + f" -- {colour(Fore.BLUE, current_scout)}")
-                                tech_tree_selection = input(colour(Fore.BLUE, "Selection: "))
+                                cur_val = DATA.civs[selected_civ_index + 1].resources[263]
+                                for k, v in scout_bank.items():
+                                    if v == cur_val:
+                                        return k
+                                return 'Unknown'
 
-                                if tech_tree_selection == '':
+                            def render_tree():
+                                """Rebuild and print the tree view and header."""
+                                # Get current disabled list
+                                tech_tree_effect_id = -1
+                                for i, effect in enumerate(DATA.effects):
+                                    if effect.name.lower() == f'{selected_civ_name.lower()} tech tree':
+                                        tech_tree_effect_id = i
+                                        break
+
+                                if tech_tree_effect_id == -1:
+                                    clear_console()
+                                    print(colour(Fore.RED, f'ERROR: Cannot find tech tree effect for {selected_civ_name}'))
+                                    return None, None
+
+                                disabled_ids = [ec.d for ec in DATA.effects[tech_tree_effect_id].effect_commands]
+
+                                # === Build text (copied from your logic; unchanged) ===
+                                branch_text = ''
+
+                                branches = {
+                                    'ARCHERY RANGE': [-1],
+                                    'Archer/Crossbowman/Arbalester': [151, 100, 237],
+                                    'Skirmisher/Elite Skirmisher/Imperial Skirmisher': [99, 98, 655],
+                                    'Slinger*0': [528],
+                                    'Hand Cannoneer*0': [85],
+                                    'Xianbei Raider*1': [1037],
+                                    'Elephant Archer*1/Elite Elephant Archer*1': [480, 481],
+                                    'Cavalry Archer*1/Heavy Cavalry Archer*1': [192, 218],
+                                    'Grenadier': [992],
+                                    'Genitour/Elite Genitour': [598, 599],
+                                    'Parthian Tactics': [436],
+                                    'Thumb Ring': [437],
+
+                                    'BARRACKS': [-1],
+                                    'Militia/Man-at-Arms/Long Swordsman/Two-Handed Swordsman*1/Champion*1': [-1, 222, 207, 217, 264],
+                                    'Militia/Man-at-Arms/Long Swordsman/Legionary*1': [-1, 222, 207, 885],
+                                    'Spearman/Pikeman/Halberdier': [87, 197, 429],
+                                    'Eagle Scout/Eagle Warrior/Elite Eagle Warrior': [433, 384, 434],
+                                    'Fire Lancer*2/Elite Fire Lancer*2': [981, 982],
+                                    'Jian Swordsman*2': [1075],
+                                    'Condottiero*2': [522],
+                                    'Arson': [602],
+                                    'Gambesons': [875],
+                                    'Squires': [215],
+
+                                    'STABLE': [25],
+                                    'Scout Cavalry/Light Cavalry/Hussar*3': [204, 254, 428],
+                                    'Scout Cavalry/Light Cavalry/Winged Hussar*3': [204, 254, 786],
+                                    'Xolotl Warrior*3': [318],
+                                    'Hei Guang Cavalry*4/Heavy Hei Guang Cavalry*4': [1032, 1033],
+                                    'Knight*4/Cavalier*4/Savar*4': [166, 209, 526],
+                                    'Knight*4/Cavalier*4/Paladin*4': [166, 209, 265],
+                                    'Camel Rider/Heavy Camel Rider/Imperial Camel Rider': [235, 236, 521],
+                                    'Steppe Lancer*5/Elite Steppe Lancer*5': [714, 715],
+                                    'Battle Elephant*5/Elite Battle Elephant*5': [630, 631],
+                                    'Bloodlines': [435],
+                                    'Husbandry': [39],
+
+                                    'SIEGE WORKSHOP': [-1],
+                                    'Battering Ram*6/Capped Ram*6/Siege Ram*6': [162, 96, 255],
+                                    'Armored Elephant*6/Siege Elephant*6': [837, 838],
+                                    'Mangonel*7/Onager*7/Siege Onager*7': [358, 257, 320],
+                                    'Rocket Cart*7/Heavy Rocket Cart*7': [979, 980],
+                                    'Scorpion*8/Heavy Scorpion*8': [94, 239],
+                                    'War Chariot*8/Elite War Charior*8': [1065, 1171],
+                                    'Siege Tower': [603],
+                                    'Flaming Camel*9': [703],
+                                    'Traction Trebuchet*9': [1025],
+                                    'Mounted Trebuchet*9': [1005],
+                                    'Bombard Cannon*9/Houfnice*9': [188, 787],
+
+                                    'BLACKSMITH': [281],
+                                    'Padded Archer Armor/Leather Archer Armor/Ring Archer Armor': [211, 212, 219],
+                                    'Fletching/Bodkin Arrow/Bracer': [199, 200, 201],
+                                    'Forging/Iron Casting/Blast Furnace': [67, 68, 75],
+                                    'Scale Barding Armor/Chain Barding Armor/Plate Barding Armor': [81, 82, 80],
+                                    'Scale Mail Armor/Chain Mail Armor/Plate Mail Armor': [74, 76, 77],
+
+                                    'DOCK': [-1],
+                                    'Galley*10/War Galley*10/Galleon*10': [240, 34, 35],
+                                    'Canoe*10/War Canoe*10/Elite War Canoe*10': [],
+                                    'Fire Galley/Fire Ship/Fast Fire Ship': [604, 243, 246],
+                                    'Demolition Galley/Demolition Ship/Heavy Demolition Ship': [605, -1, 244],
+                                    'Cannon Galleon*11/Elite Cannon Galleon*11': [37, 376],
+                                    'Dromon*11': [886],
+                                    'Lou Chuan*11': [1034],
+                                    'Turtle Ship*12/Elite Turtle Ship*12': [447, 448],
+                                    'Thirisadai*12': [841],
+                                    'Longboat*12/Elite Longboat*12': [272, 372],
+                                    'Caravel*12/Elite Caravel*12': [596, 597],
+                                    'Gillnets': [65],
+                                    'Careening/Dry Dock': [374, 375],
+                                    'Shipwright': [373],
+
+                                    'UNIVERSITY': [-1],
+                                    'Masonry/Architecture': [50, 51],
+                                    'Palisade Wall/Stone Wall/Fortified Wall': [523, 189, 194],
+                                    'Ballistics': [93],
+                                    'Watch Tower/Guard Tower/Keep': [127, 140, 63],
+                                    'Heated Shot': [380],
+                                    'Murder Holes': [322],
+                                    'Treadmill Crane': [54],
+                                    'Chemistry/Bombard Tower': [47, 64],
+                                    'Siege Engineers': [377],
+                                    'Arrowslits': [608],
+                                    'Krepost*13': [695],
+                                    'Donjon*13': [775],
+
+                                    'CASTLE': [-1],
+                                    'Trebuchet': [256],
+                                    'Petard': [426],
+                                    'Hoardings': [379],
+                                    'Sappers': [321],
+                                    'Conscription': [315],
+
+                                    'FORTIFIED CHURCH*14': [930],
+                                    'MONASTERY*14': [-1],
+                                    'Monk': [157],
+                                    'Missionary*15': [84],
+                                    'Warrior Priest*15': [948],
+                                    'Devotion/Faith': [46, 45],
+                                    'Redemption': [316],
+                                    'Atonement': [319],
+                                    'Herbal Medicine': [441],
+                                    'Heresy': [439],
+                                    'Sanctity': [231],
+                                    'Fervor': [252],
+                                    'Illumination': [233],
+                                    'Block Printing': [230],
+                                    'Theocracy': [438],
+
+                                    'TOWN CENTER': [-1],
+                                    'Loom': [22],
+                                    'Town Watch/Town Patrol': [8, 280],
+                                    'Wheelbarrow/Hand Cart': [213, 249],
+
+                                    'House': [-1],
+                                    'Caravanserai*16': [518],
+                                    'Feitoria*16': [570],
+                                    'Mining Camp': [-1],
+                                    'Lumber Camp': [-1],
+                                    'Mule Cart': [932],
+                                    'Mill*18': [-1],
+                                    'Folwark*18': [793],
+                                    'Farm*19': [216],
+                                    'Pasture*19': [1008],
+                                    'Gold Mining/Gold Shaft Mining': [55, 182],
+                                    'Stone Mining/Stone Shaft Mining': [278, 279],
+                                    'Double-Bit Axe/Bow Saw/Two-Man Saw': [202, 203, 221],
+                                    'Horse Collar*20/Heavy Plow*20/Crop Rotation*20': [14, 13, 12],
+                                    'Domestication*20/Pastoralism*20/Transhumance*20': [1014, 1013, 1012],
+
+                                    'MARKET': [-1],
+                                    'Coinage/Banking': [23, 17],
+                                    'Caravan': [48],
+                                    'Guilds': [15]
+                                }
+
+                                keys = list(branches.keys())
+                                building_items = []
+
+                                def branch_progress(ids):
+                                    length = 0
+                                    for u in ids:
+                                        if u == -1:
+                                            length += 1
+                                            continue
+                                        if u in disabled_ids:
+                                            break
+                                        length += 1
+                                    return length, len(ids)
+
+                                def pretty_item(items, length, total):
+                                    if length == 0:
+                                        return colour(Fore.RED, items[length - 1]) + (f'[{length}/{total}]' if total > 1 else '')
+                                    return colour(Fore.GREEN, items[length - 1]) + (f'[{length}/{total}]' if total > 1 else '')
+
+                                def base_labels(branch_key):
+                                    items = branch_key.split('/')
+                                    if '*' in branch_key:
+                                        items = [it.split('*')[0] + '*' for it in items]
+                                    return items
+
+                                def star_index(branch_key):
+                                    if '*' not in branch_key:
+                                        return None
+                                    tail = branch_key.rsplit('*', 1)[-1]
+                                    return int(tail) if tail.isdigit() else None
+
+                                i = 0
+                                while i < len(keys):
+                                    name = keys[i]
+                                    ids = branches[name]
+
+                                    # Building header
+                                    if name.isupper():
+                                        if building_items:
+                                            branch_text += ', '.join(building_items)
+                                            building_items = []
+                                        if branch_text:
+                                            branch_text += '\n'
+
+                                        sidx = star_index(name)
+                                        if sidx is None:
+                                            hdr_disabled = any(u in disabled_ids for u in ids if u != -1)
+                                            hdr_color = Fore.RED if hdr_disabled else Fore.GREEN
+                                            branch_text += (colour(hdr_color, name.split('*')[0]) + ': ')
+                                            i += 1
+                                            continue
+
+                                        group_keys = [name]
+                                        j = i + 1
+                                        while j < len(keys):
+                                            nxt = keys[j]
+                                            if not nxt.isupper():
+                                                break
+                                            if star_index(nxt) != sidx:
+                                                break
+                                            group_keys.append(nxt)
+                                            j += 1
+
+                                        chosen_key = group_keys[-1]
+                                        for k in group_keys:
+                                            blen, _ = branch_progress(branches[k])
+                                            if blen > 0:
+                                                chosen_key = k
+                                                break
+
+                                        chosen_ids = branches[chosen_key]
+                                        hdr_disabled = any(u in disabled_ids for u in chosen_ids if u != -1)
+                                        hdr_color = Fore.RED if hdr_disabled else Fore.GREEN
+                                        branch_text += (colour(hdr_color, chosen_key.split('*')[0]) + ': ')
+                                        i = j
+                                        continue
+
+                                    sidx = star_index(name)
+                                    if sidx is None:
+                                        labels = base_labels(name)
+                                        length, total = branch_progress(ids)
+                                        building_items.append(pretty_item(labels, length, total))
+                                        i += 1
+                                        continue
+
+                                    group_keys = [name]
+                                    j = i + 1
+                                    while j < len(keys):
+                                        nxt = keys[j]
+                                        if nxt.isupper():
+                                            break
+                                        if star_index(nxt) != sidx:
+                                            break
+                                        group_keys.append(nxt)
+                                        j += 1
+
+                                    best_key = group_keys[0]
+                                    best_len, best_tot = branch_progress(branches[best_key])
+                                    for k in group_keys[1:]:
+                                        blen, btot = branch_progress(branches[k])
+                                        if blen > best_len or (blen == best_len and btot >= best_tot):
+                                            best_key, best_len, best_tot = k, blen, btot
+
+                                    labels = base_labels(best_key)
+                                    building_items.append(pretty_item(labels, best_len, best_tot))
+                                    i = j
+
+                                if building_items:
+                                    branch_text += ', '.join(building_items)
+
+                                clear_console()
+                                print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Tech Tree Menu{save} {title_emoji}'))
+                                print(colour(Fore.WHITE, f"Scout: {current_scout_name()}"))  # <-- requested white line
+                                print(branch_text)
+                                print(colour(Fore.MAGENTA,
+                                            "\nType a unit/tech name to toggle/progress that branch, "
+                                            "or 'scout: <name|id>' to change scout, 'default' to reset, "
+                                            "Enter to quit."))
+
+                                return branches, tech_tree_effect_id
+
+                            # === Main loop: print immediately, then accept actions ===
+                            while True:
+                                result = render_tree()
+                                if result is None:
+                                    time.sleep(1)
+                                    break
+                                branches, tech_tree_effect_id = result
+
+                                tech_tree_actions = input('Action: ')
+                                if tech_tree_actions == '':
                                     if save == '*':
-                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'),
+                                                        'Saving Mod', total_steps=100)
                                         update_tech_tree_graphic(selected_civ_name)
                                         print('Tech tree saved.')
                                         time.sleep(1)
                                     break
-                                elif tech_tree_selection == '0':
-                                    while True:
-                                        # Get the tech tree effect
-                                        tech_tree_effect_id = -1
-                                        for i, effect in enumerate(DATA.effects):
-                                            if effect.name.lower() == f'{selected_civ_name.lower()} tech tree':
-                                                tech_tree_effect_id = i
-                                                break
-                                        if tech_tree_effect_id == -1:
-                                            print(colour(Fore.RED, f'ERROR: Cannot find tech tree effect for {selected_civ_name}'))
-                                            break
 
-                                        # Collect disabled IDs
-                                        disabled_ids = [ec.d for ec in DATA.effects[tech_tree_effect_id].effect_commands]
-
-                                        # Build the display
-                                        branch_text = ''
-
-                                        branches = {
-                                            'ARCHERY RANGE': [-1],
-                                            'Archer/Crossbowman/Arbalester': [151, 100, 237],
-                                            'Skirmisher/Elite Skirmisher/Imperial Skirmisher': [99, 98, 655],
-                                            'Slinger*0': [528],
-                                            'Hand Cannoneer*0': [85],
-                                            'Xianbei Raider*1': [1037],
-                                            'Elephant Archer*1/Elite Elephant Archer*1': [480, 481],
-                                            'Cavalry Archer*1/Heavy Cavalry Archer*1': [192, 218],
-                                            'Grenadier': [992],
-                                            'Genitour/Elite Genitour': [598, 599],
-                                            'Parthian Tactics': [436],
-                                            'Thumb Ring': [437],
-
-                                            'BARRACKS': [-1],
-                                            'Militia/Man-at-Arms/Long Swordsman/Two-Handed Swordsman*1/Champion*1': [-1, 222, 207, 217, 264],
-                                            'Militia/Man-at-Arms/Long Swordsman/Legionary*1': [-1, 222, 207, 885],
-                                            'Spearman/Pikeman/Halberdier': [87, 197, 429],
-                                            'Eagle Scout/Eagle Warrior/Elite Eagle Warrior': [433, 384, 434],
-                                            'Fire Lancer*2/Elite Fire Lancer*2': [981, 982],
-                                            'Jian Swordsman*2': [1075],
-                                            'Condottiero*2': [522],
-                                            'Arson': [602],
-                                            'Gambesons': [875],
-                                            'Squires': [215],
-
-                                            'STABLE': [25],
-                                            'Scout Cavalry/Light Cavalry/Hussar*3': [204, 254, 428],
-                                            'Scout Cavalry/Light Cavalry/Winged Hussar*3': [204, 254, 786],
-                                            'Xolotl Warrior*3': [318],
-                                            'Hei Guang Cavalry*4/Heavy Hei Guang Cavalry*4': [1032, 1033],
-                                            'Knight*4/Cavalier*4/Savar*4': [166, 209, 526],
-                                            'Knight*4/Cavalier*4/Paladin*4': [166, 209, 265],
-                                            'Camel Rider/Heavy Camel Rider/Imperial Camel Rider': [235, 236, 521],
-                                            'Steppe Lancer*5/Elite Steppe Lancer*5': [714, 715],
-                                            'Battle Elephant*5/Elite Battle Elephant*5': [630, 631],
-                                            'Bloodlines': [435],
-                                            'Husbandry': [39],
-
-                                            'SIEGE WORKSHOP': [-1],
-                                            'Battering Ram*6/Capped Ram*6/Siege Ram*6': [162, 96, 255],
-                                            'Armored Elephant*6/Siege Elephant*6': [837, 838],
-                                            'Mangonel*7/Onager*7/Siege Onager*7': [358, 257, 320],
-                                            'Rocket Cart*7/Heavy Rocket Cart*7': [979, 980],
-                                            'Scorpion*8/Heavy Scorpion*8': [94, 239],
-                                            'War Chariot*8/Elite War Charior*8': [1065, 1171],
-                                            'Siege Tower': [603],
-                                            'Flaming Camel*9': [703],
-                                            'Traction Trebuchet*9': [1025],
-                                            'Mounted Trebuchet*9': [1005],
-                                            'Bombard Cannon*9/Houfnice*9': [188, 787],
-
-                                            'BLACKSMITH': [281],
-                                            'Padded Archer Armor/Leather Archer Armor/Ring Archer Armor': [211, 212, 219],
-                                            'Fletching/Bodkin Arrow/Bracer': [199, 200, 201],
-                                            'Forging/Iron Casting/Blast Furnace': [67, 68, 75],
-                                            'Scale Barding Armor/Chain Barding Armor/Plate Barding Armor': [81, 82, 80],
-                                            'Scale Mail Armor/Chain Mail Armor/Plate Mail Armor': [74, 76, 77],
-
-                                            'DOCK': [-1],
-                                            #'Fishing Ship': [112],
-                                            #'Transport Ship': [-1],
-                                            #'Trade Cog': [-1],
-                                            'Galley*10/War Galley*10/Galleon*10': [240, 34, 35],
-                                            'Canoe*10/War Canoe*10/Elite War Canoe*10': [],
-                                            'Fire Galley/Fire Ship/Fast Fire Ship': [604, 243, 246],
-                                            'Demolition Galley/Demolition Ship/Heavy Demolition Ship': [605, -1, 244],
-                                            'Cannon Galleon*11/Elite Cannon Galleon*11': [37, 376],
-                                            'Dromon*11': [886],
-                                            'Lou Chuan*11': [1034],
-                                            'Turtle Ship*12/Elite Turtle Ship*12': [447, 448],
-                                            'Thirisadai*12': [841],
-                                            'Longboat*12/Elite Longboat*12': [272, 372],
-                                            'Caravel*12/Elite Caravel*12': [596, 597],
-                                            'Gillnets': [65],
-                                            'Careening/Dry Dock': [374, 375],
-                                            'Shipwright': [373],
-
-                                            'UNIVERSITY': [-1],
-                                            'Masonry/Architecture': [50, 51],
-                                            'Palisade Wall/Stone Wall/Fortified Wall': [523, 189, 194],
-                                            'Ballistics': [93],
-                                            'Watch Tower/Guard Tower/Keep': [127, 140, 63],
-                                            'Heated Shot': [380],
-                                            'Murder Holes': [322],
-                                            'Treadmill Crane': [54],
-                                            'Chemistry/Bombard Tower': [47, 64],
-                                            'Siege Engineers': [377],
-                                            'Arrowslits': [608],
-                                            'Krepost*13': [695],
-                                            'Donjon*13': [775],
-
-                                            'CASTLE': [-1],
-                                            'Trebuchet': [256],
-                                            'Petard': [426],
-                                            'Hoardings': [379],
-                                            'Sappers': [321],
-                                            'Conscription': [315],
-
-                                            'FORTIFIED CHURCH*14': [930],
-                                            'MONASTERY*14': [-1],
-                                            'Monk': [157],
-                                            'Missionary*15': [84],
-                                            'Warrior Priest*15': [948],
-                                            'Devotion/Faith': [46, 45],
-                                            'Redemption': [316],
-                                            'Atonement': [319],
-                                            'Herbal Medicine': [441],
-                                            'Heresy': [439],
-                                            'Sanctity': [231],
-                                            'Fervor': [252],
-                                            'Illumination': [233],
-                                            'Block Printing': [230],
-                                            'Theocracy': [438],
-
-                                            'TOWN CENTER': [-1],
-                                            'Loom': [22],
-                                            'Town Watch/Town Patrol': [8, 280],
-                                            'Wheelbarrow/Hand Cart': [213, 249],
-
-                                            'House': [-1],
-                                            'Caravanserai*16': [518],
-                                            'Feitoria*16': [570],
-                                            'Mining Camp': [-1],
-                                            'Lumber Camp': [-1],
-                                            'Mule Cart': [932],
-                                            'Mill*18': [-1],
-                                            'Folwark*18': [793],
-                                            'Farm*19': [216],
-                                            'Pasture*19': [1008],
-                                            'Gold Mining/Gold Shaft Mining': [55, 182],
-                                            'Stone Mining/Stone Shaft Mining': [278, 279],
-                                            'Double-Bit Axe/Bow Saw/Two-Man Saw': [202, 203, 221],
-                                            'Horse Collar*20/Heavy Plow*20/Crop Rotation*20': [14, 13, 12],
-                                            'Domestication*20/Pastoralism*20/Transhumance*20': [1014, 1013, 1012],
-
-                                            'MARKET': [-1],
-                                            'Coinage/Banking': [23, 17],
-                                            'Caravan': [48],
-                                            'Guilds': [15]
-                                        }
-
-                                        keys = list(branches.keys())
-                                        building_items = []
-
-                                        def branch_progress(ids):
-                                            # Return (branch_length, total) based on disabled_ids.
-                                            length = 0
-                                            for u in ids:
-                                                if u == -1:
-                                                    length += 1
-                                                    continue
-                                                if u in disabled_ids:
-                                                    break
-                                                length += 1
-                                            return length, len(ids)
-
-                                        def pretty_item(items, length, total):
-                                            # Green last available, or red first with [0/total].
-                                            if length == 0:
-                                                return colour(Fore.RED, items[length - 1]) + f'[{length}/{total}]' if total > 1 else colour(Fore.RED, items[length - 1])
-                                            return colour(Fore.GREEN, items[length - 1]) + f'[{length}/{total}]' if total > 1 else colour(Fore.GREEN, items[length - 1])
-
-                                        def base_labels(branch_key):
-                                            # Split names and normalise star labels to keep a trailing * when present.
-                                            items = branch_key.split('/')
-                                            if '*' in branch_key:
-                                                items = [it.split('*')[0] + '*' for it in items]
-                                            return items
-
-                                        def star_index(branch_key):
-                                            # Return integer star index if present (e.g., '*0'), else None.
-                                            if '*' not in branch_key:
-                                                return None
-                                            tail = branch_key.rsplit('*', 1)[-1]
-                                            return int(tail) if tail.isdigit() else None
-
-                                        i = 0
-                                        while i < len(keys):
-                                            name = keys[i]
-                                            ids = branches[name]
-
-                                            # Building header
-                                            if name.isupper():
-                                                # flush previous building items (no trailing comma)
-                                                if building_items:
-                                                    branch_text += ', '.join(building_items)
-                                                    building_items = []
-                                                # new line if not the very first building printed
-                                                if branch_text:
-                                                    branch_text += '\n'
-
-                                                sidx = star_index(name)
-                                                if sidx is None:
-                                                    # simple (non-starred) header
-                                                    hdr_disabled = any(u in disabled_ids for u in ids if u != -1)
-                                                    hdr_color = Fore.RED if hdr_disabled else Fore.GREEN
-                                                    branch_text += (colour(hdr_color, name.split('*')[0]) + ': ')
-                                                    i += 1
-                                                    continue
-
-                                                # starred headers group: gather consecutive UPPERCASE entries with same star index
-                                                group_keys = [name]
-                                                j = i + 1
-                                                while j < len(keys):
-                                                    nxt = keys[j]
-                                                    if not nxt.isupper():
-                                                        break
-                                                    if star_index(nxt) != sidx:
-                                                        break
-                                                    group_keys.append(nxt)
-                                                    j += 1
-
-                                                # choose first with progress (>0), else fallback to last
-                                                chosen_key = group_keys[-1]
-                                                for k in group_keys:
-                                                    blen, _ = branch_progress(branches[k])
-                                                    if blen > 0:
-                                                        chosen_key = k
-                                                        break
-
-                                                chosen_ids = branches[chosen_key]
-                                                hdr_disabled = any(u in disabled_ids for u in chosen_ids if u != -1)
-                                                hdr_color = Fore.RED if hdr_disabled else Fore.GREEN
-                                                branch_text += (colour(hdr_color, chosen_key.split('*')[0]) + ': ')
-
-                                                # advance past the whole starred header group
-                                                i = j
-                                                continue
-
-                                            # Non-star branch group (single)
-                                            sidx = star_index(name)
-                                            if sidx is None:
-                                                labels = base_labels(name)
-                                                length, total = branch_progress(ids)
-                                                building_items.append(pretty_item(labels, length, total))
-                                                i += 1
-                                                continue
-
-                                            # Starred group: gather consecutive entries sharing the same star index
-                                            group_keys = [name]
-                                            j = i + 1
-                                            while j < len(keys):
-                                                nxt = keys[j]
-                                                if nxt.isupper():
-                                                    break
-                                                if star_index(nxt) != sidx:
-                                                    break
-                                                group_keys.append(nxt)
-                                                j += 1
-
-                                            # Choose the sub-branch with the greatest progress length
-                                            best_key = group_keys[0]
-                                            best_len, best_tot = branch_progress(branches[best_key])
-                                            for k in group_keys[1:]:
-                                                blen, btot = branch_progress(branches[k])
-                                                if blen > best_len or (blen == best_len and btot >= best_tot):
-                                                    best_key, best_len, best_tot = k, blen, btot
-
-                                            labels = base_labels(best_key)
-                                            building_items.append(pretty_item(labels, best_len, best_tot))
-
-                                            # advance past the whole group
-                                            i = j
-
-                                        # flush the final building's items
-                                        if building_items:
-                                            branch_text += ', '.join(building_items)
-
-                                        # Print the whole tech tree
-                                        print(branch_text)
-
-                                        # Get the user prompt
-                                        tech_tree_actions = input('Tech tree action: ')
-
-                                        if tech_tree_actions == '':
-                                            # Exit
-                                            break
-
-                                        # Separate the actions into a list
-                                        for action in tech_tree_actions.split(','):
-                                            if action.lower() == 'default':
-                                                # Set tech tree to default
-                                                DATA.effects[tech_tree_effect_id].effect_commands.clear()
-                                                for tech_id in [84, 272, 447, 448, 521, 522, 526, 528, 570, 598, 599, 655, 695, 703, 773, 775, 787, 790, 793, 842, 843, 885, 930, 932, 940, 941, 948, 992, 1005, 1037, 1065, 1075, 1136, 1142, 1065, 1167, 1168, 1169]:
-                                                    DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
-                                                print('Tech tree set to default.')
-                                                time.sleep(1)
-                                            else:
-                                                # Check to see if there's a tech mentioned
-                                                for branch_key, ids in branches.items():
-                                                    target = action.strip().lower().replace('*', '')
-                                                    labels = [t.split('*')[0].strip().lower() for t in branch_key.split('/')]
-                                                    if target not in labels:
-                                                        continue
-
-                                                    golden_index = labels.index(target)
-
-                                                    ec_list = DATA.effects[tech_tree_effect_id].effect_commands
-                                                    disabled_set = {ec.d for ec in ec_list if getattr(ec, "type", None) == 102}
-
-                                                    # Compute current progress on this line
-                                                    length = 0
-                                                    for u in ids:
-                                                        if u == -1:
-                                                            length += 1
-                                                            continue
-                                                        if u in disabled_set:
-                                                            break
-                                                        length += 1
-                                                    fully_disabled = (length == 0)
-                                                    current_enabled_index = (length - 1) if length > 0 else None
-
-                                                    if (not fully_disabled) and (current_enabled_index == golden_index):
-                                                        # Chosen unit is already the green one -> disable the whole line
-                                                        for tid in ids:
-                                                            if tid == -1:
-                                                                continue
-                                                            if tid not in disabled_set:
-                                                                ec_list.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tid))
-                                                        save = '*'
-                                                    else:
-                                                        # Make the chosen unit (and all predecessors) enabled; disable everything after
-                                                        # 1) Enable <= golden: remove existing disables for those ids
-                                                        to_enable = {tid for idx, tid in enumerate(ids) if tid != -1 and idx <= golden_index}
-                                                        if to_enable:
-                                                            for ec in ec_list[::-1]:
-                                                                if getattr(ec, "type", None) == 102 and ec.d in to_enable:
-                                                                    ec_list.remove(ec)
-
-                                                        # 2) Disable > golden: ensure disables exist
-                                                        disabled_set = {ec.d for ec in ec_list if getattr(ec, "type", None) == 102}  # refresh
-                                                        for idx, tid in enumerate(ids):
-                                                            if tid == -1 or idx <= golden_index:
-                                                                continue
-                                                            if tid not in disabled_set:
-                                                                ec_list.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tid))
-                                                        save = '*'
-
-                                                        # 3) If this branch is part of a starred group, disable conflicting units in sibling branches
-                                                        sidx = star_index(branch_key)
-                                                        if sidx is not None:
-                                                            # Gather sibling keys in the same starred group (non-headers)
-                                                            group_keys = []
-                                                            # We need the ordered key list 'keys' already built earlier
-                                                            # Find the span containing this group's entries
-                                                            # (Re-scan locally: cheap and robust)
-                                                            started = False
-                                                            for kname in keys:
-                                                                if kname.isupper():
-                                                                    started = False
-                                                                if star_index(kname) == sidx and not kname.isupper():
-                                                                    if not started:
-                                                                        started = True
-                                                                    group_keys.append(kname)
-                                                                elif started:
-                                                                    # we passed the block for this star group
-                                                                    break
-
-                                                            # Disable all units from sibling branches that aren't part of our enabled set
-                                                            to_enable = {tid for idx, tid in enumerate(ids) if tid != -1 and idx <= golden_index}
-                                                            ec_list = DATA.effects[tech_tree_effect_id].effect_commands
-                                                            disabled_set = {ec.d for ec in ec_list if getattr(ec, "type", None) == 102}
-
-                                                            for sib in group_keys:
-                                                                if sib == branch_key:
-                                                                    continue
-                                                                for tid in branches[sib]:
-                                                                    if tid == -1 or tid in to_enable:
-                                                                        continue
-                                                                    if tid not in disabled_set:
-                                                                        ec_list.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tid))
-                                                                        disabled_set.add(tid)
-                                                    break  # handled this action once; move to next action
-
-                                elif tech_tree_selection == '1':
-                                    while True:
-                                        # Set the scout unit
-                                        scout_input = input(f"\nEnter scout unit for {selected_civ_name}: ")
-
-                                        if scout_input == '':
-                                            print(f"Scout unit for {selected_civ_name} not changed.")
-                                            time.sleep(1)
-                                            break
-                                        elif scout_input == '?':
-                                            for i, key in enumerate(scout_bank):
-                                                print(f"{i}: {key}")
-                                        else:
-                                            # Normalize input
-                                            scout_input = scout_input.lower().strip()
-                                            # Check if input is a number
-                                            try:
-                                                scout_id = int(scout_input)
-                                                if scout_id < 0 or scout_id >= len(scout_bank):
-                                                    print(f'\033[31mERROR: Invalid scout selection.\n\033[0m')
-                                                    continue
-                                                else:
-                                                    # Set the scout name
-                                                    scout_name = list(scout_bank.keys())[scout_input]
-                                            except ValueError:
-                                                # Normalize dictionary for case-insensitive key lookup
-                                                normalized_dict = {k.lower(): v for k, v in scout_bank.items()}
-                                                if scout_input in normalized_dict:
-                                                    scout_id = normalized_dict[scout_input]
-
-                                                    # Set the scout name
-                                                    scout_name = list(scout_bank.keys())[list(scout_bank.values()).index(scout_id)]
-                                                else:
-                                                    print(f'\033[31mERROR: Invalid scout selection.\n\033[0m')
-                                                    continue
-                                                
-                                            # Set the scout
-                                            DATA.civs[selected_civ_index + 1].resources[263] = scout_id
-                                            print(f"Scout unit for {selected_civ_name} set to {scout_name}.")
-                                            save = '*'
-                                            time.sleep(1)
-                                            break
-
-                                '''try:
-                                    # Prompt user for action
-                                    tech_tree_action = input('\nSpecify units (start line with * to enable units): ').lower()
-
-                                    # Get tech tree effect ID
-                                    tech_tree_indexes = [254, 258, 259, 262, 255, 257, 256, 260, 261, 263, 275, 277, 276, 446, 447, 449, 448, 504, 20, 1, 3, 5, 7, 31, 28, 42, 27, 646, 648, 650, 652, 706, 708, 710, 712, 782, 784, 801, 803, 808, 840, 842, 890, 923, 927, 1101, 1107, 1129, 1030, 1031, 1028, 986, 988]
-
-                                    # React to responses
-                                    if tech_tree_action == '':
-                                        # Upgrade the tech tree JSON file
-                                        #update_tech_tree_graphic(selected_civ_name)
-
-                                        # Save data
-                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
-                                        print('Tech tree saved.')
-                                        time.sleep(1)
-                                        break
-                                    elif tech_tree_action in ['all', 'clear']:
-                                        # Clear the tech tree
-                                        DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.clear()
-
-                                        # Disable Chronicles units
-                                        for tech_id in [1136, 1142]:
-                                            DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
-                                        print('Tech tree completely cleared.')
-                                        time.sleep(1)
-                                    elif tech_tree_action in ['reset', 'default']:
-                                        # Clear the tech tree
-                                        DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.clear()
-                                        
-                                        # Disable all unique units
-                                        for tech_id in [84, 272, 447, 448, 518, 521, 522, 528, 574, 598, 599, 655, 703, 773, 786, 787, 790, 842, 843, 858, 885, 948, 992, 1005, 1008, 1012, 1013, 1014, 1037, 1065, 1075, 1136, 1142, 1065, 1167, 1168, 1169]:
-                                            DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
-                                        print('Tech tree set to default.')
-                                        time.sleep(1)
-                                    else:
-                                        # Check if enable or disable
-                                        enable = '*' in tech_tree_action
-                                        tech_tree_action = tech_tree_action.replace('*', '').strip()
-
-                                        # Separate items into a list
-                                        items_to_disable = tech_tree_action.replace(', ', ',').split(',')
-
-                                        # Disable tech tree items
-                                        for item in items_to_disable:
-                                            # Disable tech
-                                            if item == 'stable':
-                                                # Disable stable units
-                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 25))
-                                                for tech_id in [204, 254, 428, 521, 858, 1065, 790, 842, 843, 166, 209, 265, 526, 236, 235, 435, 714, 715, 630, 631, 1033, 1032, 39]:
-                                                    DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
-                                                continue
-                                            elif item == 'ship dock':
-                                                # Disable all ships and enable canoes
-                                                for tech_id in [604, 243, 246, 605, 244, 37, 376, 886, 1034]:
-                                                    DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
-                                                
-                                                # Enable canoe-line
-                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 539, get_unit_id('canoe', False), -1, -1))
-                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 21, get_unit_id('canoe', False)+1, -1, -1))
-                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(3, 442, get_unit_id('canoe', False)+2, -1, -1))
-                                                continue
-
-                                            # Correct mistakes
-                                            if item == 'trebuchet':
-                                                item = 'trebuchet (packed)'
-
-                                            #print('Trying for:', item)
-                                            # Determine the item ID
-                                            tech_id = -1
-                                            unit_id = get_unit_id(item, False)
-                                            if unit_id == -1 or unit_id == None:
-                                                tech_id = get_tech_id(item)
-                                                #print('technology id for', item, ':', tech_id)
-
-                                            if unit_id == -1 and tech_id == -1:
-                                                print(colour(Fore.RED, f'ERROR: Cannot find item: {item}'))
-                                                continue
-                                            elif not enable:
-                                                for i, tech in enumerate(DATA.techs):
-                                                    if tech_id != -1 and tech.name.lower() == item.lower():
-                                                        DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id))
-                                                        #print(f'Tech for technology ({item}):', i)
-                                                        continue
-
-                                                    # Disable unit
-                                                    elif unit_id != -1:
-                                                        try:
-                                                            if (DATA.effects[tech.effect_id].effect_commands[0].a == unit_id and DATA.effects[tech.effect_id].effect_commands[0].type == 2) or (DATA.effects[tech.effect_id].effect_commands[0].b == unit_id and DATA.effects[tech.effect_id].effect_commands[0].type == 3):
-                                                                # Add the effect command to the tech tree effect
-                                                                DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, i))
-                                                                #print(f'Tech for unit ({item}):', i)
-                                                                continue
-                                                        except:
-                                                            pass
-                                            elif enable:
-                                                # Gather all techs to enable
-                                                items_to_enable = []
-                                                for item in items_to_disable:
-                                                    if item == 'trebuchet':
-                                                        item = 'trebuchet (packed)'
-                                                    
-                                                    if get_tech_id(item) != -1:
-                                                        items_to_enable.append(get_tech_id(item))
-                                                    elif get_unit_id(item, False) != -1:
-                                                        items_to_enable.append(get_unit_id(item, False))
-
-                                                # Enable unit or tech
-                                                for ec in DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands[::-1]:
-                                                    if ec.type == 102 and ec.d in items_to_enable:
-                                                        # Remove the effect command from the tech tree
-                                                        DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.remove(ec)
-                                                        #print(f'Removed effect command for {ec.d}.')
-                                        
-                                        # Change scout unit
-                                        if genieutils.effect.EffectCommand(102, -1, -1, -1, 858.0) not in DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands:
-                                            scout_id = 1755
-                                            print('Scout set to Camel Scout')
-                                        elif genieutils.effect.EffectCommand(102, -1, -1, -1, 433.0) not in DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands:
-                                            scout_id = 751
-                                            print('Scout set to Eagle Scout')
-                                        else:
-                                            scout_id = 448
-                                            print('Scout set to Scout Cavalry')
-                                        DATA.civs[selected_civ_index + 1].resources[263] = scout_id
-
-                                        # Print results
-                                        print('Units enabled.' if enable else 'Units disabled.')
-                                except Exception as e:
-                                    print(str(e))'''
-
-                            '''while True:
-                                # Tech tree main menu
-                                print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Tech Tree Menu {title_emoji}'))
-                                print(colour(Fore.WHITE, "0️⃣  Barracks"))
-                                print(colour(Fore.WHITE, "1️⃣  Archery Range"))
-                                print(colour(Fore.WHITE, "2️⃣  Stable"))
-                                print(colour(Fore.WHITE, "3️⃣  Blacksmith"))
-                                print(colour(Fore.WHITE, "4️⃣  Market"))
-                                print(colour(Fore.WHITE, "5️⃣  Dock"))
-                                print(colour(Fore.WHITE, "6️⃣  Siege Workshop"))
-                                print(colour(Fore.WHITE, "7️⃣  University"))
-                                print(colour(Fore.WHITE, "8️⃣  Monastery"))
-                                print(colour(Fore.WHITE, "9️⃣  Castle and Defensive"))
-                                print(colour(Fore.WHITE, "🔟 Economic"))
-                                tech_tree_selection = input(colour(Fore.BLUE, "Selection: "))
-
-                                # Set the tree
-                                building_ids = [12, 87, 101, 103, 84, 45, 49, 209, [104, 1806], [72, 117, 82, 1251, 1665], [70, 109, 584, 562, 68, 1734, 1808, 1754, 1021]]
-                                try:
-                                    selected = building_ids[int(tech_tree_selection)]
-
-                                    if isinstance(selected, list):
-                                        tree = []
-                                        for sub_id in selected:
-                                            tree.extend([entry for entry in FOREST if entry.get("Building ID") == sub_id])
-                                    else:
-                                        tree = [entry for entry in FOREST if entry.get("Building ID") == selected]
-                                except:
-                                    continue
-
-                                while True:
-                                    # Tech tree unit bank
-                                    tech_tree_unit_bank = []
-
-                                    # Build mappings
-                                    link_map = {unit.get("Link ID"): unit for unit in tree if unit.get("Link ID") is not None}
-                                    node_map = {unit.get("Node ID"): unit for unit in tree if unit.get("Node ID") is not None}
-
-                                    # Identify all end-of-line units
-                                    end_units = [unit for unit in tree if unit.get("Link ID") == -1]
-
-                                    # Track printed lines to avoid duplicates
-                                    seen = set()
-                                    print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} Tech Tree Branch Menu {title_emoji}'))
-
-                                    # Add the host building
-                                    current_building_id = building_ids[int(tech_tree_selection)]
-
-                                    # Find the host building (first match with this Building ID and a Use Type of "Building" if needed)
-                                    host_building = next((entry for entry in FOREST if entry.get("Node ID") == current_building_id), None)
-                                    if host_building:
-                                        building_colour = Fore.GREEN if host_building.get("Node Status") == "ResearchedCompleted" or host_building.get('Node Status') == 'ResearchRequired' else Fore.RED
-                                        print(colour(building_colour, f"{host_building.get('Name')}"))
-
-                                    for end_unit in end_units:
-                                        line = [end_unit]
-                                        current = end_unit
-
-                                        # Walk backward in the upgrade chain
-                                        while True:
-                                            next_unit = next(
-                                                (unit for unit in tree if unit.get("Link ID") == current.get("Node ID")), None
+                                # Parse multi-actions separated by commas
+                                for action in tech_tree_actions.split(','):
+                                    act = action.strip()
+                                    if not act:
+                                        continue
+
+                                    # Reset to default
+                                    if act.lower() == 'default':
+                                        DATA.effects[tech_tree_effect_id].effect_commands.clear()
+                                        for tech_id in [84, 272, 447, 448, 521, 522, 526, 528, 570, 598, 599, 655, 695, 703, 773, 775, 787, 790, 793, 842, 843, 885, 930, 932, 940, 941, 948, 992, 1005, 1037, 1065, 1075, 1136, 1142, 1065, 1167, 1168, 1169]:
+                                            DATA.effects[tech_tree_indexes[selected_civ_index]].effect_commands.append(
+                                                genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id)
                                             )
-                                            if next_unit:
-                                                line.append(next_unit)
-                                                current = next_unit
+                                        save = '*'
+                                        continue
+
+                                    # Change Scout: "scout: Camel Scout" or "scout: 1"
+                                    if act.lower().startswith('scout:') or act.lower().startswith('s:'):
+                                        scout_bank = {'Scout Cavalry': 448, 'Eagle Scout': 751, 'Camel Scout': 1755}
+                                        choice = act.split(':', 1)[1].strip()
+                                        if choice.isdigit():
+                                            idx = int(choice)
+                                            keys = list(scout_bank.keys())
+                                            if 0 <= idx < len(keys):
+                                                name = keys[idx]
+                                                DATA.civs[selected_civ_index + 1].resources[263] = scout_bank[name]
+                                                save = '*'
                                             else:
-                                                break
-                                            
-                                        # Skip if already printed
-                                        if line[0].get("Node ID") in seen:
+                                                print(colour(Fore.RED, 'ERROR: Invalid scout index.'))
+                                                time.sleep(1)
+                                        else:
+                                            # name
+                                            low = {k.lower(): v for k, v in scout_bank.items()}
+                                            if choice.lower() in low:
+                                                DATA.civs[selected_civ_index + 1].resources[263] = low[choice.lower()]
+                                                save = '*'
+                                            else:
+                                                print(colour(Fore.RED, 'ERROR: Invalid scout name.'))
+                                                time.sleep(1)
+                                        continue
+
+                                    # Otherwise treat as unit/tech toggle on a branch
+                                    # (same logic you had previously)
+                                    for branch_key, ids in branches.items():
+                                        target = act.strip().lower().replace('*', '')
+                                        labels = [t.split('*')[0].strip().lower() for t in branch_key.split('/')]
+                                        if target not in labels:
                                             continue
-                                        
-                                        seen.update(unit.get("Node ID") for unit in line)
 
-                                        # Print it
-                                        CIV_OBJECTS
-                                        line_display = []
+                                        golden_index = labels.index(target)
 
-                                        for unit in line:
-                                            node_id = unit.get("Node ID")
+                                        ec_list = DATA.effects[tech_tree_effect_id].effect_commands
+                                        disabled_set = {ec.d for ec in ec_list if getattr(ec, "type", None) == 102}
 
-                                            # Find matching civ unit entry
-                                            civ_unit = next((u for u in CIV_OBJECTS[selected_civ_index].units if u.get("Node ID") == node_id), None)
-
-                                            # Set the colour for the item
-                                            unit_colour = Fore.BLACK
-                                            if civ_unit and civ_unit.get("Node Status") == "ResearchedCompleted" or civ_unit and civ_unit.get("Node Status") == "ResearchRequired":
-                                                unit_colour = Fore.GREEN
-                                            elif civ_unit and civ_unit.get("Node Status") == "NotAvailable":
-                                                unit_colour = Fore.RED
-
-                                            line_display.append(colour(unit_colour, unit.get("Name")))
-
-                                        print(" → ".join(line_display))
-
-                                    # Get user input
-                                    branch_action = input(colour(Fore.BLUE, 'Tech Tree Branch action: '))
-
-                                    # Exit
-                                    if branch_action == '':
-                                        break
-                                    else:
-                                        pass
-
-                                while True:
-                                    global TECH_TREE
-                                    TECH_TREE = {}
-                                    with open(f'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r') as file:
-                                        # Get the line of the selected civ
-                                        lines = file.readlines()
-                                        civ_id_line_indexes = [i for i, line in enumerate(lines) if '"civ_id":' in line]
-                                        index = civ_id_line_indexes[selected_civ_index] + 1
-
-                                        # Get the tech tree of the selected civ
-                                        for line in lines[index:]:
-                                            if '\"Name\":' in line:
-                                                selected_unit = line.split('\"Name\": "')[1].split('",')[0].lower()
-                                            elif '\"Node Status\":' in line:
-                                                selected_status = line.split('\"Node Status\": "')[1].split('",')[0]
-
-                                                # Convert status to integer
-                                                if selected_status == 'NotAvailable':
-                                                    selected_status = 0
-                                                elif selected_status == 'ResearchedCompleted':
-                                                    selected_status = 1
-                                                elif selected_status == 'ResearchRequired':
-                                                    selected_status = 2
-
-                                                # Add to tech tree
-                                                TECH_TREE[selected_unit] = selected_status
-
-                                            # Check for the end of the tech tree section
-                                            if 'civ_id' in line:
+                                        # compute current progress on this line
+                                        length = 0
+                                        for u in ids:
+                                            if u == -1:
+                                                length += 1
+                                                continue
+                                            if u in disabled_set:
                                                 break
+                                            length += 1
+                                        fully_disabled = (length == 0)
+                                        current_enabled_index = (length - 1) if length > 0 else None
 
-                                    # Print the respective branch of the tree
-                                    print(f"\033[32m\n--- {selected_civ_name} {branch_title} Branch Menu ---\033[0m")
-                                    tree_string = ''
-                                    for i, branch in enumerate(tree):
-                                        twig_string = ''
-                                        for letter, twig in zip(string.ascii_uppercase, branch):
-                                            try:
-                                                if (TECH_TREE[re.sub(r'\s*\([^)]*\)', '', twig).lower()] == 0):
-                                                    twig_string += f'[{i}{letter}] \033[31m{twig[:-4]}\033[0m --> '
-                                                else:
-                                                    twig_string += f'[{i}{letter}] \033[32m{twig[:-4]}\033[0m --> '
-                                            except:
-                                                pass
-                                        tree_string += twig_string
-                                        print(twig_string[:-4])
-                                    toggle_selection = input("Addresses: ")
+                                        if (not fully_disabled) and (current_enabled_index == golden_index):
+                                            # disable whole line
+                                            for tid in ids:
+                                                if tid == -1:
+                                                    continue
+                                                if tid not in disabled_set:
+                                                    ec_list.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tid))
+                                            save = '*'
+                                        else:
+                                            # enable <= golden, disable > golden
+                                            to_enable = {tid for idx, tid in enumerate(ids) if tid != -1 and idx <= golden_index}
+                                            if to_enable:
+                                                for ec in ec_list[::-1]:
+                                                    if getattr(ec, "type", None) == 102 and ec.d in to_enable:
+                                                        ec_list.remove(ec)
 
-                                    # Exit
-                                    if toggle_selection == '':
-                                        break
+                                            disabled_set = {ec.d for ec in ec_list if getattr(ec, "type", None) == 102}
+                                            for idx, tid in enumerate(ids):
+                                                if tid == -1 or idx <= golden_index:
+                                                    continue
+                                                if tid not in disabled_set:
+                                                    ec_list.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tid))
+                                            save = '*'
 
-                                    # Help
-                                    elif toggle_selection == '?':
-                                        print('\n\x1b[35mGreen items are enabled. Red items are disabled.\x1b[0m')
-                                        print('\x1b[35mType any address to toggle enable/disable the item.\x1b[0m')
-                                        print('\x1b[35mYou may stack several addresses in one line, separated by a space.\x1b[0m')
+                                            # If this branch is part of a starred group, disable conflicting siblings
+                                            def star_index_local(bk):
+                                                if '*' not in bk:
+                                                    return None
+                                                t = bk.rsplit('*', 1)[-1]
+                                                return int(t) if t.isdigit() else None
 
-                                    # Toggle units
-                                    else:
-                                        toggle_addresses = toggle_selection.split(' ')
-
-                                        # Toggle each unit
-                                        for address in toggle_addresses:
-                                            try:
-                                                # Convert the address into the unit's name
-                                                unit_to_toggle = tree[int(address[:-1])][ord(address[-1].upper()) - ord('A')][:-4]
-
-                                                # Toggle the unit's value in the tree between 0 and 1
-                                                TECH_TREE[unit_to_toggle.lower()] = abs(TECH_TREE[unit_to_toggle.lower()])
-
-                                                # Get the tech tree effect index
-                                                for i, effect in enumerate(DATA.effects):
-                                                    if 'tech tree' in effect.name.lower() and selected_civ_name.lower() in effect.name.lower():
-                                                        tech_tree_index = i
+                                            sidx = star_index_local(branch_key)
+                                            if sidx is not None:
+                                                # rebuild siblings in same starred group
+                                                group_keys = []
+                                                started = False
+                                                for kname in list(branches.keys()):
+                                                    if kname.isupper():
+                                                        started = False
+                                                    if star_index_local(kname) == sidx and not kname.isupper():
+                                                        if not started:
+                                                            started = True
+                                                        group_keys.append(kname)
+                                                    elif started:
                                                         break
 
-                                                # Determine whether it's a unit or a tech
-                                                if get_unit_id(unit_to_toggle) is None:
-                                                    item_index = f'_{get_tech_id(unit_to_toggle)}'
-                                                else:
-                                                    item_index = get_unit_id(unit_to_toggle)
+                                                ec_list = DATA.effects[tech_tree_effect_id].effect_commands
+                                                disabled_set = {ec.d for ec in ec_list if getattr(ec, "type", None) == 102}
 
-                                                # Toggle the unit
-                                                toggle_unit(item_index, 'toggle', tech_tree_index, selected_civ_name)
-
-                                                # Follow toggle rules
-                                                #for branch in tree:
-                                                    # If disabling, disable all non-X units that are higher
-
-
-                                                # If enabling, enable all non-X units that are lower
-                                                # If enabling an X unit, disable all non-X that are higher
-                                                # If enabling a tiered unit, disable all units in the same tier on the same branch
-
-                                            except Exception as e:
-                                                print(e)
-                                                #print(f'Invalid address: {address.upper()}')
-
-                                        # Save the .dat file and tell the user the update is complete
-                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
-                                        print(f'{selected_civ_name} Tech Tree updated.')
-                                        time.sleep(1)'''
+                                                for sib in group_keys:
+                                                    if sib == branch_key:
+                                                        continue
+                                                    for tid in branches[sib]:
+                                                        if tid == -1 or tid in to_enable:
+                                                            continue
+                                                        if tid not in disabled_set:
+                                                            ec_list.append(genieutils.effect.EffectCommand(102, -1, -1, -1, tid))
+                                                            disabled_set.add(tid)
+                                        break  # handled one action on a matching branch
                 else:
                     pass
             except Exception as e:

@@ -2,28 +2,118 @@ Xommon
 14. April 2025
 Talofa - Age of Empires II: Definitive Edition Civilisation Editor
 
-This program
+This program allows the user to change the Name, Title, Bonuses, Unique Unit, Unique Techs, Graphics, Language, and Tech Tree of every civilisation in Age of Empires II: Definitive Edition.
 
 CREATING A NEW MOD:
 To create a new mod, select the new mod selection on the main menu.
 
-===== CHANGES FOR BASEGAME =====
-## NEW UNITS ##
+===== BASEGAME NEW ADDITIONS =====
+Name                        Type             About
+--------------------------- ---------------- ---------------------------------------------------------------------------
+Canoe                       Warship          Ranged warship, replaces Galley. Lightweight and fast
+War Canoe                   Warship          Long ranged warship, replaces War Galley. Lightweight and fast
+Elite War Canoe             Warship          Long ranged warship, replaces Galleon. Lightweight and fast
+Naasiri                     Castle Unit      Camel unit that generates gold when it kills a military unit
+Elephant Gunner             Castle Unit      Elephant unit with a ranged, hand cannoneer attack
+Flamethrower                Castle Unit      Slow siege unit with a fire attack
+Weichafe                    Castle Unit      Bolas-throwing unit that slows down targets
+Crusader                    Castle Unit      Heavy cavalry that cannot be converted
+Tomahawk Warrior            Castle Unit      Light infantry with a bonus attack against cavalry
+Imperial Elephant Archer    Mounted Archer   Upgrade for Heavy Elephant Archer
+Lightning Warrior           Castle Unit      Very fast infantry with a super fast, weak melee attack
+Destroyer                   Castle Unit      Slow, heavy infantry with a bonus attack against buildings and siege
+Cossack                     Castle Unit      Medium cavalry with a charged attack
+Fire Tower                  Building         Tower that attacks with a ranged, fire attack
+Qizilbash Warrior           Castle Unit      Medium cavalry with an attack bonus against anti-cavalry units
+Yurt                        Building         House that supports 15 and can be packed to move and unpacked.
 
+Greek                       Language         Spoken in real life by Greeks and Byzantines.
 
-## COSMETIC ##
-- PAGANS: Vikings and Lithuanian Monastery/Monk replaced with the Pagan Shrine/Pagan Priest graphics.
-#- Southeastern European architecture set added and set for the Byzantines, Georgians, and Armenians.
-#- Chinese architecture set added and set for the Chinese, Vietnamese, Jurchens, Khitans, Shu, Wei, Wu, and Koreans. The Japanese and Mongols remain on the East Asian architecture set.
-- PERSIANS/HINDUSTANIS: Caravanserai bonus text removed for the Persians and Hindustanis descriptions. These two civilisations still get the Caravanserai, but now any other civilisation can have their tech tree edited to have the Caravansarai enabled.
-- SOUTHEAST ASIANS: Southeast Asian architecture split into two: Castle/Imperial graphics for the Khmer and Burmese (Southeast Asian), Feudal graphics for the Malay (Austronesian).
-- GOTHS: Goths units speak Gothic, instead of German
-- BYZANTINES: Byzantine units speak Greek, instead of Latin
-- WU: Wu units speak Cantonese, instead of Mandarin
+Southeast European          Architecture     Catbarf's Byzantine Buildings ported from AOE2HD by Age of Mods
+Southeast Asian             Architecture     The previous Feudal Age graphics have been replaced with the Castle Age graphics
+Austronesian                Architecture     The Feudal/Castle/Imperial graphics are the Feudal Age graphics from Southeast Asian
+
 
 ## GAMEPLAY ##
-- PASTURES: Mongols, Berbers, Huns, and Cumans have pastures enabled instead of farms.
-- CHINESE: The Dragon Ship unique unit for the Chinese is reverted back to the Fast Fire Ship, due to the War Canoe using its graphics. (The Chinese have enough unique units anyway)
-- CANOES: The Canoe/War Canoe/Elite War Canoe replace all warship units for the Aztecs, Cumans, Huns, Inca, Khmer, Malay, Malians, Maya, Mongols, Tatars, and Vietnamese. Each have access to all three canoes types.
 #- CANOES: Civilisations with the canoe-line AND the hand cannoneer will have their canoe-line projectiles swapped with the hand cannoneer projectile, attack increased, and reload time increased.
 #- SOUTHEAST ASIANS: Burmese and Khmer Cavalry Archer-line disabled, Elephant Archer-line enabled
+
+===== BASEGAME CIVILISATION CHANGES =====
+Civilisation        Type        Changes
+------------------- ----------- ---------------------------------------------------------------------------
+Armenians           ---
+Aztecs              Gameplay    Warships disabled, Canoes enabled
+Bengalis            Cosmetic    Monk graphic set to Muslim
+Berbers             Cosmetic    Architecture set to African
+                    Cosmetic    Trade Cart graphic set to Camel
+                    Gameplay    Farm disabled, Pasture enabled
+Bohemians           ---
+Britons             ---
+Bulgarians          ---
+Burmese             Cosmetic    Monk graphic set to Buddhist
+                    Gameplay    Cavalry Archers disabled, Elephant Archers enabled
+                    Gameplay    Battering Rams disabled, Armored Elephants enabled
+Burgundians         ---
+Byzantines          Cosmetic    Architecture set to Southeast European
+                    Audio       Language set to Greek
+Celts               Cosmetic    Monk graphic set to Catholic
+Chinese             Gameplay    Dragon Ship disabled, Fast Fire Ship enabled
+Cumans              Gameplay    Farm disabled, Pasture enabled
+                    Gameplay    Warships disabled, Canoes enabled
+Dravidians          Cosmetic    Trade Cart graphic set to Water Buffalo
+Ethiopians          ---
+Franks              Cosmetic    Monk graphic set to Catholic
+Georgians           ---
+Goths               Cosmetic    Architecture set to Mediterranean
+                    Audio       Language set to Gothic
+Gurjaras            Cosmetic    Monk graphic set to Hindu
+                    Cosmetic    Trade Cart graphic set to Camel
+Hindustanis         Text        Bonus Text Removed: "Can build Caravanserai in Imperial Age"
+                    Cosmetic    Architecture set to Middle Eastern
+                    Cosmetic    Trade Cart graphic set to Camel
+Huns                Gameplay    Farm disabled, Pasture enabled
+                    Gameplay    Warships disabled, Canoes enabled
+Inca                Gameplay    Warships disabled, Canoes enabled
+Italians            ---
+Japanese            ---
+Jurchens            ---
+Khmer               Cosmetic    Monk graphic set to Hindu
+                    Gameplay    Warships disabled, Canoes enabled
+                    Gameplay    Cavalry Archers disabled, Elephant Archers enabled
+                    Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
+Khitans             ---
+Koreans             ---
+Lithuanians         Cosmetic    Architecture set to Central European
+                    Cosmetic    Monk graphic set to Pagan
+                    Cosmetic    Monastery graphic set to Pagan
+Magyars             Cosmetic    Architecture set to Central European
+Malay               Cosmetic    Architecture set to Austronesian
+                    Cosmetic    Monk graphic set to Muslim
+                    Gameplay    Warships disabled, Canoes enabled
+                    Gameplay    Cavalry Archers disabled, Elephant Archers enabled
+                    Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
+Malians             Gameplay    Warships disabled, Canoes enabled
+Maya                Gameplay    Warships disabled, Canoes enabled
+Mongols             Gameplay    Warships disabled, Canoes enabled
+                    Gameplay    Farm disabled, Pasture enabled
+Persians            Cosmetic    Architecture set to Central Asian
+                    Cosmetic    Trade Cart graphic set to Horse
+                    Text        Bonus Text Removed: "Can build Caravanserai in Imperial Age"
+Poles               Cosmetic    Architecture set to Central European
+Portuguese          ---
+Romans              ---
+Saracens            ---
+Shu                 ---
+Sicilians           ---
+Slavs               ---
+Spanish             ---
+Tatars              Gameplay    Warships disabled, Canoes enabled
+Teutons             ---
+Turks               ---
+Vietnamese          Gameplay    Warships disabled, Canoes enabled
+                    Cosmetic    Ship graphic set to Southeast Asian
+                    Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
+Vikings             Cosmetic    Monk graphic set to Pagan
+                    Cosmetic    Monastery graphic set to Pagan
+Wei                 ---
+Wu                  Audio       Language set to Cantonese
