@@ -44,7 +44,7 @@ Civilisation        Type        Changes
 Armenians           ---
 Aztecs              Gameplay    Warships disabled, Canoes enabled
 Bengalis            Cosmetic    Monk graphic set to Muslim
-Berbers             Cosmetic    Architecture set to African
+Berbers             Cosmetic    Architecture set to West African
                     Cosmetic    Trade Cart graphic set to Camel
                     Gameplay    Farm disabled, Pasture enabled
 Bohemians           ---
@@ -52,7 +52,7 @@ Britons             ---
 Bulgarians          ---
 Burmese             Cosmetic    Monk graphic set to Buddhist
                     Gameplay    Cavalry Archers disabled, Elephant Archers enabled
-                    Gameplay    Battering Rams disabled, Armored Elephants enabled
+                    Gameplay    Battering Rams disabled, Armored Elephants enabled (Siege Elephant disabled)
 Burgundians         ---
 Byzantines          Cosmetic    Architecture set to Southeast European
                     Audio       Language set to Greek
@@ -74,14 +74,14 @@ Hindustanis         Text        Bonus Text Removed: "Can build Caravanserai in I
 Huns                Gameplay    Farm disabled, Pasture enabled
                     Gameplay    Warships disabled, Canoes enabled
 Inca                Gameplay    Warships disabled, Canoes enabled
-Italians            ---
+Italians            Audio       Language set to Italian
 Japanese            ---
 Jurchens            ---
 Khmer               Cosmetic    Monk graphic set to Hindu
                     Gameplay    Warships disabled, Canoes enabled
                     Gameplay    Cavalry Archers disabled, Elephant Archers enabled
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
-Khitans             ---
+Khitans             Text        Bonus Text Removed: "Pastures replace Farms"
 Koreans             ---
 Lithuanians         Cosmetic    Architecture set to Central European
                     Cosmetic    Monk graphic set to Pagan
@@ -102,7 +102,7 @@ Persians            Cosmetic    Architecture set to Central Asian
 Poles               Cosmetic    Architecture set to Central European
 Portuguese          ---
 Romans              ---
-Saracens            ---
+Saracens            #Gameplay    Scout Unit set to Camel Scout
 Shu                 ---
 Sicilians           ---
 Slavs               ---
@@ -111,7 +111,7 @@ Tatars              Gameplay    Warships disabled, Canoes enabled
 Teutons             ---
 Turks               ---
 Vietnamese          Gameplay    Warships disabled, Canoes enabled
-                    Cosmetic    Ship graphic set to Southeast Asian
+                    Cosmetic    Ship graphic set to Southeast Asian (only visible in Full Tech Tree mode)
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
 Vikings             Cosmetic    Monk graphic set to Pagan
                     Cosmetic    Monastery graphic set to Pagan

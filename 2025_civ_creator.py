@@ -250,16 +250,57 @@ def get_unit_id(name, list_ids):
 
     return list(set(final_ids))
 
+def get_unit_enabling_tech_id(unit_id):
+    # Find the effect that enables this unit
+    enabling_effect_id = -1
+    for i, effect in enumerate(DATA.effects):
+        try:
+            for ec in effect.effect_commands:
+                if (ec.type == 2 and ec.a == unit_id) or (ec.type == 3 and ec.b == unit_id):
+                    enabling_effect_id = i
+                    break
+        except:
+            pass
+
+    for i, tech in enumerate(DATA.techs):
+        try:
+            if tech.effect_id == enabling_effect_id:
+                return i
+        except:
+            pass
+    return -1
+
 def update_tech_tree_graphic(current_civ_name):
+    # Find current civ index
+    for i, civ in enumerate(DATA.civs):
+        if civ.name.lower() == current_civ_name.lower():
+            current_civ_index = i
+            break
+
+    # Find unique Castle unit
+    for i, effect in enumerate(DATA.effects):
+        if effect.name.lower() == f'{current_civ_name.lower()}: (imperial unit)':
+            castle_unit_id = effect.effect_commands[0].a
+            imperial_unit_id = effect.effect_commands[0].b
+            break
+
+    # Find unique Castle techs
+    for i, tech in enumerate(DATA.techs):
+        castle_tech_id, imperial_tech_id = -1, -1
+        if tech.research_locations[0].location_id == 82 and tech.civ == current_civ_index and tech.research_locations[0].button_id == 7:
+            if tech.required_techs[0] == 102:
+                castle_tech_id = i
+            elif tech.required_techs[0] == 103:
+                imperial_tech_id = i
+
     # Load the reference JSON
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r', encoding="utf-8") as file:
         json_tree = json.load(file)
 
-    # Build an entry bank of all unique nodes across civs
-    entry_bank = {}      # Node ID (int/str) -> entry dict
-    entry_section = {}   # Node ID -> "civ_techs_buildings" | "civ_techs_units"
+    # Build an entry bank of ALL variants per Node ID
+    # Node ID -> [entry, entry, ...], each entry keeps its originating section in _section
+    entry_bank = defaultdict(list)
     for i, civ in enumerate(json_tree.get("civs", [])):
-        # Skip Chronicles civs if you still want that behavior
         if i in [45, 46, 47]:
             continue
 
@@ -272,58 +313,507 @@ def update_tech_tree_graphic(current_civ_name):
                     nid_key = int(nid)
                 except Exception:
                     nid_key = nid
-                if nid_key in entry_bank:
-                    continue
-                entry_bank[nid_key] = copy.deepcopy(entry)
-                entry_section[nid_key] = section
+                e = copy.deepcopy(entry)
+                e["_section"] = section
+                entry_bank[nid_key].append(e)
 
-    # Find the tech-tree effect for this civ 
-    tech_tree_id = -1 
-    target_name = f'{current_civ_name.lower()} tech tree' 
-    for i, effect in enumerate(DATA.effects): 
-        if effect.name.lower() == target_name: 
-            tech_tree_id = i 
-            break 
-    if tech_tree_id == -1: 
+    def clone_entry(node_id, picture_index, overrides=None):
+        candidates = entry_bank.get(node_id, [])
+        for c in candidates:
+            try:
+                c_pic = int(c.get("Picture Index", -1))
+            except Exception:
+                c_pic = -1
+            if c_pic == picture_index:
+                new_entry = copy.deepcopy(c)
+                if overrides:
+                    for k, v in overrides.items():
+                        new_entry[k] = v
+                # Make sure it goes into the same Node ID bucket
+                entry_bank[node_id].append(new_entry)
+                return new_entry
+        return None
+    
+    # Create additional units
+    clone_entry(539, 87, {"Name": "Canoe", "Picture Index": 164, 'Help String ID': 105119, 'Name String ID': 5119})
+    clone_entry(21, 25, {"Name": "War Canoe", "Picture Index": 178, 'Help String ID': 105119, 'Name String ID': 90000})
+    clone_entry(442, 60, {"Name": "Elite War Canoe", "Picture Index": 178, 'Help String ID': 105119, 'Name String ID': 92000})
+
+    # Find the tech-tree effect for this civ
+    tech_tree_id = -1
+    target_name = f'{current_civ_name.lower()} tech tree'
+    for i, effect in enumerate(DATA.effects):
+        if effect.name.lower() == target_name:
+            tech_tree_id = i
+            break
+    if tech_tree_id == -1:
         print(f"Tech tree effect not found for civ '{current_civ_name}'")
         return
 
-    # Collect disabled tech triggers and disabled unit IDs 
-    disabled_triggers = set() 
-    #disabled_units = set() 
-    for ec in DATA.effects[tech_tree_id].effect_commands: 
-        try: 
-            d_val = int(ec.d) 
-        except Exception: 
-            # Fall back to string if needed, but prefer ints everywhere 
-            d_val = ec.d 
+    # Collect disabled tech triggers
+    disabled_triggers = set()
+    for ec in DATA.effects[tech_tree_id].effect_commands:
+        try:
+            d_val = int(ec.d)
+        except Exception:
+            d_val = ec.d
         disabled_triggers.add(d_val)
-    #print('disabled triggers', disabled_triggers)
+    # print('disabled triggers:', disabled_triggers)
 
-    # Helpers
-    def get_section(node_id):
-        return entry_section.get(node_id, "civ_techs_buildings")
+    # Map building names to the tech trigger that disables/enables them
+    trigger_dictionary = {
+        'stable': 25,
+        'watch tower': 127,
+        'guard tower': 140,
+        'keep': 63,
+        'bombard tower': 64,
+        'stone wall': 189,
+        'fortified wall': 194,
+        'krepost': 695,
+        'donjon': 775,
+        'caravanserai': 518,
+        'feitoria': 570,
+        # 'house': -1,  # not controlled directly by a trigger
+    }
 
-    # Create a fresh civ block and populate with ALL bank items
+    # ---- Helpers -------------------------------------------------------------
+    def _to_int_safe(v, default=-1):
+        try:
+            return int(v)
+        except Exception:
+            return default
+
+    def _find_block(node_spec):
+        if isinstance(node_spec, tuple) and len(node_spec) == 2:
+            nid_key = _to_int_safe(node_spec[0], node_spec[0])
+            pic_idx = _to_int_safe(node_spec[1], node_spec[1])
+        else:
+            nid_key = _to_int_safe(node_spec, node_spec)
+            pic_idx = None
+
+        candidates = entry_bank.get(nid_key, [])
+        if not candidates:
+            return None
+
+        if pic_idx is None:
+            return copy.deepcopy(candidates[0])
+
+        for c in candidates:
+            c_pic = _to_int_safe(c.get("Picture Index", -1), -1)
+            if c_pic == pic_idx:
+                return copy.deepcopy(c)
+
+        return None
+
+    def get_building_blocks(node_specs):
+        final_blocks, missing = [], []
+        for spec in node_specs:
+            block = _find_block(spec)
+            if block is None:
+                missing.append(spec)
+                continue
+
+            # Determine building availability from your name→trigger map (if present)
+            name_key = str(block.get('Name', '')).lower()
+            trigger = trigger_dictionary.get(name_key, -1)
+            block['Node Status'] = 'NotAvailable' if trigger in disabled_triggers else 'ResearchedCompleted'
+
+            final_blocks.append(block)
+
+        if missing:
+            print(f"[update_tech_tree_graphic] Missing building node(s): {missing}")
+        return final_blocks
+
+    def get_tech_blocks(node_specs):
+        final_blocks, missing = [], []
+
+        for spec in node_specs:
+            block = _find_block(spec)
+            if block is None:
+                missing.append(spec)
+                continue
+
+            # Prefer your custom resolver; fall back to the block's own Trigger Tech ID
+            if 'Unit' in block['Node Type']:
+                # Unit
+                unit_id = get_unit_id(block['Name'], False)
+                trigger = get_unit_enabling_tech_id(unit_id)
+            else:
+                # Tech
+                trigger = block['Node ID']
+
+            # Disable/Enable unit/tech based on the trigger tech
+            if trigger not in disabled_triggers or trigger < 1:
+                block['Node Status'] = 'ResearchedCompleted'
+            else:
+                block['Node Status'] = 'NotAvailable'
+
+            # Add block to final list
+            final_blocks.append(block)
+
+        if missing:
+            print(f"[update_tech_tree_graphic] Missing tech/unit node(s): {missing}")
+        return final_blocks
+
+    def create_edited_block(node_id, fields_dict):
+        nid_key = _to_int_safe(node_id, node_id)
+        candidates = entry_bank.get(nid_key, [])
+        if not candidates:
+            print('No block to edit for Node ID:', node_id)
+            return None
+        block = copy.deepcopy(candidates[0])
+        for k, v in fields_dict.items():
+            block[k] = v
+        return block
+    # -------------------------------------------------------------------------
+
+    # Create a fresh civ block
     new_civ_block = {
         "civ_id": current_civ_name.upper(),
         "civ_techs_buildings": [],
         "civ_techs_units": [],
     }
 
-    # Optionally sort by Node ID for stable output; remove sorted(...) to keep discovery order
-    for nid in sorted(entry_bank, key=lambda x: (isinstance(x, str), x)):
-        block = copy.deepcopy(entry_bank[nid])
+    # -------- BUILDINGS -------------------------------------------------------
+    building_ids = [(87, 0), (12, 2)]
 
-        # Enable or Disable block
-        block['Node Status'] == 'ResearchedCompleted'
-        if block['Trigger Tech ID'] in disabled_triggers:
-            block['Node Status'] == 'NotAvailable'
+    if 25 not in disabled_triggers:
+        building_ids.append((101, 23))  # Stable
 
-            # Skip unique units if they're not available
-            
-        if block['Node Status'] == 'ResearchedComplated' or ('Unique' not in block['Node Type'] and 'Regoinal' not in block['Node Type'] and block['Node Status'] == 'NotAvailable'):
-            new_civ_block[get_section(nid)].append(block)
+    building_ids += [
+        (49, 22), (103, 4), (45, 13), (209, 33), (598, 38),
+        (79, 25), (234, 27), (235, 26), (236, 42), (72, 30),
+        (792, 44), (487, 36), (117, 31), (155, 32), (82, 7)
+    ]
+
+    if 695 not in disabled_triggers:
+        building_ids.append((1251, 55))   # Krepost
+
+    if 775 not in disabled_triggers:
+        building_ids.append((1665, 84))   # Donjon
+
+    if 929 in disabled_triggers:
+        building_ids.append((104, 10))    # Monastery
+        monastery_id = 104
+    else:
+        building_ids.append((1806, 88))   # Fortified Church
+        monastery_id = 1806
+
+    building_ids += [(109, 28), (70, 34), (621, 28), (276, 37)]
+
+    if 570 not in disabled_triggers:
+        building_ids.append((1021, 53))   # Feitoria
+
+    if 518 not in disabled_triggers:
+        building_ids.append((1754, 87))   # Caravanserai
+
+    if 932 in disabled_triggers:
+        building_ids += [(584, 39), (562, 40)]  # Mining/Lumber Camp
+        mining_camp_id, lumber_camp_id = 584, 562
+    else:
+        building_ids.append((1808, 89))   # Mule Cart
+        mining_camp_id = lumber_camp_id = 1808
+
+    building_ids.append((84, 16))  # Market
+
+    if 793 in disabled_triggers:
+        building_ids.append((68, 19))     # Mill
+        mill_id = 68
+    else:
+        building_ids.append((1734, 86))   # Folwark
+        mill_id = 1734
+
+    if 1008 in disabled_triggers:
+        building_ids.append((50, 35))     # Farm
+        farm_id = 50
+    else:
+        building_ids.append((1889, 96))   # Pasture
+        farm_id = 1889
+
+    # Add all building blocks at once
+    blocks = get_building_blocks(building_ids)
+
+    
+
+    # Add blocks to the tech tree
+    if blocks:
+        new_civ_block["civ_techs_buildings"].extend(blocks)
+
+    # -------- TECHS / UNITS ---------------------------------------------------
+    tech_ids = [(4, 17), (24, 18), (492, 90), (7, 20), (6, 21)]
+
+    if 655 not in disabled_triggers:
+        tech_ids.append((1155, 229))  # Imperial Skirmisher
+
+    # Slinger / Hand Cannoneer
+    tech_ids.append((185, 143) if 528 not in disabled_triggers else (5, 22))
+
+    # Elephant Archer / Cavalry Archer
+    if 480 not in disabled_triggers:
+        tech_ids += [(873, 393), (875, 93)]
+    else:
+        tech_ids += [(39, 19), (474, 71)]
+
+    # Genitours / Grenadier / Xianbei Raider
+    if 598 not in disabled_triggers:
+        tech_ids += [(1010, 201), (1012, 499)]
+    elif 992 not in disabled_triggers:
+        tech_ids += [(1911, 462)]
+    elif 1037 not in disabled_triggers:
+        tech_ids += [(1952, 433)]
+
+    # Thumb Ring thru Long Swordsman
+    tech_ids += [(437, 112), (436, 111), (74, 8), (75, 10), (77, 13)]
+
+    # Legionary / Two-Handed Swordsman, Champion
+    if 885 not in disabled_triggers:
+        tech_ids += [(1793, 139)]
+    else:
+        tech_ids += [(473, 12), (567, 72)]
+
+    # Spearman thru Pikeman
+    tech_ids += [(93, 31), (358, 11), (359, 104)]
+
+    # Eagle-line (or Condottiero)
+    if 433 not in disabled_triggers:
+        tech_ids += [(751, 109), (753, 148), (752, 149)]
+    elif 522 not in disabled_triggers:
+        tech_ids += [(882, 134)]
+
+    # Fire Lancer-line / Jian Swordsman / Flemish Militia
+    if 981 not in disabled_triggers:
+        tech_ids += [(1901, 457), (1903, 458)]
+    elif 1075 not in disabled_triggers:
+        tech_ids += [(1974, 437)]
+    elif 773 not in disabled_triggers:
+        tech_ids += [(1699, 354)]
+
+    # Arson, Gambesons, Squires
+    tech_ids += [(602, 118), (875, 116), (215, 80)]
+
+    # Stable line (if Stable available)
+    if 25 not in disabled_triggers:
+        # Scout Cavalry, Light Cavalry
+        tech_ids += [(448, 64), (546, 91)]
+
+        # Hussar / Winged Hussar
+        if 786 not in disabled_triggers:
+            tech_ids += [(1707, 371)]
+        else:
+            tech_ids += [(441, 103)]
+
+        # Shrivamsha Riders / Hei Guang / Knight line
+        if 842 not in disabled_triggers:
+            tech_ids += [(1751, 391), (1753, 519)]
+        elif 1032 not in disabled_triggers:
+            tech_ids += [(1944, 429), (1946, 430)]
+        else:
+            tech_ids += [(38, 1), (283, 49)]  # Knight, Cavalier
+            if 526 not in disabled_triggers:
+                tech_ids += [(1813, 410)]     # Paladin
+            else:
+                tech_ids += [(569, 2)]        # Savar
+
+        # Camel Riders
+        if 235 not in disabled_triggers:
+            # If civ uses Camel Scout as scout unit
+            for civ in DATA.civs:
+                if civ.name == current_civ_name and getattr(civ, "resources", [None]*264)[263] == 1755:
+                    tech_ids += [(1755, 392)]
+                    break
+            tech_ids += [(329, 78), (330, 79)]
+            if 521 not in disabled_triggers:
+                tech_ids += [(207, 185)]
+
+        # Steppe Lancers or Battle Elephants
+        if 714 not in disabled_triggers:
+            tech_ids += [(1370, 273), (1372, 274)]
+        elif 630 not in disabled_triggers:
+            tech_ids += [(1132, 228), (1134, 246)]
+
+        # Bloodlines, Husbandry
+        tech_ids += [(435, 110), (39, 10)]
+
+    # Battering Ram / Armoured Elephant
+    if 837 not in disabled_triggers:
+        tech_ids += [(1744, 394), (1746, 395)]
+    else:
+        tech_ids += [(1258, 74), (422, 63), (548, 73)]
+
+    # Rocket Cart / Mangonel
+    if 979 not in disabled_triggers:
+        tech_ids += [(1904, 459), (1907, 460)]
+    else:
+        tech_ids += [(280, 27), (550, 101), (588, 102)]
+
+    # Scorpion / War Chariot
+    if 1065 not in disabled_triggers:
+        tech_ids += [(2150, 627), (2151, 628)]
+    else:
+        tech_ids += [(279, 80), (542, 89)]
+
+    # Flaming Camel
+    if 703 not in disabled_triggers:
+        tech_ids += [(1263, 270)]
+
+    # Siege Tower
+    tech_ids += [(1105, 212)]
+
+    # Trebuchet family (Traction / Mounted / Bombard Cannon fallback)
+    if 1025 not in disabled_triggers:
+        tech_ids += [(1942, 428)]
+    elif 1005 not in disabled_triggers:
+        tech_ids += [(1923, 464)]
+    else:
+        tech_ids += [(36, 30)]  # Bombard Cannon
+
+    # Houfnice
+    if 787 not in disabled_triggers:
+        tech_ids += [(1709, 372)]
+
+    # Blacksmith armour/range upgrades and ships
+    tech_ids += [
+        (211, 49), (212, 50), (219, 51),
+        (199, 34), (200, 35), (201, 37),
+        (67, 17), (68, 18), (75, 21),
+        (81, 66), (82, 23), (80, 65),
+        (74, 63), (76, 22), (77, 64),
+        (13, 24), (199, 41), (545, 95),
+        (65, 41), (374, 98), (375, 99), (373, 97),
+        (1103, 203), (529, 86), (532, 85), (1104, 202),
+        (527, 84), (528, 83)
+    ]
+
+    # Canoes / Galleys
+    if 240 in disabled_triggers:
+        tech_ids += [(539, 164), (21, 178), (442, 178)] # Canoes
+    else:
+        tech_ids += [(539, 87), (21, 25), (442, 60)] # Galleys
+
+    # Trade Cog
+    tech_ids += [(17, 23)]
+
+    # Harbor (Malay)
+    if current_civ_name == 'Malay':
+        tech_ids += [(1189, 56)]
+
+    # Dromon / Lou Chuan / Cannon Galleon
+    if 886 not in disabled_triggers:
+        tech_ids += [(1795, 406)]
+    elif 1034 not in disabled_triggers:
+        tech_ids += [(1948, 431)]
+    else:
+        tech_ids += [(420, 55), (691, 298)]
+
+    # Turtle Ship / Longboat / Caravel / Thirisadai
+    if 447 not in disabled_triggers:
+        tech_ids += [(831, 116), (832, 491)]
+    elif 272 not in disabled_triggers:
+        tech_ids += [(250, 40), (533, 474)]
+    elif 596 not in disabled_triggers:
+        tech_ids += [(1004, 198), (1006, 497)]
+    elif 841 not in disabled_triggers:
+        tech_ids += [(1750, 387)]
+
+    # University techs, unique unit, castle units, unique techs, monk
+    tech_ids += [
+        (50, 13), (51, 14), (194, 46),
+        (47, 12), (64, 47), (93, 25), (377, 101),
+        (140, 76), (63, 16), (380, 104), (608, 119),
+        (322, 61), (54, 60),
+        (1735, 386), (1737, 515),  # UU (Castle/Imp)
+        (440, 113), (331, 29),     # Treb / Petard
+        (833, 33), (834, 107),     # UTs (Castle/Imp)
+        (379, 103), (315, 91), (321, 5), (408, 19), (125, 290)
+    ]
+
+    # Missionary / Warrior Priest
+    if 84 not in disabled_triggers:
+        tech_ids += [(775, 107)]
+    elif 948 not in disabled_triggers:
+        tech_ids += [(1811, 409)]
+
+    # Monastery & Town Center & Camps & Market techs
+    tech_ids += [
+        (46, 131), (45, 11), (316, 92), (233, 84), (319, 93),
+        (230, 82), (441, 114), (438, 109), (439, 108), (231, 83),
+        (252, 73), (83, 15), (8, 69), (280, 89), (101, 30), (102, 31),
+        (103, 32), (22, 6), (213, 79), (249, 42), (55, 15), (182, 62),
+        (278, 87), (279, 88), (202, 70), (203, 71), (221, 81),
+        (128, 34), (48, 113), (23, 7), (17, 3), (15, 58)
+    ]
+
+    # Mill techs
+    if 1008 in disabled_triggers:
+        tech_ids += [(14, 2), (13, 1), (12, 0)]
+    else:
+        tech_ids += [(1014, 138), (1013, 137), (1012, 136)]
+
+    # Add all tech/unit blocks at once
+    blocks = get_tech_blocks(tech_ids)
+
+    # Edit a few blocks
+    for block in blocks:
+        # Monastery techs
+        if block['Building ID'] == 104 or block['Building ID'] == 1806:
+            block['Building ID'] = monastery_id
+        # Mill techs
+        if block['Building ID'] == 68 or block['Building ID'] == 1734:
+            block['Building ID'] = mill_id
+        # Lumber Camp techs
+        if block['Building ID'] == 562 or block['Building ID'] == 1808:
+            block['Building ID'] = lumber_camp_id
+        # Mining Camp techs
+        if block['Building ID'] == 584 or block['Building ID'] == 1808:
+            block['Building ID'] = mining_camp_id
+        # Camel Scout
+        if DATA.civs[current_civ_index].resources[263] == 1755 and block['Node ID'] == 329 and block['Picture Index'] == 78:
+            block['Link ID'] = 1755
+        # Trebuchet (Packed)
+        if block['Name'] == "Trebuchet (Packed)" and 256 in disabled_triggers:
+            block['Node Status'] = 'NotAvailable'
+        # Monk graphic
+        monk_sprites = {998: 33, 7338: 131, 4491: 291, 8342: 218, 4483: 290, 8264: 169, 4475: 293, 4462: 122, 4844: 292, 5626: 349}
+        if block['Name'] == "Monk":
+            block['Picture Index'] = monk_sprites[DATA.civs[current_civ_index].units[125].standing_graphic[0]]
+         # Trade Cart graphic
+        trade_cart_sprites = {1141: 34, 7360: 287, 4863: 289, 4855: 288, 4871: 155}
+        if block['Name'] == "Trade Cart":
+            block['Picture Index'] = trade_cart_sprites[DATA.civs[current_civ_index].units[128].standing_graphic[0]]
+        # Unique Castle Unit
+        if block['Name'] == 'Urumi Swordsman':
+            castle_unit = DATA.civs[current_civ_index].units[castle_unit_id]
+            block['Name'] = get_string(castle_unit.language_dll_name)
+            block['Picture Index'] = castle_unit.icon_id
+            block['Name String ID'] = castle_unit.language_dll_name
+            block['Help String ID'] = castle_unit.language_dll_name + 100000
+        elif block['Name'] == 'Elite Urumi Swordsman':
+            imperial_unit = DATA.civs[current_civ_index].units[imperial_unit_id]
+            block['Name'] = get_string(imperial_unit.language_dll_name)
+            block['Picture Index'] = imperial_unit.icon_id
+            block['Name String ID'] = imperial_unit.language_dll_name
+            block['Help String ID'] = imperial_unit.language_dll_name + 100000
+        # Unique Castle Techs
+        if block['Name'] == 'Paiks':
+            castle_tech = DATA.techs[castle_tech_id]
+            block['Name'] = get_string(castle_tech.language_dll_name)
+            block['Name String ID'] = castle_tech.language_dll_name
+            block['Help String ID'] = castle_tech.language_dll_name + 100000
+        elif block['Name'] == 'Mahayana':
+            imperial_tech = DATA.techs[imperial_tech_id]
+            block['Name'] = get_string(imperial_tech.language_dll_name)
+            block['Name String ID'] = imperial_tech.language_dll_name + 10000
+            block['Help String ID'] = imperial_tech.language_dll_name + 100000
+        # Demolition ships
+        if 240 in disabled_triggers and (block['Name'] == 'Demolition Raft' or block['Name'] == 'Demolition Ship' or block['Name'] == 'Heavy Demolition Ship'):
+            block['Node Status'] = 'NotAvailable'
+        # Transport Ship
+        if block['Name'] == 'Transport Ship':
+            block['Node Status'] = 'ResearchedCompleted'
+
+    # Add blocks to the tech tree
+    if blocks:
+        new_civ_block["civ_techs_units"].extend(blocks)
 
     # Replace civ in JSON and save
     replaced = False
@@ -337,7 +827,6 @@ def update_tech_tree_graphic(current_civ_name):
 
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'w', encoding="utf-8") as file:
         json.dump(json_tree, file, ensure_ascii=False, indent=2)
-        print('Tech tree graphic updated with full bank contents')
 
 def get_effect_id(name):
     for i, effect in enumerate(DATA.effects):
@@ -1082,9 +1571,13 @@ def open_mod(mod_folder):
     #    print(f'{key}: {value}')
     #print(UNIT_CATEGORIES)
 
+    # Update the tech trees
+    for civ in DATA.civs:
+        if civ.name not in ['Achaemenids', 'Athenians', 'Spartans', 'Gaia']:
+            update_tech_tree_graphic(civ.name)
+
     # Tell the user that the mod was loaded
     print('Mod loaded!')
-    update_tech_tree_graphic("Britons")
 
     '''unique_unit_techs = []
     for unit_name in ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer']:
@@ -1504,59 +1997,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             if g1 > -1:
                 unit.dying_graphic = g1 + starting_graphic_index
 
-    # Add new strings for unit names
-    ORIGINAL_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-strings-utf8.txt'
-    '''with open(ORIGINAL_STRINGS, 'r+') as file:
-        lines = file.readlines()
-        for line in lines:
-            if '400042' in line:
-                # Add header
-                lines.append('\n')
-                lines.append('// Talofa strings\n')
-
-                # Add the lines
-                #"cretan archer", "scimitar warrior", "drengr", "qizilbash warrior", "axe cavalry", "sun warrior", "island sentinel"]
-                #894 - Scimitar Warrior (Eastern Swordsman)
-                #361 - Norse Warrior
-                #1817,1829 - Qizilbash Warrior
-                #2320 - Rhodian Slinger
-                #2323 - Axe Cavalry (Elite Persian Cavalry/Scythian Axe Cavalry)
-                #749 - (Cusi Yupanqui)
-                #1157 - (Gajah Mada)
-                #1067 - Skull Knight (Itzcoatl)
-                #188 - Flamethrower
-                #1574 - ??? (Sosso Guard)
-                line_count = 0
-                unit_bank = [
-                    ['Amazon Warrior', 'Amazon Warriors', r'Fast-moving infantry unit. Strong vs. buildings and siege weapons. Weak vs. archers and cavalry. <i> Upgrades: attack, armor (Blacksmith); speed (Barracks); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Amazon Archer', 'Amazon Archers', r'Fast-moving archer. Strong vs. infantry. Weak vs. cavalry.<i> Upgrades: attack, range, armor (Blacksmith); accuracy (Archery Range); attack, accuracy (University); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Camel Raider', 'Camel Raiders', r'Anti-cavalry unit that generates gold when fighting other units. Strong vs. cavalry. Weak vs. Spearmen, Monks, and archers.<i> Upgrades: attack, armor (Blacksmith); speed, to Elite Camel Raider 325F, 360G (Castle); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Crusader', 'Crusaders', r'Powerful but slow-moving cavalry. Strong vs. melee and slow ranged units. Weak vs. Halberdiers. Cannot be converted by enemy Monks.<i> Upgrades: attack, armor (Blacksmith); speed, hit points (Stable).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Tomahawk Warrior', 'Tomahawk Warriors', r'Quick infantry with ranged melee attack. Strong vs. cavalry and infantry. <i> Upgrades: attack, armor (Blacksmith); speed (Barracks); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Ninja', 'Ninjas', r'All-purpose infantry with a quick, powerful attack. Weak vs. Archers.<i> Upgrades: attack, armor (Blacksmith); speed (Barracks); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Scimitar Warrior', 'Scimitar Warriors', r'Infantry that resists attacks from Camel and Elephant units. Strong vs. camels and elephants. Weak vs. archers at long range.<i> Upgrades: attack, armor (Blacksmith); speed (Barracks); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Drengr', 'Drengrs', r'All-purpose infantry unit. Strong vs. buildings and infantry. Weak vs. archers at long range.<i> Upgrades: attack, armor (Blacksmith); speed (Barracks); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Qizilbash', 'Qizilbash', r'Powerful all-purpose cavalry. Strong vs. infantry, archers, and camelry.<i> Upgrades: attack, armor (Blacksmith); speed, hit points (Stable); creation speed, to Elite Qizilbash 850F, 600G (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Axe Cavalry', 'Axe Cavalry', r'Ranged cavalry with a melee attack. Strong vs. infantry and arhcers.<i> Upgrades: attack, armor (Blacksmith); speed, hit points (Stable); creation speed, to Elite Axe Cavalry 850F, 600G (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Sun Warrior', 'Sun Warriors', r'Light and quick skirmisher. Strong vs. archers and cavalry. Weak vs. skirmishers.<i> Upgrades: attack, armor (Blacksmith); speed (Barracks); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>'],
-                    ['Island Sentinel', 'Island Sentinels', r'Light and quick infantry. Strong vs. infantry.<i> Upgrades: attack, armor (Blacksmith); speed (Barracks); creation speed (Castle); more resistant to Monks (Monastery).<i>\n<hp> <attack> <armor> <piercearmor> <range>']
-                    ]
-                for unit in unit_bank:
-                    lines.append(rf'{90000 + line_count + 0} "{unit[0]}"' + '\n')
-                    lines.append(rf'{90000 + line_count + 1} "Create {unit[0]}"' + '\n')
-                    lines.append(rf'{90000 + line_count + 2} "Create <b>{unit[0]}<b> (<cost>)\n{unit[2]}"' + '\n')
-                    lines.append(rf'{90000 + line_count + 3} "Upgrade to Elite {unit[0]}"' + '\n')
-                    lines.append(rf'{90000 + line_count + 4} "Upgrade to Elite <b>{unit[0]}<b> (<cost>)\nUpgrades your {unit[1]} and lets you build Elite {unit[1]}, which are stronger."' + '\n')
-                    lines.append(rf'{90000 + line_count + 5} "Elite {unit[0]}"' + '\n')
-                    lines.append(rf'{90000 + line_count + 6} "Create Elite {unit[0]}"' + '\n')
-                    lines.append(rf'{90000 + line_count + 7} "Create <b>Elite {unit[0]}<b> (<cost>)\n{unit[2]}"' + '\n')
-                    line_count += 10
-                break
-            
-        file.seek(0)         # Go back to start of file
-        file.writelines(lines)
-        file.truncate()      # Remove any extra content after the new end'''
-
     # Genie elements
     AttackOrArmor = genieutils.unit.AttackOrArmor
     Bird = genieutils.unit.Bird
@@ -1616,6 +2056,15 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             modded_file.write(line)
         modded_file.truncate()
 
+    # Remove the Pasture text for the Khitans
+    with open(MOD_STRINGS, 'r+', encoding='utf-8') as modded_file:
+        modded_strings = modded_file.readlines()
+        modded_file.seek(0)  # rewind to start
+        for line in modded_strings:
+            line = line.replace(r'• Pastures replace Farms\n', '')
+            modded_file.write(line)
+        modded_file.truncate()
+
     # Make the Caravanserai potentially available to all civs
     DATA.techs[518].civ = -1
     DATA.techs[552].effect_id = -1
@@ -1652,9 +2101,20 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 tech_tree_indexes.append(i)
                 break
 
-    # Define the unit techs that need to be expanded
-    unique_techs_indexes = [84, 272, 447, 448, 521, 522, 526, 528, 570, 598, 599, 655, 695, 703, 773, 775, 787, 790, 793, 842, 843, 885, 930, 932, 940, 941, 948, 992, 1005, 1037, 1065, 1075]
+    # Make the Fortified Church potentially available to all civs
+    DATA.techs[941].effect_id = -1
+    DATA.techs[941].name = 'Fortified Church (DISABLED)'
+    DATA.techs[930].effect_id = -1
+    DATA.techs[930].name = 'Fortified Church (DISABLED)'
+    DATA.effects[941].name = 'Fortified Church'
+    DATA.techs[929].name = 'Fortified Church'
+    DATA.techs[929].effect_id = 941
+    for tt in tech_tree_indexes:
+        if tt not in [925, 927]:
+            DATA.effects[tt].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 929))
 
+    # Define the unit techs that need to be expanded
+    unique_techs_indexes = [84, 272, 447, 448, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 773, 775, 787, 790, 793, 841, 842, 843, 885, 930, 932, 940, 941, 948, 992, 1005, 1037, 1065, 1075]
     for tech_id in unique_techs_indexes:
         # Find the original civ that had the tech
         excluded_civ_id = DATA.techs[tech_id].civ
@@ -1843,17 +2303,18 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             if unit.dying_graphic != -1 and dying_graphic_id != -1:
                 unit.dying_graphic = dying_graphic_id
 
-    # Enable the pasture for Mongols, Berbers, Huns, and Cumans
+    # Enable the Pasture for Mongols, Berbers, Huns, Cumans, and Khitans
     DATA.techs[1008].civ = -1
     DATA.techs[1014].civ = -1
     DATA.techs[1013].civ = -1
     DATA.techs[1012].civ = -1
+    DATA.techs[1008].name = 'Pasture'
+    DATA.effects[1008].name = 'Pasture'
+    DATA.effects[1008].effect_commands[0] = genieutils.effect.EffectCommand(3, 50, 1889, -1, -1)
     for effect in [effect_ for effect_ in DATA.effects if "tech tree" in effect_.name.lower()]:
         name = effect.name.lower()
-        if any(group in name for group in ['mongols', 'berbers', 'huns', 'cumans']):
+        if any(group in name for group in ['mongols', 'berbers', 'huns', 'cumans', 'khitans']):
             # Disable farms and farm upgrades
-            #effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 216))
-            effect.effect_commands.append(genieutils.effect.EffectCommand(3, 50, 1889, -1, -1))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 12))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 13))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 14))
@@ -1864,9 +2325,16 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1013))
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1014))
 
+    # Rename certain techs/effects
+    DATA.techs[695].name = 'Krepost'
+    DATA.effects[732].name = 'Krepost'
+    DATA.techs[775].name = 'Donjon'
+    DATA.effects[800].name = 'Donjon'
+
     # Remove the Dragon Ship upgrade for the Chinese
     DATA.techs[1010].effect_id = -1
     DATA.techs[1010].civ = 0
+    DATA.techs[1010].required_tech_count = 6
     for i, ec in enumerate(DATA.effects[257].effect_commands):
         if ec.type == 102 and ec.d == 246:
             DATA.effects[257].effect_commands.pop(i)
@@ -1883,26 +2351,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             old_tech_costs.append(DATA.techs[tech_id].resource_costs)
             old_tech_research_locations.append(DATA.techs[tech_id].research_locations)'''
 
-    # Create techs unique to Talofa
-    # Imperial Elephant Archer
-    imperial_elephant_archer_tech = copy.deepcopy(DATA.techs[481])
-    change_string(87000, 'Imperial Elephant Archer')
-    change_string(88000, 'Upgrade to Imperial Elephant Archer')
-    change_string(89000, r'Upgrade to <b>Imperial Elephant Archer<b> (<cost>)\nUpgrades your Elite Elephant Archers and lets you create Imperial Elephant Archers, which are stronger.')
-    imperial_elephant_archer_tech.language_dll_name = 87000
-    imperial_elephant_archer_tech.language_dll_description = 88000
-    imperial_elephant_archer_tech.language_dll_help = 89000
-    imperial_elephant_archer_tech.required_techs = (103, 481, -1, -1, -1, -1)
-    imperial_elephant_archer_tech.resource_costs[0].amount = 1000
-    imperial_elephant_archer_tech.resource_costs[1].amount = 800
-    imperial_elephant_archer_tech.research_locations[0].research_time = 110
-    imperial_elephant_archer_tech.civ = 1
-    DATA.techs.append(imperial_elephant_archer_tech)
-
     # Create units unique to Talofa
     for civ in DATA.civs:
         # Canoe
-        canoe_id = len(civ.units)
+        custom_unit_starting_index = len(civ.units)
         canoe = copy.deepcopy(DATA.civs[1].units[778])
         canoe.creatable.train_locations[0].unit_id = 45
         canoe.creatable.train_locations[0].button_id = 4
@@ -2327,7 +2779,69 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         yurt_packed.creatable.train_locations[0].train_time = 8
         civ.units.append(yurt_packed)'''
 
-    # Create more techs/effects
+    # Create techs unique to Talofa
+    custom_tech_starting_index = len(DATA.techs)
+    custom_effect_starting_index = len(DATA.effects)
+
+    # 0: Canoe
+    canoe_tech = copy.deepcopy(DATA.techs[151])
+    canoe_tech.name = 'Canoe (make avail)'
+    canoe_effect = genieutils.effect.Effect(name='Canoe (make avail)', effect_commands=[genieutils.effect.EffectCommand(3, 539, custom_unit_starting_index, -1, -1)])
+    DATA.effects.append(canoe_effect)
+    canoe_tech.effect_id = len(DATA.effects)-1
+    DATA.techs.append(canoe_tech)
+
+    # 1: War Canoe
+    war_canoe_tech = copy.deepcopy(DATA.techs[34])
+    change_string(84000, 'War Canoe')
+    change_string(85000, 'Upgrade to War Canoe')
+    change_string(86000, r'Upgrade to <b>War Canoe<b> (<cost>)\nUpgrades your Canoes and lets you create War Canoes, which are stronger.')
+    war_canoe_tech.language_dll_name = 84000
+    war_canoe_tech.language_dll_description = 85000
+    war_canoe_tech.language_dll_help = 86000
+    war_canoe_tech.required_techs = (102, custom_tech_starting_index, -1, -1, -1, -1)
+    war_canoe_tech.resource_costs[0].amount = 200
+    war_canoe_tech.resource_costs[0].type = 1
+    war_canoe_tech.resource_costs[1].amount = 100
+    war_canoe_tech.research_locations[0].research_time = 30
+    war_canoe_tech.icon_id = 105
+    war_canoe_effect = genieutils.effect.Effect(name='War Canoe', effect_commands=[genieutils.effect.EffectCommand(3, 539, custom_unit_starting_index+1, -1, -1), genieutils.effect.EffectCommand(3, custom_unit_starting_index, custom_unit_starting_index+1, -1, -1)])
+    DATA.effects.append(war_canoe_effect)
+    war_canoe_tech.effect_id = len(DATA.effects)-1
+    DATA.techs.append(war_canoe_tech)
+
+    # 2: Elite War Canoe
+    elite_war_canoe_tech = copy.deepcopy(DATA.techs[34])
+    change_string(81000, 'Elite War Canoe')
+    change_string(82000, 'Upgrade to Elite War Canoe')
+    change_string(83000, r'Upgrade to <b>Elite War Canoe<b> (<cost>)\nUpgrades your War Canoes and lets you create Elite War Canoes, which are stronger.')
+    elite_war_canoe_tech.language_dll_name = 81000
+    elite_war_canoe_tech.language_dll_description = 82000
+    elite_war_canoe_tech.language_dll_help = 83000
+    elite_war_canoe_tech.required_techs = (103, custom_tech_starting_index+1, -1, -1, -1, -1)
+    elite_war_canoe_tech.resource_costs[0].amount = 300
+    elite_war_canoe_tech.resource_costs[1].amount = 250
+    elite_war_canoe_tech.research_locations[0].research_time = 45
+    elite_war_canoe_tech.icon_id = 105
+    elite_war_canoe_effect = genieutils.effect.Effect(name='Elite War Canoe', effect_commands=[genieutils.effect.EffectCommand(3, 539, custom_unit_starting_index+2, -1, -1), genieutils.effect.EffectCommand(3, custom_unit_starting_index, custom_unit_starting_index+2, -1, -1), genieutils.effect.EffectCommand(3, custom_unit_starting_index+1, custom_unit_starting_index+2, -1, -1)])
+    DATA.effects.append(elite_war_canoe_effect)
+    elite_war_canoe_tech.effect_id = len(DATA.effects)-1
+    DATA.techs.append(elite_war_canoe_tech)
+
+    '''imperial_elephant_archer_tech = copy.deepcopy(DATA.techs[481])
+    change_string(87000, 'Imperial Elephant Archer')
+    change_string(88000, 'Upgrade to Imperial Elephant Archer')
+    change_string(89000, r'Upgrade to <b>Imperial Elephant Archer<b> (<cost>)\nUpgrades your Elite Elephant Archers and lets you create Imperial Elephant Archers, which are stronger.')
+    imperial_elephant_archer_tech.language_dll_name = 87000
+    imperial_elephant_archer_tech.language_dll_description = 88000
+    imperial_elephant_archer_tech.language_dll_help = 89000
+    imperial_elephant_archer_tech.required_techs = (103, 481, -1, -1, -1, -1)
+    imperial_elephant_archer_tech.resource_costs[0].amount = 1000
+    imperial_elephant_archer_tech.resource_costs[1].amount = 800
+    imperial_elephant_archer_tech.research_locations[0].research_time = 110
+    imperial_elephant_archer_tech.civ = -1
+    DATA.techs.append(imperial_elephant_archer_tech)'''
+
     '''fire_tower_tech = copy.deepcopy(DATA.techs[64])
     change_string(84000, 'Fire Tower')
     change_string(85000, 'Upgrade to Fire Tower')
@@ -2349,21 +2863,14 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             DATA.effects[DATA.techs[tech_id].effect_id].name = f'{DATA.civs[DATA.techs[tech_id].civ].name.upper()}: (Imperial Unit)'
 
     # Set civilisations to canoe docks by disabling all other warships
-    for effect_id in [447, 489, 3, 648, 42, 710, 448, 227, 708, 652, 646]:
-        # Disable the warships
-        for tech_id in [604, 243, 246, 605, 244, 37, 376]:
-            DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
-
-        # Swap galley-line for canoe-line
-        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 539 , canoe_id, -1, -1))
-        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 21 , canoe_id+1, -1, -1))
-        DATA.effects[effect_id].effect_commands.append(genieutils.effect.EffectCommand(3, 442 , canoe_id+2, -1, -1))
-
-        # Allow every canoe civ to train the Elite War Canoe
-        for i, ec in enumerate(DATA.effects[effect_id].effect_commands):
-            if ec.type == 102 and ec.d == 35:
-                DATA.effects[effect_id].effect_commands.pop(i)
-
+    for tech_tree_effect_id in tech_tree_indexes:
+        if tech_tree_effect_id in [447, 449, 3, 648, 42, 710, 448, 227, 708, 652, 646]: # Canoe dock
+            for tech_id in [240, 34, 35, 604, 243, 246, 605, 244, 37, 376]:
+                    DATA.effects[tech_tree_effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
+        else: # Ship dock
+            for tech_id in [custom_tech_starting_index, custom_tech_starting_index+1, custom_tech_starting_index+2]:
+                DATA.effects[tech_tree_effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
+                
     # Enable gun canoes for civs with canoes and hand cannoneers
     #DATA.techs.append(copy.deepcopy(DATA.techs[1250]))
     #DATA.techs[-1].name = 'Gun Canoe'
@@ -3771,8 +4278,8 @@ def main():
                                     'Scale Mail Armor/Chain Mail Armor/Plate Mail Armor': [74, 76, 77],
 
                                     'DOCK': [-1],
+                                    'Canoe*10/War Canoe*10/Elite War Canoe*10': [get_tech_id('Canoe (make avail)'), get_tech_id('War Canoe'), get_tech_id('Elite War Canoe')],
                                     'Galley*10/War Galley*10/Galleon*10': [240, 34, 35],
-                                    'Canoe*10/War Canoe*10/Elite War Canoe*10': [],
                                     'Fire Galley/Fire Ship/Fast Fire Ship': [604, 243, 246],
                                     'Demolition Galley/Demolition Ship/Heavy Demolition Ship': [605, -1, 244],
                                     'Cannon Galleon*11/Elite Cannon Galleon*11': [37, 376],
@@ -3807,7 +4314,7 @@ def main():
                                     'Sappers': [321],
                                     'Conscription': [315],
 
-                                    'FORTIFIED CHURCH*14': [930],
+                                    'FORTIFIED CHURCH*14': [929],
                                     'MONASTERY*14': [-1],
                                     'Monk': [157],
                                     'Missionary*15': [84],
