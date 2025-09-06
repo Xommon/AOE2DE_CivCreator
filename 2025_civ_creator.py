@@ -2139,6 +2139,21 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         DATA.techs[tech_id].effect_id = -1
         DATA.techs[tech_id].civ = -1
 
+    # Saracens start with Camel Scout
+    DATA.civs[9].resources[263] = 1755
+
+    # Enable Dromon for Vikings and Bulgarians
+    for tech_tree in [276, 706]:
+        DATA.effects[tech_tree].effect_commands.remove(genieutils.effect.EffectCommand(102, -1, -1, -1, 886))
+        DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 37))
+        DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 376))
+
+    # Enable Lou Chuan for Vietnamese
+    for tech_tree in [652]:
+        DATA.effects[tech_tree].effect_commands.remove(genieutils.effect.EffectCommand(102, -1, -1, -1, 1034))
+        DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 37))
+        DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 376))
+
     # Change the Monastery and Monk graphics for the Vikings and Lithuanians
     graphic_replacements = [1712, 1712, 1712, 1712, 1526, 1940, 1941, 1941, 1941, 1941]
     unit_ids = [30, 31, 32, 104, 1421, 125, 286, 922, 1025, 1327]
@@ -2786,7 +2801,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # 0: Canoe
     canoe_tech = copy.deepcopy(DATA.techs[151])
     canoe_tech.name = 'Canoe (make avail)'
-    canoe_effect = genieutils.effect.Effect(name='Canoe (make avail)', effect_commands=[genieutils.effect.EffectCommand(3, 539, custom_unit_starting_index, -1, -1)])
+    canoe_effect = genieutils.effect.Effect(name='Canoe (make avail)', effect_commands=[genieutils.effect.EffectCommand(2, 539, 1, -1, -1), genieutils.effect.EffectCommand(3, 539, custom_unit_starting_index, -1, -1)])
     DATA.effects.append(canoe_effect)
     canoe_tech.effect_id = len(DATA.effects)-1
     DATA.techs.append(canoe_tech)
@@ -2864,7 +2879,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
     # Set civilisations to canoe docks by disabling all other warships
     for tech_tree_effect_id in tech_tree_indexes:
-        if tech_tree_effect_id in [447, 449, 3, 648, 42, 710, 448, 227, 708, 652, 646]: # Canoe dock
+        if tech_tree_effect_id in [447, 449, 3, 648, 42, 710, 448, 646]: # Canoe dock
             for tech_id in [240, 34, 35, 604, 243, 246, 605, 244, 37, 376]:
                     DATA.effects[tech_tree_effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
         else: # Ship dock

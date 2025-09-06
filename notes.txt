@@ -49,7 +49,7 @@ Berbers             Cosmetic    Architecture set to West African
                     Gameplay    Farm disabled, Pasture enabled
 Bohemians           ---
 Britons             ---
-Bulgarians          ---
+Bulgarians          Gameplay    Cannon Galleon disabled, Dromon enabled
 Burmese             Cosmetic    Monk graphic set to Buddhist
                     Gameplay    Cavalry Archers disabled, Elephant Archers enabled
                     Gameplay    Battering Rams disabled, Armored Elephants enabled (Siege Elephant disabled)
@@ -82,6 +82,7 @@ Khmer               Cosmetic    Monk graphic set to Hindu
                     Gameplay    Cavalry Archers disabled, Elephant Archers enabled
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
 Khitans             Text        Bonus Text Removed: "Pastures replace Farms"
+                    Audio       Language set to Khitan
 Koreans             ---
 Lithuanians         Cosmetic    Architecture set to Central European
                     Cosmetic    Monk graphic set to Pagan
@@ -94,26 +95,26 @@ Malay               Cosmetic    Architecture set to Austronesian
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
 Malians             Gameplay    Warships disabled, Canoes enabled
 Maya                Gameplay    Warships disabled, Canoes enabled
-Mongols             Gameplay    Warships disabled, Canoes enabled
-                    Gameplay    Farm disabled, Pasture enabled
+Mongols             Gameplay    Farm disabled, Pasture enabled
 Persians            Cosmetic    Architecture set to Central Asian
                     Cosmetic    Trade Cart graphic set to Horse
                     Text        Bonus Text Removed: "Can build Caravanserai in Imperial Age"
 Poles               Cosmetic    Architecture set to Central European
 Portuguese          ---
 Romans              ---
-Saracens            #Gameplay    Scout Unit set to Camel Scout
+Saracens            Gameplay    Scout Unit set to Camel Scout
 Shu                 ---
 Sicilians           ---
 Slavs               ---
 Spanish             ---
-Tatars              Gameplay    Warships disabled, Canoes enabled
+Tatars              ---
 Teutons             ---
 Turks               ---
-Vietnamese          Gameplay    Warships disabled, Canoes enabled
-                    Cosmetic    Ship graphic set to Southeast Asian (only visible in Full Tech Tree mode)
+Vietnamese          Cosmetic    Ship graphic set to Southeast Asian
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
+                    Gameplay    Lou Chuan enabled
 Vikings             Cosmetic    Monk graphic set to Pagan
                     Cosmetic    Monastery graphic set to Pagan
+                    Gameplay    Cannon Galleons disabled, Dromon enabled
 Wei                 ---
 Wu                  Audio       Language set to Cantonese
