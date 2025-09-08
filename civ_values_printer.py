@@ -24,4 +24,4 @@ time.sleep(1)
 
 # Edit code after here
 
-print(DATA.civs[1].units[1186].type_50.armours[0])
+print(DATA.effects[997])

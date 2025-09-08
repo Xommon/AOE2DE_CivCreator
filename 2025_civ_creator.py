@@ -16,6 +16,9 @@ wine /home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/T
 
 # Custom Map .RMS
 /home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/resources/_common/random-map-scripts
+
+# Terminal code to show image overlay
+python3 overlay.py ~/Documents/central_america.jpg 0.5 350 350
 '''
 
 import os
@@ -56,6 +59,7 @@ import ollama
 import traceback
 import sys
 import unicodedata
+from pathlib import Path
 
 class Civ:
     def __init__(self, civ_id, buildings, units):
@@ -1011,6 +1015,7 @@ def create_bonus(bonus_string, civ_id):
             'turtle ships': [831, 832],
             'longboats': [250, 533],
             'caravels': [1004, 1006],
+            'lou chuans': [1948],
             'camel units': [282, 556, 1755, 329, 330, 207, 1007, 1009, 1263, 1923, get_unit_id('naasiri', False), get_unit_id('elite naasiri', False)],
             'elephant units': [239, 558, 873, 875, 1120, 1122, 1132, 1134, 1744, 1746, 1923, get_unit_id('imperial elephant archer', False)],
             'gunpowder units': [5, 36, 420, 46, 691, 771, 773, 557, 1001, 1003, 831, 832, 1709, 1704, 1706, 1904, 1907, 1901, 1903, 1911],
@@ -1032,6 +1037,7 @@ def create_bonus(bonus_string, civ_id):
             'stone miners': get_unit_id('stone miner', True),
             'miners': get_unit_id('gold miner', True) + get_unit_id('stone miner', True),
             'repairers': get_unit_id('repairer', True),
+            'fortifications': [82, 71, 109, 141, 142],
         }
 
         # If you need to keep your existing unit_lines contents, don't recreate it.
@@ -1103,6 +1109,7 @@ def create_bonus(bonus_string, civ_id):
             'livestock': [58],
             'military units': [0, 35, 6, 36, 47, 12, 44, 23],
             'all military units': [0, 55, 22, 35, 6, 54, 13, 51, 36, 12],
+            'fortifications': [27, 52, 39],
         }
         technologies = {
             'castle technologies': [321, 379],
@@ -1133,7 +1140,7 @@ def create_bonus(bonus_string, civ_id):
         # Sample stat patterns with detection and stat_id
         stat_patterns = [
             (re.compile(r'([-+]?\d+%?)\s+hit points', re.IGNORECASE), [0]),
-            (re.compile(r'([-+]?\d+%?)\s+HP', re.IGNORECASE), [0]),
+            #(re.compile(r'([-+]?\d+%?)\s+HP', re.IGNORECASE), [0]),
             (re.compile(r'([-+]?\d+%?)\s+line of sight', re.IGNORECASE), [1, 23]),
             (re.compile(r'([-+]?\d+%?)\s+LOS', re.IGNORECASE), [1, 23]),
             (re.compile(r'([-+]?\d+%?)\s+garrison capacity', re.IGNORECASE), [2]),
@@ -1247,6 +1254,21 @@ def create_bonus(bonus_string, civ_id):
             
             bonus_response += f'T({required_techs[0]}, {required_techs[1]}, {required_techs[2]}, {required_techs[3]}, {required_techs[4]}, {required_techs[5]}'
             #bonus_response += f'E101~{tech_id}~0~0~0|E101~{tech_id}~1~0~0|E101~{tech_id}~2~0~0|E101~{tech_id}~3~0~0|E103~{tech_id}~0~0~0|'
+        elif bonus_string.lower() == "rocket carts, grenadiers and lou chuans detonate when defeated; projectiles produce additional explosions":
+            # Thunderclap Bombs effect
+            bonus_response = (
+                "E0~1911~-1~66~1917|"
+                "E0~1913~-1~57~1887|E0~1913~-1~68~2|"
+                "E0~1906~-1~57~1928|E0~1904~-1~66~1919|E0~1907~-1~66~1919|E0~1906~-1~68~2|"
+                "E0~1913~-1~73~12833|E0~1938~-1~57~1883|E0~1939~-1~57~1883|"
+                "E0~1938~-1~67~1|E0~1939~-1~67~1|E0~1938~-1~68~2|E0~1939~-1~68~2|"
+                "E0~1938~-1~75~13112|E0~1939~-1~75~13112|E0~1938~-1~71~13112|E0~1939~-1~71~13112|"
+                "E0~1948~-1~77~13016|E0~1948~-1~107~11|E0~1948~-1~62~7|E0~1948~-1~57~1881|"
+                "E0~1948~-1~73~1751|E0~1948~-1~66~1882|E0~1948~-1~125~1938|E0~1948~-1~65~1936|"
+                "E0~1948~-1~63~26|E0~1911~-1~73~1751|E0~1911~-1~74~12739|E0~1911~-1~57~1916|"
+                "E0~1904~-1~73~1751|E0~1904~-1~74~12734|E0~1904~-1~57~1918|"
+                "E0~1907~-1~73~1751|E0~1907~-1~74~13102|E0~1907~-1~57~1895"
+            )
         else:
             # Edit unit/building attribute
             bonus_response = build_modifiers(bonus_string, unit_lines, categories)
@@ -1256,9 +1278,9 @@ def create_bonus(bonus_string, civ_id):
         final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', effect_commands=[])]
 
         # Error out if bonus text is invalid
-        if bonus_response == '':
+        '''if bonus_response == '':
             print(colour(Fore.RED, 'ERROR: Bonus text invalid.'))
-            return final_techs, final_effects
+            return final_techs, final_effects'''
 
         # Split the response into parts
         bonus_parts = bonus_response.split('|')
@@ -1571,11 +1593,6 @@ def open_mod(mod_folder):
     #    print(f'{key}: {value}')
     #print(UNIT_CATEGORIES)
 
-    # Update the tech trees
-    for civ in DATA.civs:
-        if civ.name not in ['Achaemenids', 'Athenians', 'Spartans', 'Gaia']:
-            update_tech_tree_graphic(civ.name)
-
     # Tell the user that the mod was loaded
     print('Mod loaded!')
 
@@ -1789,7 +1806,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             sound_count = int(sound_ids[sound_id][-1])
 
             # Add the sound items to the sound
-            language_presets = {1: "English", 2: "French", 3: "Gothic", 4: "German", 5: "Japanese", 6: "Mandarin", 7: "Greek", 8: "Persian", 9: "Arabic", 10: "Turkish", 11: "Norse", 12: "Mongolian", 13: "Gaelic", 14: "Spanish", 15: "Yucatec", 16: "Kaqchikel", 17: "Mongolian", 18: "Korean", 19: "Italian", 20: "Hindustani", 21: "Quechua", 22: "Hungarian", 23: "Russian", 24: "Portuguese", 25: "Amharic", 26: "Maninka", 27: "Taqbaylit", 28: "Khmer", 29: "Malaysian", 30: "Burmese", 31: "Vietnamese", 32: "Bulgarian", 33: "Chagatai", 34: "Cuman", 35: "Lithuanian", 36: "Burgundian", 37: "Sicilian", 38: "Polish", 39: "Czech", 40: "Tamil", 41: "Bengali", 42: "Gujarati", 43: "Vulgar Latin", 44: "Armenian", 45: "Georgian", 49: "Mandarin", 50: "Cantonese", 51: "Mandarin", 52: "Mandarin", 53: "Mongolian"}
+            language_presets = {1: "English", 2: "French", 3: "Gothic", 4: "German", 5: "Japanese", 6: "Mandarin", 7: "Greek", 8: "Persian", 9: "Arabic", 10: "Turkish", 11: "Norse", 12: "Mongolian", 13: "Gaelic", 14: "Spanish", 15: "Yucatec", 16: "Kaqchikel", 17: "Chuvash", 18: "Korean", 19: "Italian", 20: "Hindustani", 21: "Quechua", 22: "Hungarian", 23: "Russian", 24: "Portuguese", 25: "Amharic", 26: "Maninka", 27: "Taqbaylit", 28: "Khmer", 29: "Malaysian", 30: "Burmese", 31: "Vietnamese", 32: "Bulgarian", 33: "Chagatai", 34: "Cuman", 35: "Lithuanian", 36: "Burgundian", 37: "Sicilian", 38: "Polish", 39: "Czech", 40: "Tamil", 41: "Bengali", 42: "Gujarati", 43: "Vulgar Latin", 44: "Armenian", 45: "Georgian", 49: "Mandarin", 50: "Cantonese", 51: "Mandarin", 52: "Jurchen", 53: "Khitan"}
             for i in range(sound_count):
                 # Correct the name
                 if civ_id not in language_presets:
@@ -2113,8 +2130,17 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         if tt not in [925, 927]:
             DATA.effects[tt].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 929))
 
+    # Make the Mule Cart potentially available to all civs
+    DATA.techs[940].effect_id = -1
+    DATA.techs[940].name = 'Mule Cart (DISABLED)'
+    DATA.techs[940].civ = -1
+    DATA.techs[932].civ = -1
+    for tt in tech_tree_indexes:
+        if tt not in [925, 927]:
+            DATA.effects[tt].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 932))
+
     # Define the unit techs that need to be expanded
-    unique_techs_indexes = [84, 272, 447, 448, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 773, 775, 787, 790, 793, 841, 842, 843, 885, 930, 932, 940, 941, 948, 992, 1005, 1037, 1065, 1075]
+    unique_techs_indexes = [84, 272, 447, 448, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 773, 775, 787, 790, 793, 841, 842, 843, 885, 930, 941, 948, 992, 1005, 1037, 1065, 1075]
     for tech_id in unique_techs_indexes:
         # Find the original civ that had the tech
         excluded_civ_id = DATA.techs[tech_id].civ
@@ -2815,6 +2841,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     war_canoe_tech.language_dll_description = 85000
     war_canoe_tech.language_dll_help = 86000
     war_canoe_tech.required_techs = (102, custom_tech_starting_index, -1, -1, -1, -1)
+    war_canoe_tech.required_tech_count = 2
     war_canoe_tech.resource_costs[0].amount = 200
     war_canoe_tech.resource_costs[0].type = 1
     war_canoe_tech.resource_costs[1].amount = 100
@@ -2834,6 +2861,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     elite_war_canoe_tech.language_dll_description = 82000
     elite_war_canoe_tech.language_dll_help = 83000
     elite_war_canoe_tech.required_techs = (103, custom_tech_starting_index+1, -1, -1, -1, -1)
+    elite_war_canoe_tech.required_tech_count = 2
     elite_war_canoe_tech.resource_costs[0].amount = 300
     elite_war_canoe_tech.resource_costs[1].amount = 250
     elite_war_canoe_tech.research_locations[0].research_time = 45
@@ -3224,6 +3252,11 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     edit_tech_tree(get_effect_id('Vietnamese Tech Tree'), [-162, -96, -255, 837, 838])
     edit_tech_tree(get_effect_id('Persians Tech Tree'), [630, 631])
 
+    # Update the tech trees
+    for civ in DATA.civs:
+        if civ.name not in ['Achaemenids', 'Athenians', 'Spartans', 'Gaia']:
+            update_tech_tree_graphic(civ.name)
+
     # Reorder tech trees
     for civ in DATA.civs:
         civ_tech_tree_index = -1
@@ -3268,6 +3301,7 @@ def main():
 
     # Main menu
     while True:
+        import os
         print(colour(Back.BLUE, Style.BRIGHT, f'{title_emoji} Talofa - Age of Empires II Civilization Editor {title_emoji}'))
         global MOD_FOLDER
         if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
@@ -3311,12 +3345,373 @@ def main():
         # Display selected mod menu
         print(colour(Back.CYAN, Style.BRIGHT, f'\n{title_emoji} {mod_name} Menu {title_emoji}'))
         print(colour(Fore.WHITE, "0️⃣  Edit Civilization"))
-        print(colour(Fore.WHITE, "1️⃣  Revert Mod"))
-        print(colour(Fore.WHITE, "2️⃣  Open Mod Directory"))
+        print(colour(Fore.WHITE, "1️⃣  Save Civilization"))
+        print(colour(Fore.WHITE, "2️⃣  Load Civilization"))
+        print(colour(Fore.WHITE, "3️⃣  Open Mod Directory"))
+        print(colour(Fore.WHITE, "4️⃣  Revert Mod"))
         mod_menu_selection = input(colour(Fore.CYAN, "Selection: "))
 
+        # Save Civilisation
+        if mod_menu_selection == '1':
+            # Display all civilisations
+            selected_civ_index = -1
+            all_civs = []
+            with open(MOD_STRINGS, 'r', encoding='utf-8') as file:
+                lines = file.readlines()
+                for civ in DATA.civs:
+                    if civ.name not in ('Gaia', 'Athenians', 'Spartans', 'Achaemenids'):
+                        all_civs.append(civ.name)
+
+                while True:
+                    while True:
+                        readline.set_completer(make_completer(all_civs))
+                        readline.parse_and_bind("tab: complete")
+                        selection = input("\nEnter Civilization ID/Name to save: ").lower()
+
+                        # Convert word to index
+                        if selection in [opt.lower() for opt in all_civs]:
+                            selection = int([opt.lower() for opt in all_civs].index(selection))
+                            break
+
+                        # Help
+                        elif selection == '?':
+                            for i, allciv in enumerate(all_civs):
+                                print(f"{i}: {allciv}")
+                            continue
+
+                        # Back
+                        elif selection == '':
+                            continue
+
+                        else:
+                            # Catch error
+                            try:
+                                int(selection)
+                            except:
+                                print("\033[31mERROR: Invalid civilization ID.\033[0m")
+                                continue
+
+                            # Check to break loop
+                            if int(selection) < len(DATA.civs) - 4:
+                                break
+                            else:
+                                print(colour(Fore.RED, 'ERROR: Invalid entry.'))
+                                continue
+
+                    if int(selection) < len(DATA.civs):
+                        # Use the civilization ID
+                        selected_civ_index = int(selection)
+                        if selected_civ_index > 44:
+                            selected_civ_index += 3
+                        selected_civ_name = lines[selected_civ_index][7:-2]
+                        break
+                    else:
+                        # If no match is found, continue the while loop
+                        print("\033[31mERROR: Invalid civilization ID.\033[0m")
+                        continue
+
+                # ---------------------------------------------------------------------
+                # Save selected civ to civs/<CIV NAME>.pkl
+                # Creates the folder if needed, warns before overwrite, and writes a single
+                # payload (same code path whether it's a new file or overwriting an old one).
+                # ---------------------------------------------------------------------
+                # Separate the description to be edited later
+                with open(MOD_STRINGS, 'r', encoding='utf-8') as file:
+                    lines = file.readlines()
+                    line_index = selected_civ_index + len(DATA.civs) - 1
+                    line = lines[line_index]
+                    description_code = line[:6]
+                    description_lines = line[8:].split(r'\n')
+
+                    # Remove any unnecessary characters from the strings
+                    description_lines = [s.replace('"', '') for s in description_lines]
+                    description_lines = [s.replace('\n', '') for s in description_lines]
+
+                # Make sure "civs" folder exists
+                civs_dir = Path("civs")
+                civs_dir.mkdir(parents=True, exist_ok=True)
+
+                # Build your file path inside that folder
+                outfile = civs_dir / f'{selected_civ_name}.txt'
+
+                # Check to see if the file already exists and warn the user about overwriting the file
+                if outfile.exists():
+                    overwrite = input(colour(Fore.YELLOW, f'WARNING: "{selected_civ_name}" already exists. Overwrite? (y/n): '))
+                    if overwrite.lower() != 'y':
+                        print('File not overwritten.\n')
+                        continue
+
+                # Get the componets to save
+                save_name = selected_civ_name
+                save_title = description_lines[0]
+                bonuses = []
+                next_line_is_unique_unit = False
+                next_line_is_team = False
+                next_line_is_castle_tech = False
+                next_line_is_imperial_tech = False
+                searching_for_dots = True
+                team_bonus = 'NO TEAM BONUS'
+                save_unique_techs = ''
+
+                for i, line in enumerate(description_lines):
+                    # --- Handle unique techs first ---
+                    if next_line_is_castle_tech:
+                        revised_lines = line.replace('• ', '').replace(')', '').split('(')
+                        save_unique_techs = f"{revised_lines[0].strip()}:{revised_lines[1].strip()}"
+                        next_line_is_castle_tech = False
+                        next_line_is_imperial_tech = True
+                        continue
+
+                    elif next_line_is_imperial_tech:
+                        revised_lines = line.replace('• ', '').replace(')', '').split('(')
+                        save_unique_techs += f"|{revised_lines[0].strip()}:{revised_lines[1].strip()}"
+                        next_line_is_imperial_tech = False
+                        continue
+
+                    # --- Handle unique unit ---
+                    if next_line_is_unique_unit:
+                        save_unique_unit = line.split('(')[0].strip()
+                        next_line_is_unique_unit = False
+                        continue
+
+                    # --- Handle bonuses ---
+                    if line.startswith('•') and searching_for_dots:
+                        bonuses.append(line[2:])
+                        continue
+
+                    # --- Set flags based on section headers ---
+                    if 'Unique Techs' in line:
+                        next_line_is_castle_tech = True
+                        searching_for_dots = False
+                    elif 'Unique Unit' in line or 'Unique ' in line:  # make this more precise
+                        searching_for_dots = False
+                        next_line_is_unique_unit = True
+                    elif 'Team Bonus' in line:
+                        next_line_is_team = True
+
+                    # --- Handle team bonus ---
+                    if next_line_is_team:
+                        team_bonus = line
+                        next_line_is_team = False
+
+                save_bonuses = '|'.join(bonuses) + '|' + team_bonus
+                save_graphics = DATA.civs[selected_civ_index].units
+                for sound_item in DATA.sounds[303].items:
+                    if sound_item.civilization == selected_civ_index + 1:
+                        save_language = sound_item.filename.split('_')[0]
+                        break
+                for effect in DATA.effects:
+                    if effect.name.lower() == f'{selected_civ_name} tech tree'.lower():
+                        save_tech_tree = [ec.d for ec in effect.effect_commands if ec.type == 102]
+                        save_tech_tree = ','.join(str(x) for x in save_tech_tree)
+                        break
+                save_scout = DATA.civs[selected_civ_index].resources[263]
+                
+                # Create the file unpickled
+                with open(outfile, "wb") as file:
+                    try:
+                        file.write(f'Name: {save_name}\n'.encode('utf-8'))
+                    except Exception:
+                        file.write(b'Name: ERROR\n')
+                        print("Name: ERROR")
+
+                    try:
+                        file.write(f'Title: {save_title}\n'.encode('utf-8'))
+                    except Exception:
+                        file.write(b'Title: ERROR\n')
+                        print("Title: ERROR")
+
+                    try:
+                        file.write(f'Bonuses: {save_bonuses}\n'.encode('utf-8'))
+                    except Exception:
+                        file.write(b'Bonuses: ERROR\n')
+                        print("Bonuses: ERROR")
+
+                    try:
+                        file.write(f'Unique Unit: {save_unique_unit}\n'.encode('utf-8'))
+                    except Exception:
+                        file.write(b'Unique Unit: ERROR\n')
+                        print("Unique Unit: ERROR")
+
+                    try:
+                        file.write(f'Unique Techs: {save_unique_techs}\n'.encode('utf-8'))
+                    except Exception as e:
+                        file.write(b'Unique Techs: ERROR\n')
+                        print(print(str(e)))
+
+                    try:
+                        file.write(f'Graphics: {save_graphics}\n'.encode('utf-8'))
+                    except Exception:
+                        file.write(b'Graphics: ERROR\n')
+                        print("Graphics: ERROR")
+
+                    try:
+                        file.write(f'Language: {save_language}\n'.encode('utf-8'))
+                    except Exception:
+                        file.write(b'Language: ERROR\n')
+                        print("Language: ERROR")
+
+                    try:
+                        file.write(f'Tech Tree: {save_tech_tree}\n'.encode('utf-8'))
+                    except Exception:
+                        file.write(b'Tech Tree: ERROR\n')
+                        print("Tech Tree: ERROR")
+
+                    try:
+                        file.write(f'Scout: {save_scout}\n'.encode('utf-8'))
+                    except Exception:
+                        file.write(b'Scout: ERROR\n')
+                        print("Scout: ERROR")
+
+                print(colour(Fore.GREEN, f'"{selected_civ_name}.txt" saved successfully!\n'))
+                time.sleep(1)
+
+
+                '''import os
+                import pickle
+                from pathlib import Path
+
+                def sanitize_filename(name: str) -> str:
+                    """Keep letters, numbers, spaces, underscores, and dashes."""
+                    return "".join(c for c in name if c.isalnum() or c in (" ", "_", "-")).strip()
+
+                # Build the data-to-save ONCE so we use the exact same write path for new/overwrite
+                # Build the data-to-save ONCE so we use the exact same write path for new/overwrite
+                def build_data_to_save(description_lines):
+                    bonuses = []
+                    team_bonus = ''
+                    unique_techs = []
+                    searching_for_dots = True
+                    next_line_is_team = False
+                    next_line_is_castle_tech = False
+                    next_line_is_imperial_tech = False
+
+                    for i, line in enumerate(description_lines):
+                        if 'Team Bonus' in line:
+                            next_line_is_team = True
+                        elif 'Unique Techs' in line:
+                            next_line_is_castle_tech = True
+                        elif 'Unique' in line:
+                            searching_for_dots = False
+
+                        if line.startswith('•') and searching_for_dots:
+                            bonuses.append(line[2:])
+                        elif next_line_is_team:
+                            team_bonus = line
+                            next_line_is_team = False
+                        elif next_line_is_castle_tech:
+                            revised_lines = line.replace('• ', '').replace(')', '').split('(')
+                            unique_techs.append(f'{revised_lines[0].strip()}:{revised_lines[1].strip()}')
+                            next_line_is_castle_tech = False
+                            next_line_is_imperial_tech = True
+                        elif next_line_is_imperial_tech:
+                            revised_lines = line.replace('• ', '').replace(')', '').split('(')
+                            unique_techs.append(f'{revised_lines[0].strip()}:{revised_lines[1].strip()}')
+                            next_line_is_imperial_tech = False
+
+                    # Unique Unit
+                    unique_unit = ''
+                    for i, effect in enumerate(DATA.effects):
+                        if effect.name.lower() == f'{selected_civ_name}: (castle unit)'.lower():
+                            unique_unit = get_unit_name(effect.effect_commands[0].a)
+                            break
+
+                    # Tech tree
+                    disabled_techs = []
+                    for i, effect in enumerate(DATA.effects):
+                        if effect.name.lower() == f'{selected_civ_name} tech tree'.lower():
+                            for ec in effect.effect_commands:
+                                if ec.type == 102:
+                                    disabled_techs.append(ec.d)
+                            break
+
+                    # Graphics
+                    general_architecture_sets = {'Southeast European': 7, 'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1}
+                    monk_sets = {'Christian': 0, 'Mesoamerican': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40, 'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35}
+                    monastery_sets = {'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Tengri': 12, 'Pagan': 35}
+                    trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
+                    ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5, "Eastern European": 23, "Mediterranean": 14, "Mesoamerican": 15, "Middle Eastern": 9, "Southeast Asian": 28, "Western European": 1}
+                    castle_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6, "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11, "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17, "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22, "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27, "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32, "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37, "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42, "Romans": 43, "Armenians": 44, "Georgians": 45, "Shu": 49, "Wu": 50, "Wei": 51, "Jurchens": 52, "Khitans": 53}
+                    wonder_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6, "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11, "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17, "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22, "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27, "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32, "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37, "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42, "Romans": 43, "Armenians": 44, "Georgians": 45, "Shu": 49, "Wu": 50, "Wei": 51, "Jurchens": 52, "Khitans": 53}
+                            
+                    # Custom Castles
+                    for custom_castle in ['Poenari Castle']:
+                        castle_sets[custom_castle] = len(castle_sets)
+
+                    # Custom Wonders
+                    for custom_wonder in ['Aachen Cathedral', 'Dome of the Rock', 'Dormition Cathedral', 'Gol Gumbaz', 'Minaret of Jam', 'Pyramid', 'Quimper Cathedral', 'Sankore Madrasah', 'Tower of London']:
+                        wonder_sets[custom_wonder] = len(wonder_sets)
+
+                    # Combine all dictionaries
+                    graphic_sets = [general_architecture_sets, castle_sets, wonder_sets, monk_sets, monastery_sets, trade_cart_sets, ship_sets]
+
+                    # Sort each dictionary by key alphabetically
+                    graphic_sets = [dict(sorted(g.items())) for g in graphic_sets]
+
+                    # Get current graphics
+                    graphic_titles = ["General", "Castle", "Wonder", 'Monk', 'Monastery', 'Trade Cart', 'Ships']
+                    unit_bank = {0: range(0, len(DATA.civs[1].units)), 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [128, 204], 6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
+                    current_graphics = [''] * len(graphic_titles)
+
+                    # Scan the units for their graphics
+                    try:
+                        for i, graphic_set in enumerate(graphic_sets):
+                            try:
+                                test_unit = unit_bank[i][0] if i > 0 else 463
+                                for key, value in graphic_set.items():
+                                    if DATA.civs[selected_civ_index + 1].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
+                                        current_graphics[i] = key
+                                        break
+                            except Exception as e:
+                                etype, evalue, etb = sys.exc_info()
+                                print(f"[ERROR] {etype.__name__}: {e}")
+                                print("Traceback:")
+                                print("".join(traceback.format_exception(etype, evalue, etb)))
+                    except:
+                        pass
+
+                    payload = {
+                        'Name': selected_civ_name,
+                        'Title': description_lines[0],
+                        'Bonuses': '|'.join(bonuses),
+                        'Team Bonus': team_bonus,
+                        'Unique Unit': unique_unit,
+                        'Unique Techs': '|'.join(unique_techs),
+                        'Graphics': '|'.join(current_graphics),
+                        'Tech Tree': ', '.join(disabled_techs)
+                    }
+                    return payload
+
+                civs_dir = Path("civs")
+                civs_dir.mkdir(parents=True, exist_ok=True)
+
+                safe_name = sanitize_filename(selected_civ_name)
+                outfile = civs_dir / f"{safe_name}.pkl"
+
+                # Build the payload once
+                data_to_save = build_data_to_save(description_lines)
+
+                # If exists, confirm overwrite
+                if outfile.exists():
+                    warn = (
+                        f"\033[31mWARNING: {selected_civ_name} has already been saved. "
+                        f"If you continue, the previous {selected_civ_name} file will be overwritten. "
+                        f"Is this okay? y/n\033[0m: "
+                    )
+                    resp = input(warn).strip().lower()
+                    if resp not in ("y", "yes"):
+                        print("Save cancelled.")
+                    else:
+                        with open(outfile, "wb") as f:
+                            pickle.dump(data_to_save, f)
+                        print(f"Overwrote save for {selected_civ_name}: {outfile}")
+                else:
+                    with open(outfile, "wb") as f:
+                        pickle.dump(data_to_save, f)
+                    print(f"Saved {selected_civ_name}: {outfile}")'''
+
         # Open Mod Directory
-        if mod_menu_selection == '2':
+        if mod_menu_selection == '3':
             try:
                 system = platform.system()
                 if system == "Windows":
@@ -3329,7 +3724,7 @@ def main():
                 print("\033[31mERROR: Mod directory not found in local mods folder.\033[0m")
 
         # Revert Mod
-        elif mod_menu_selection == '1':
+        elif mod_menu_selection == '4':
             print("\n\033[31mWARNING: Reverting the mod will completely erase all changes made to the modded files. THIS CHANGE IS IRREVERSIBLE.\033[0m")
             time.sleep(0.5)
             yes = input("Enter 'Y' to continue: ")
@@ -3355,7 +3750,7 @@ def main():
                     while True:
                         readline.set_completer(make_completer(all_civs))
                         readline.parse_and_bind("tab: complete")
-                        selection = input("\nEnter civilization ID or name: ").lower()
+                        selection = input("\nEnter Civilization ID/Name to edit: ").lower()
 
                         # Convert word to index
                         if selection in [opt.lower() for opt in all_civs]:
@@ -3924,41 +4319,111 @@ def main():
 
                         # Unique Techs
                         elif selection == '4':
-                            # Get current techs information
+                            # ---------- helpers ----------
+                            def read_costs_from_tech(tech_obj):
+                                """Return [food, wood, gold, time] from a DATA.techs[*] object."""
+                                food = wood = gold = 0
+                                # Try both common time field names
+                                time_val = getattr(tech_obj, "research_time", None)
+                                if time_val is None:
+                                    time_val = getattr(tech_obj, "research", 0)
+
+                                # resource_cost.type : 0=Food, 1=Wood, 3=Gold in your codebase
+                                for rc in getattr(tech_obj, "resource_costs", []):
+                                    try:
+                                        t = int(getattr(rc, "type", -1))
+                                        amt = int(getattr(rc, "amount", 0))
+                                    except Exception:
+                                        continue
+                                    if t == 0:
+                                        food = amt
+                                    elif t == 1:
+                                        wood = amt
+                                    elif t == 3:
+                                        gold = amt
+                                return [food, wood, gold, int(time_val or 0)]
+
+                            def write_costs_to_tech(tech_obj, costs):
+                                """Apply [food, wood, gold, time] to a DATA.techs[*] object."""
+                                f, w, g, t = costs
+                                # Update resource costs if entries exist
+                                types_seen = set()
+                                for rc in getattr(tech_obj, "resource_costs", []):
+                                    tcode = getattr(rc, "type", None)
+                                    if tcode == 0:
+                                        rc.amount = int(f); types_seen.add(0)
+                                    elif tcode == 1:
+                                        rc.amount = int(w); types_seen.add(1)
+                                    elif tcode == 3:
+                                        rc.amount = int(g); types_seen.add(3)
+
+                                # If any of Food/Wood/Gold entries are missing, we won't synthesize new rc objects
+                                # (your data model likely defines a specific class/constructor). Safe no-op.
+
+                                # Research time (try both common attributes)
+                                if hasattr(tech_obj, "research_time"):
+                                    setattr(tech_obj, "research_time", int(t))
+                                elif hasattr(tech_obj, "research"):
+                                    setattr(tech_obj, "research", int(t))
+
+                            def prompt_costs(label, defaults):
+                                """Prompt with defaults; require exactly 4 ints; clamp negatives to 0; return list of 4 ints."""
+                                df, dw, dg, dt = list(defaults)  # copy to list
+                                while True:
+                                    raw = prompt(
+                                        f'Enter {label} tech costs [Food Wood Gold Time]: ',
+                                        default=f'{df} {dw} {dg} {dt}'
+                                    ).strip()
+
+                                    # Keep defaults
+                                    if raw == '':
+                                        return [df, dw, dg, dt]
+
+                                    # Parse user input
+                                    parts = raw.replace(',', ' ').split()
+                                    if len(parts) != 4:
+                                        print('\033[31mERROR: Please enter exactly 4 integers [Food Wood Gold Time].\033[0m')
+                                        continue
+
+                                    try:
+                                        vals = [max(0, int(p)) for p in parts]  # clamp negatives to 0
+                                    except ValueError:
+                                        print('\033[31mERROR: All values must be integers.\033[0m')
+                                        continue
+
+                                    return vals
+
+                            # ---------- locate current unique techs ----------
                             unique_techs_names = current_unique_techs.split(' / ')
                             unique_techs_ids = [-1, -1]
                             for i, tech in enumerate(DATA.techs):
                                 if tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 102 and tech.research_location == 82:
-                                    unique_techs_ids[0] = i
+                                    unique_techs_ids[0] = i  # Castle
                                 elif tech.civ == selected_civ_index + 1 and tech.required_techs[0] == 103 and tech.research_location == 82:
-                                    unique_techs_ids[1] = i
+                                    unique_techs_ids[1] = i  # Imperial
 
-                            # Clone and assign unique effects for each tech
-                            # Castle Age
+                            # Clone and assign unique effects for each tech (so changes are isolated)
+                            # Castle
                             castle_effect_clone = copy.deepcopy(DATA.effects[DATA.techs[unique_techs_ids[0]].effect_id])
                             castle_effect_id = len(DATA.effects)
                             DATA.effects.append(castle_effect_clone)
                             DATA.techs[unique_techs_ids[0]].effect_id = castle_effect_id
 
-                            # Imperial Age
+                            # Imperial
                             imperial_effect_clone = copy.deepcopy(DATA.effects[DATA.techs[unique_techs_ids[1]].effect_id])
                             imperial_effect_id = len(DATA.effects)
                             DATA.effects.append(imperial_effect_clone)
                             DATA.techs[unique_techs_ids[1]].effect_id = imperial_effect_id
 
-                            # Prompt the user for Castle Age tech
-                            new_castle_tech_name = input(f"\nChange Castle Age tech name: ")#, default=unique_techs_names[0].strip())
+                            # ---------- Castle tech name & description ----------
+                            new_castle_tech_name = input(f"\nChange Castle Age tech name: ")
                             if new_castle_tech_name == '':
                                 new_castle_tech_name = unique_techs_names[0]
 
-                            # Get default description
                             prompt_default_text_castle = description_lines[-5].split('(')[1].strip(')')
 
                             while True:
-                                new_castle_tech_description = input(
-                                    f"Change Castle Age tech description: ")#,
-                                    #default=prompt_default_text_castle.strip()
-                                #)
+                                new_castle_tech_description = input(f"Change Castle Age tech description: ")
                                 new_castle_tech, new_castle_effect = create_bonus(new_castle_tech_description, selected_civ_index)
                                 if len(new_castle_effect[0].effect_commands) == 0 and '*' not in new_castle_tech_description:
                                     print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
@@ -3969,16 +4434,15 @@ def main():
                                     new_castle_tech_description = new_castle_tech_description.replace('*', '')
                                     break
 
-                            # Prompt the user for Imperial Age tech
-                            new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ")#, default=unique_techs_names[1].strip())
+                            # ---------- Imperial tech name & description ----------
+                            new_imperial_tech_name = prompt(f"Change Imperial Age tech name: ")
                             if new_imperial_tech_name == '':
                                 new_imperial_tech_name = unique_techs_names[1]
 
-                            # Get default description
                             prompt_default_text_imperial = description_lines[-4].split('(')[1].strip(')')
 
                             while True:
-                                new_imperial_tech_description = input(f"Change Imperial Age tech description: ")#, default=prompt_default_text_imperial.strip())
+                                new_imperial_tech_description = input(f"Change Imperial Age tech description: ")
                                 new_imperial_tech, new_imperial_effect = create_bonus(new_imperial_tech_description, selected_civ_index)
                                 if len(new_imperial_effect[0].effect_commands) == 0 and '*' not in new_imperial_tech_description:
                                     print(f'\033[31mERROR: Invalid tech description.\n\033[0m\n')
@@ -3989,7 +4453,20 @@ def main():
                                     new_imperial_tech_description = new_imperial_tech_description.replace('*', '')
                                     break
 
-                            # Change the names in string resources
+                            # ---------- Costs: prompt with defaults, validate, clamp ----------
+                            castle_tech = DATA.techs[unique_techs_ids[0]]
+                            imperial_tech = DATA.techs[unique_techs_ids[1]]
+
+                            castle_defaults = read_costs_from_tech(castle_tech)
+                            imperial_defaults = read_costs_from_tech(imperial_tech)
+
+                            castle_costs = prompt_costs("Castle", castle_defaults)
+                            imperial_costs = prompt_costs("Imperial", imperial_defaults)
+
+                            write_costs_to_tech(castle_tech, castle_costs)
+                            write_costs_to_tech(imperial_tech, imperial_costs)
+
+                            # ---------- Strings ----------
                             change_string(DATA.techs[unique_techs_ids[0]].language_dll_name, new_castle_tech_name)
                             change_string(DATA.techs[unique_techs_ids[0]].language_dll_name + 10000, new_castle_tech_name)
                             change_string(DATA.techs[unique_techs_ids[0]].language_dll_description, f"Research {new_castle_tech_name} ({new_castle_tech_description})")
@@ -3999,16 +4476,16 @@ def main():
                             change_string(DATA.techs[unique_techs_ids[1]].language_dll_description, f"Research {new_imperial_tech_name} ({new_imperial_tech_description})")
                             change_string(DATA.techs[unique_techs_ids[1]].language_dll_description + 20000, rf"Research <b>{new_imperial_tech_name}<b> (<cost>)\n{new_imperial_tech_description}.")
 
-                            # Update the internal tech names
+                            # ---------- Internal names ----------
                             DATA.techs[unique_techs_ids[0]].name = new_castle_tech_name
                             DATA.techs[unique_techs_ids[1]].name = new_imperial_tech_name
 
-                            # Update description file
+                            # ---------- Update description file ----------
                             description_lines[-5] = f'• {new_castle_tech_name} ({new_castle_tech_description})'
                             description_lines[-4] = f'• {new_imperial_tech_name} ({new_imperial_tech_description})'
                             save_description(description_code, description_lines)
 
-                            # Save file
+                            # ---------- Save ----------
                             with_real_progress(
                                 lambda progress: save_dat(
                                     progress,
@@ -4215,7 +4692,6 @@ def main():
                                 return 'Unknown'
 
                             def render_tree():
-                                """Rebuild and print the tree view and header."""
                                 # Get current disabled list
                                 tech_tree_effect_id = -1
                                 for i, effect in enumerate(DATA.effects):
@@ -4353,9 +4829,8 @@ def main():
                                     'House': [-1],
                                     'Caravanserai*16': [518],
                                     'Feitoria*16': [570],
-                                    'Mining Camp': [-1],
-                                    'Lumber Camp': [-1],
-                                    'Mule Cart': [932],
+                                    'Mining & Lumber Camp*21': [-1],
+                                    'Mule Cart*21': [932],
                                     'Mill*18': [-1],
                                     'Folwark*18': [793],
                                     'Farm*19': [216],

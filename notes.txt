@@ -73,10 +73,11 @@ Hindustanis         Text        Bonus Text Removed: "Can build Caravanserai in I
                     Cosmetic    Trade Cart graphic set to Camel
 Huns                Gameplay    Farm disabled, Pasture enabled
                     Gameplay    Warships disabled, Canoes enabled
+                    Audio       Language set to Chuvash
 Inca                Gameplay    Warships disabled, Canoes enabled
 Italians            Audio       Language set to Italian
 Japanese            ---
-Jurchens            ---
+Jurchens            Audio       Language set to Jurchen
 Khmer               Cosmetic    Monk graphic set to Hindu
                     Gameplay    Warships disabled, Canoes enabled
                     Gameplay    Cavalry Archers disabled, Elephant Archers enabled
