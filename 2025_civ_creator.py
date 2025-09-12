@@ -458,17 +458,6 @@ def update_tech_tree_graphic(current_civ_name):
         if missing:
             print(f"Missing tech/unit node(s): {missing}")
         return final_blocks
-
-    def create_edited_block(node_id, fields_dict):
-        nid_key = _to_int_safe(node_id, node_id)
-        candidates = entry_bank.get(nid_key, [])
-        if not candidates:
-            print('No block to edit for Node ID:', node_id)
-            return None
-        block = copy.deepcopy(candidates[0])
-        for k, v in fields_dict.items():
-            block[k] = v
-        return block
     # -------------------------------------------------------------------------
 
     # Create a fresh civ block
@@ -1003,6 +992,7 @@ def create_bonus(bonus_string, civ_id):
             'battering rams': [35, 422, 548, 1258],
             'armored elephants': [1744, 1746],
             'mangonel-line': [280, 550, 588],
+            'traction trebuchets': [1942],
             'rocket carts': [1904, 1907],
             'scorpions': [279, 542],
             'fishing ships': [13],
@@ -1157,7 +1147,7 @@ def create_bonus(bonus_string, civ_id):
             (re.compile(r'cost\s+([-+]?\d+%?)\s+wood', re.IGNORECASE), [104]),
             (re.compile(r'cost\s+([-+]?\d+%?)\s+gold', re.IGNORECASE), [105]),
             (re.compile(r'cost\s+([-+]?\d+%?)\s+stone', re.IGNORECASE), [106]),
-            (re.compile(r'cost\s+([-+]?\d+)', re.IGNORECASE), [103, 104, 105, 106]),
+            (re.compile(r'cost\s+([-+]?\d+)', re.IGNORECASE), [100]),
             (re.compile(r'regenerate\s+([-+]?\d+%?)\s+HP per minute', re.IGNORECASE), [109]),
             (re.compile(r'([-+]?\d+%?)\s+pierce armor', re.IGNORECASE), [8.768]),
             (re.compile(r'([-+]?\d+%?)\s+armor', re.IGNORECASE), [8.1024]),
@@ -2480,7 +2470,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elephant_gunner.speed = 0.8
         elephant_gunner.type_50.reload_time = 3.45
         elephant_gunner.type_50.accuracy_percent = 75
-        elephant_gunner.creatable.train_time = 28
+        elephant_gunner.creatable.train_locations[0].train_time = 28
         elephant_gunner.creatable.resource_costs = (ResourceCost(type=0, amount=80, flag=1), ResourceCost(type=3, amount=100, flag=1), ResourceCost(type=4, amount=1, flag=0))
         elephant_gunner.type_50.projectile_unit_id = 380
         elephant_gunner.creatable.train_locations[0].hot_key_id = 16107
@@ -4003,6 +3993,16 @@ def main():
                                         if team_label_idx is not None and team_label_idx + 1 < len(working_description):
                                             working_description[team_label_idx + 1] = team_text_original
 
+                                            # Persist change to MOD_STRINGS
+                                            with open(MOD_STRINGS, 'r+', encoding='utf-8') as f:
+                                                lines = f.readlines()
+                                                line_index = selected_civ_index + len(DATA.civs) - 1
+                                                # Write description back with escaped \n sequences
+                                                lines[line_index] = f'{lines[line_index][:6]}"{"\\\\n".join(working_description)}"\n'
+                                                f.seek(0)
+                                                f.writelines(lines)
+                                                f.truncate()
+
                                         print(f'Team bonus changed for {selected_civ_name}.')
                                         save = '*'
                                         time.sleep(1)
@@ -4026,7 +4026,7 @@ def main():
 
                                         # Disable old effect
                                         for tech in DATA.techs:
-                                            if tech.name == f'{selected_civ_name.UPPER()}: {old_text}':
+                                            if tech.name == f'{selected_civ_name.upper()}: {old_text}':
                                                 tech.effect_id = -1
 
                                         # Replace effect
@@ -4098,6 +4098,8 @@ def main():
 
                                 if new_castle_unit == '?':
                                     print(ALL_CASTLE_UNITS)
+                                elif new_castle_unit == '':
+                                    break
                                 elif new_castle_unit not in ALL_CASTLE_UNITS:
                                     print("\033[31mERROR: Unit not found.\033[0m")
                                 else:
@@ -4884,8 +4886,7 @@ def main():
                                 tech_tree_actions = input('Action: ')
                                 if tech_tree_actions == '':
                                     if save == '*':
-                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'),
-                                                        'Saving Mod', total_steps=100)
+                                        with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
                                         update_tech_tree_graphic(selected_civ_name)
                                         print('Tech tree saved.')
                                         time.sleep(1)
