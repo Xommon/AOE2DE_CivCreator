@@ -2,11 +2,14 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
+  <property name="enabled">
+   <bool>true</bool>
+  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>911</width>
+    <width>951</width>
     <height>672</height>
    </rect>
   </property>
@@ -14,9 +17,15 @@
    <string>Mod Creator</string>
   </property>
   <widget class="QWidget" name="centralwidget">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <layout class="QHBoxLayout" name="horizontalLayout">
     <item>
      <widget class="QSplitter" name="splitter">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
@@ -26,12 +35,59 @@
         <verstretch>0</verstretch>
        </sizepolicy>
       </property>
-      <widget class="QWidget" name="leftPanel">
+      <widget class="QFrame" name="leftPanel">
+       <property name="enabled">
+        <bool>true</bool>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>300</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>300</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <layout class="QVBoxLayout" name="verticalLayout_left">
         <item>
          <layout class="QHBoxLayout" name="layout_civ_row">
           <item>
-           <widget class="QComboBox" name="dropdown_civ_name"/>
+           <widget class="QComboBox" name="dropdown_civ_name">
+            <property name="minimumSize">
+             <size>
+              <width>170</width>
+              <height>40</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>170</width>
+              <height>40</height>
+             </size>
+            </property>
+            <property name="font">
+             <font>
+              <family>Noto Sans</family>
+              <pointsize>12</pointsize>
+             </font>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
           </item>
           <item>
            <widget class="QLabel" name="image_civ_icon">
@@ -55,7 +111,23 @@
          </layout>
         </item>
         <item>
-         <widget class="QTextEdit" name="textbox_description"/>
+         <widget class="QTextEdit" name="textbox_description">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>300</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>300</width>
+            <height>16777215</height>
+           </size>
+          </property>
+         </widget>
         </item>
        </layout>
       </widget>
@@ -63,112 +135,12 @@
        <layout class="QVBoxLayout" name="verticalLayout_right">
         <item>
          <widget class="QTabWidget" name="tabWidget">
-          <property name="currentIndex">
-           <number>1</number>
+          <property name="enabled">
+           <bool>true</bool>
           </property>
-          <widget class="QWidget" name="tabTechTree">
-           <attribute name="title">
-            <string>Tech Tree</string>
-           </attribute>
-           <layout class="QHBoxLayout" name="horizontalLayout_techtree" stretch="0,0">
-            <item>
-             <widget class="QFrame" name="frameAges">
-              <property name="frameShape">
-               <enum>QFrame::StyledPanel</enum>
-              </property>
-              <layout class="QVBoxLayout" name="verticalLayout_ages">
-               <item>
-                <widget class="QLabel" name="labelDarkAge">
-                 <property name="text">
-                  <string>Dark Age</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="labelFeudalAge">
-                 <property name="text">
-                  <string>Feudal Age</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="labelCastleAge">
-                 <property name="text">
-                  <string>Castle Age</string>
-                 </property>
-                </widget>
-               </item>
-               <item>
-                <widget class="QLabel" name="labelImperialAge">
-                 <property name="text">
-                  <string>Imperial Age</string>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </widget>
-            </item>
-            <item>
-             <widget class="QScrollArea" name="scrollAreaTechTree">
-              <property name="verticalScrollBarPolicy">
-               <enum>Qt::ScrollBarAlwaysOff</enum>
-              </property>
-              <property name="horizontalScrollBarPolicy">
-               <enum>Qt::ScrollBarAlwaysOn</enum>
-              </property>
-              <property name="widgetResizable">
-               <bool>true</bool>
-              </property>
-              <widget class="QWidget" name="scrollAreaWidgetContents">
-               <property name="geometry">
-                <rect>
-                 <x>0</x>
-                 <y>0</y>
-                 <width>359</width>
-                 <height>540</height>
-                </rect>
-               </property>
-               <layout class="QHBoxLayout" name="horizontalLayout_agesFrames">
-                <item>
-                 <widget class="QFrame" name="frameDarkAge">
-                  <property name="frameShape">
-                   <enum>QFrame::StyledPanel</enum>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QFrame" name="frameFeudalAge">
-                  <property name="styleSheet">
-                   <string notr="true">background-color: #e0e0e0;</string>
-                  </property>
-                  <property name="frameShape">
-                   <enum>QFrame::StyledPanel</enum>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QFrame" name="frameCastleAge">
-                  <property name="frameShape">
-                   <enum>QFrame::StyledPanel</enum>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QFrame" name="frameImperialAge">
-                  <property name="styleSheet">
-                   <string notr="true">background-color: #e0e0e0;</string>
-                  </property>
-                  <property name="frameShape">
-                   <enum>QFrame::StyledPanel</enum>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
-              </widget>
-             </widget>
-            </item>
-           </layout>
-          </widget>
+          <property name="currentIndex">
+           <number>0</number>
+          </property>
           <widget class="QWidget" name="tabGeneral">
            <attribute name="title">
             <string>General</string>
@@ -188,7 +160,18 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="input_civ_name"/>
+             <layout class="QHBoxLayout" name="horizontalLayout_2">
+              <item>
+               <widget class="QLineEdit" name="input_civ_name"/>
+              </item>
+              <item>
+               <widget class="QPushButton" name="button_civ_name">
+                <property name="text">
+                 <string>Check</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
             </item>
             <item>
              <widget class="QLabel" name="labelLanguage">
@@ -254,64 +237,218 @@
             <item>
              <layout class="QHBoxLayout" name="layout_castle_tech">
               <item>
-               <layout class="QVBoxLayout" name="castle_tech_name_column">
-                <item>
-                 <widget class="QLabel" name="labelCastleTechName">
-                  <property name="text">
-                   <string>Castle Tech Name</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLineEdit" name="input_castle_tech_name"/>
-                </item>
-               </layout>
+               <widget class="QFrame" name="frame">
+                <property name="minimumSize">
+                 <size>
+                  <width>200</width>
+                  <height>0</height>
+                 </size>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>200</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <layout class="QVBoxLayout" name="castle_tech_name_column">
+                 <item>
+                  <widget class="QLabel" name="labelCastleTechName">
+                   <property name="minimumSize">
+                    <size>
+                     <width>0</width>
+                     <height>18</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>16777215</width>
+                     <height>18</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>Castle Tech Name</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="input_castle_tech_name">
+                   <property name="minimumSize">
+                    <size>
+                     <width>0</width>
+                     <height>26</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>16777215</width>
+                     <height>26</height>
+                    </size>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
               </item>
               <item>
-               <layout class="QVBoxLayout" name="castle_tech_desc_column">
-                <item>
-                 <widget class="QLabel" name="labelCastleTechDescription">
-                  <property name="text">
-                   <string>Castle Tech Description</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLineEdit" name="input_castle_tech_description"/>
-                </item>
-               </layout>
+               <widget class="QFrame" name="">
+                <layout class="QVBoxLayout" name="castle_tech_desc_column">
+                 <item>
+                  <widget class="QLabel" name="labelCastleTechDescription">
+                   <property name="minimumSize">
+                    <size>
+                     <width>0</width>
+                     <height>18</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>16777215</width>
+                     <height>18</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>Castle Tech Description</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <layout class="QHBoxLayout" name="horizontalLayout_3">
+                   <item>
+                    <widget class="QLineEdit" name="input_castle_tech_description">
+                     <property name="minimumSize">
+                      <size>
+                       <width>0</width>
+                       <height>26</height>
+                      </size>
+                     </property>
+                     <property name="maximumSize">
+                      <size>
+                       <width>16777215</width>
+                       <height>26</height>
+                      </size>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="button_castle_desc">
+                     <property name="text">
+                      <string>Check</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                </layout>
+               </widget>
               </item>
              </layout>
             </item>
             <item>
              <layout class="QHBoxLayout" name="layout_imperial_tech">
               <item>
-               <layout class="QVBoxLayout" name="imperial_tech_name_column">
-                <item>
-                 <widget class="QLabel" name="labelImperialTechName">
-                  <property name="text">
-                   <string>Imperial Tech Name</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLineEdit" name="input_imperial_tech_name"/>
-                </item>
-               </layout>
+               <widget class="QFrame" name="frame">
+                <property name="minimumSize">
+                 <size>
+                  <width>200</width>
+                  <height>0</height>
+                 </size>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>200</width>
+                  <height>16777215</height>
+                 </size>
+                </property>
+                <layout class="QVBoxLayout" name="imperial_tech_name_column">
+                 <item>
+                  <widget class="QLabel" name="labelImperialTechName">
+                   <property name="minimumSize">
+                    <size>
+                     <width>0</width>
+                     <height>18</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>16777215</width>
+                     <height>18</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>Imperial Tech Name</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="input_imperial_tech_name">
+                   <property name="minimumSize">
+                    <size>
+                     <width>0</width>
+                     <height>26</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>16777215</width>
+                     <height>26</height>
+                    </size>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
               </item>
               <item>
-               <layout class="QVBoxLayout" name="imperial_tech_desc_column">
-                <item>
-                 <widget class="QLabel" name="labelImperialTechDescription">
-                  <property name="text">
-                   <string>Imperial Tech Description</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLineEdit" name="input_imperial_tech_description"/>
-                </item>
-               </layout>
+               <widget class="QFrame" name="">
+                <layout class="QVBoxLayout" name="imperial_tech_desc_column">
+                 <item>
+                  <widget class="QLabel" name="labelImperialTechDescription">
+                   <property name="minimumSize">
+                    <size>
+                     <width>0</width>
+                     <height>18</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>16777215</width>
+                     <height>18</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>Imperial Tech Description</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <layout class="QHBoxLayout" name="horizontalLayout_4">
+                   <item>
+                    <widget class="QLineEdit" name="input_imperial_tech_description">
+                     <property name="minimumSize">
+                      <size>
+                       <width>0</width>
+                       <height>26</height>
+                      </size>
+                     </property>
+                     <property name="maximumSize">
+                      <size>
+                       <width>16777215</width>
+                       <height>26</height>
+                      </size>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="button_imperial_desc">
+                     <property name="text">
+                      <string>Check</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                </layout>
+               </widget>
               </item>
              </layout>
             </item>
@@ -785,6 +922,74 @@
             </item>
            </layout>
           </widget>
+          <widget class="QWidget" name="tabTechTree">
+           <attribute name="title">
+            <string>Tech Tree</string>
+           </attribute>
+           <layout class="QHBoxLayout" name="horizontalLayout_techtree" stretch="0,0">
+            <item>
+             <widget class="QFrame" name="frameAges">
+              <property name="frameShape">
+               <enum>QFrame::StyledPanel</enum>
+              </property>
+              <layout class="QVBoxLayout" name="verticalLayout_ages">
+               <item>
+                <widget class="QLabel" name="labelDarkAge">
+                 <property name="text">
+                  <string>Dark Age</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="labelFeudalAge">
+                 <property name="text">
+                  <string>Feudal Age</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="labelCastleAge">
+                 <property name="text">
+                  <string>Castle Age</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="labelImperialAge">
+                 <property name="text">
+                  <string>Imperial Age</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QScrollArea" name="scrollAreaTechTree">
+              <property name="verticalScrollBarPolicy">
+               <enum>Qt::ScrollBarAlwaysOff</enum>
+              </property>
+              <property name="horizontalScrollBarPolicy">
+               <enum>Qt::ScrollBarAlwaysOn</enum>
+              </property>
+              <property name="widgetResizable">
+               <bool>true</bool>
+              </property>
+              <widget class="QWidget" name="scrollAreaWidgetContents">
+               <property name="geometry">
+                <rect>
+                 <x>0</x>
+                 <y>0</y>
+                 <width>498</width>
+                 <height>540</height>
+                </rect>
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_agesFrames"/>
+              </widget>
+             </widget>
+            </item>
+           </layout>
+          </widget>
          </widget>
         </item>
        </layout>
@@ -794,11 +999,14 @@
    </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>911</width>
+     <width>951</width>
      <height>23</height>
     </rect>
    </property>
@@ -821,7 +1029,11 @@
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+  </widget>
   <action name="actionNew_Mod">
    <property name="text">
     <string>New Mod...</string>

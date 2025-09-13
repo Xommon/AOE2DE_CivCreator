@@ -68,30 +68,38 @@ from PyQt5.QtWidgets import QFileDialog
 from main_window import Ui_MainWindow
 import unicodedata
 from PyQt5 import QtCore
+from PyQt5 import QtGui
 
 class MyApp(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         uic.loadUi("main_window.ui", self)
+        self.setWindowTitle("Talofa")
+        self.centralwidget.setEnabled(False)
 
-        # Get mod location
-        global MOD_FOLDER
-        MOD_FOLDER = r'/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test'
+        # Menu buttons
+        self.actionSave_Mod.triggered.connect(self.save_mod)
+        self.actionOpen_Mod.triggered.connect(self.open_mod)
 
-        # Load the mod
-        print('Loading file...')
-        global DATA
-        DATA = DatFile.parse(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+        # Program buttons
+        self.button_civ_name.clicked.connect(self.change_name)
+
+    def load_mod(self):
+        # Enable app
+        self.centralwidget.setEnabled(True)
 
         # Load the strings
         global MODDED_STRINGS
         MODDED_STRINGS = rf'{MOD_FOLDER}/resources/en/strings/key-value/key-value-modded-strings-utf8.txt'
         global ORIGINAL_STRINGS
         ORIGINAL_STRINGS = rf'{MOD_FOLDER}/resources/en/strings/key-value/key-value-strings-utf8.txt'
+        global MOD_NAME
+        MOD_NAME = MOD_FOLDER.split(r'/')[-1]
+        self.setWindowTitle(f"Talofa - {MOD_NAME}")
 
         # Create the civ class
         class Civ:
-            def __init__(self, index, name, description, tech_tree_index, team_bonus_index, unique_unit_index, language, unique_techs):
+            def __init__(self, index, name, description, tech_tree_index, team_bonus_index, unique_unit_index, language, unique_techs, graphics):
                 self.index = index
                 self.name = name
                 self.description = description
@@ -100,6 +108,7 @@ class MyApp(QtWidgets.QMainWindow):
                 self.unique_unit_index = unique_unit_index
                 self.language = language
                 self.unique_techs = unique_techs
+                self.graphics = graphics
 
         def get_unit_name(unit_id):
             with open(ORIGINAL_STRINGS, 'r', encoding='utf-8') as file:
@@ -169,6 +178,12 @@ class MyApp(QtWidgets.QMainWindow):
 
             return list(set(final_ids))
         
+        # Remove diacritics method
+        def remove_diacritics(text: str) -> str:
+            normalized = unicodedata.normalize("NFD", text)
+            no_diacritics = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+            return no_diacritics.casefold()
+        
         def parse_unique_techs(description: str):
             techs = []
 
@@ -205,12 +220,33 @@ class MyApp(QtWidgets.QMainWindow):
                     techs.append(f"{tech_name}|{tech_description}")
 
             return techs
+        
+        # Update graphics
+        GRAPHICS_GENERAL = {'Austronesian': 29, 'Byzantine': 7, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Mesoamerican': 15, 'Middle Eastern': 9, 'South Asian': 20, 'Southeast Asian': 28, 'West African': 26, 'Western European': 1}
+        GRAPHICS_CASTLE = {'Armenians': 44, 'Aztecs': 15, 'Bengalis': 41, 'Berbers': 27, 'Bohemians': 39, 'Britons': 1, 'Bulgarians': 32, 'Burgundians': 36, 'Burmese': 30, 'Byzantines': 7, 'Celts': 13, 'Chinese': 6, 'Cumans': 34, 'Dravidians': 40, 'Ethiopians': 25, 'Franks': 2, 'Georgians': 45, 'Goths': 3, 'Gurjaras': 42, 'Hindustanis': 20, 'Huns': 17, 'Inca': 21, 'Italians': 19, 'Japanese': 5, 'Jurchens': 52, 'Khitan': 53, 'Khmer': 28, 'Koreans': 18, 'Lithuanians': 35, 'Magyars': 22, 'Malay': 29, 'Malians': 26, 'Maya': 16, 'Mongols': 12, 'Persians': 8, 'Poles': 38, 'Portuguese': 24, 'Romans': 43, 'Saracens': 9, 'Shu': 49, 'Sicilians': 37, 'Slavs': 23, 'Spanish': 14, 'Tatars': 33, 'Teutons': 4, 'Turks': 10, 'Vikings': 11, 'Vietnamese': 31, 'Wei': 51, 'Wu': 50}
+        GRAPHICS_WONDER = {'Armenians': 44, 'Aztecs': 15, 'Bengalis': 41, 'Berbers': 27, 'Bohemians': 39, 'Britons': 1, 'Bulgarians': 32, 'Burgundians': 36, 'Burmese': 30, 'Byzantines': 7, 'Celts': 13, 'Chinese': 6, 'Cumans': 34, 'Dravidians': 40, 'Ethiopians': 25, 'Franks': 2, 'Georgians': 45, 'Goths': 3, 'Gurjaras': 42, 'Hindustanis': 20, 'Huns': 17, 'Inca': 21, 'Italians': 19, 'Japanese': 5, 'Jurchens': 52, 'Khitan': 53, 'Khmer': 28, 'Koreans': 18, 'Lithuanians': 35, 'Magyars': 22, 'Malay': 29, 'Malians': 26, 'Maya': 16, 'Mongols': 12, 'Persians': 8, 'Poles': 38, 'Portuguese': 24, 'Romans': 43, 'Saracens': 9, 'Shu': 49, 'Sicilians': 37, 'Slavs': 23, 'Spanish': 14, 'Tatars': 33, 'Teutons': 4, 'Turks': 10, 'Vikings': 11, 'Vietnamese': 31, 'Wei': 51, 'Wu': 50}
+        GRAPHICS_MONK = {'African': 25, 'Buddhist': 5, 'Catholic': 14, 'Christian': 0, 'Hindu': 40, 'Mesoamerican': 15, 'Muslim': 9, 'Orthodox': 23, 'Pagan': 35, 'Tengri': 12}
+        GRAPHICS_MONASTERY = {'Byzantine': 7, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'East African': 25, 'Eastern European': 23, 'Mediterranean': 14, 'Mesoamerican': 15, 'Middle Eastern': 9, 'Pagan': 35, 'South Asian': 40, 'Southeast Asian': 28, 'Southeast European': 44, 'Tengri': 12, 'West African': 26, 'Western European': 1}
+        GRAPHICS_TRADECART = {'Camel': 9, 'Horse': 1, 'Human': 15, 'Ox': 25, 'Water Buffalo': 5}
+        GRAPHICS_SHIPS = {'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Mesoamerican': 15, 'Middle Eastern': 9, 'Southeast Asian': 28, 'West African': 25, 'Western European': 1}
 
-        # Remove diacritics method
-        def remove_diacritics(text: str) -> str:
-            normalized = unicodedata.normalize("NFD", text)
-            no_diacritics = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
-            return no_diacritics.casefold()
+        # Combine all dictionaries
+        graphic_sets = [GRAPHICS_GENERAL, GRAPHICS_CASTLE, GRAPHICS_WONDER, GRAPHICS_MONK, GRAPHICS_MONASTERY, GRAPHICS_TRADECART, GRAPHICS_SHIPS]
+
+        # Add graphics
+        def populate_dropdown_from_dict(dropdown, data_dict):
+            dropdown.clear()
+            for name, value in sorted(data_dict.items(), key=lambda x: x[0]):  # sort by name
+                dropdown.addItem(name, userData=value)
+
+        # Fill each dropdown
+        populate_dropdown_from_dict(self.dropdown_general_graphics, GRAPHICS_GENERAL)
+        populate_dropdown_from_dict(self.dropdown_castle_graphics, GRAPHICS_CASTLE)
+        populate_dropdown_from_dict(self.dropdown_wonder_graphics, GRAPHICS_WONDER)
+        populate_dropdown_from_dict(self.dropdown_monk_graphics, GRAPHICS_MONK)
+        populate_dropdown_from_dict(self.dropdown_monastery_graphics, GRAPHICS_MONASTERY)
+        populate_dropdown_from_dict(self.dropdown_tradecart_graphics, GRAPHICS_TRADECART)
+        populate_dropdown_from_dict(self.dropdown_ships_graphics, GRAPHICS_SHIPS)
 
         # Load all current civs
         global CIVS
@@ -227,7 +263,7 @@ class MyApp(QtWidgets.QMainWindow):
             TOTAL_CIVS_COUNT = len(DATA.civs) - len(DISABLED_CIVS)
 
             # Create new civ object
-            new_civ = Civ(-1, '', '', -1, -1, -1, '', [])
+            new_civ = Civ(-1, '', '', -1, -1, -1, '', [], [])
             new_civ.index = i
 
             # Get the stats for the civ
@@ -292,6 +328,45 @@ class MyApp(QtWidgets.QMainWindow):
                 if sound_item.civilization == new_civ.index:
                     new_civ.language = sound_item.filename.split('_')[0]
 
+            # Load architecture sets
+            global ARCHITECTURE_SETS
+            ARCHITECTURE_SETS = []
+            '''try:
+                with open(f"{MOD_FOLDER}/{MOD_NAME}.pkl", "rb") as file:
+                    while True:
+                        try:
+                            units = pickle.load(file)
+                            ARCHITECTURE_SETS.append(units)
+                        except EOFError:
+                            break
+            except FileNotFoundError:
+                print(f"[ERROR] Could not find architecture pickle: {MOD_FOLDER}/{MOD_NAME}.pkl")
+                ARCHITECTURE_SETS = []'''
+
+            # Sort each dictionary by key alphabetically
+            graphic_sets = [dict(sorted(g.items())) for g in graphic_sets]
+
+            # Get current graphics
+            graphic_titles = ["General", "Castle", "Wonder", 'Monk', 'Monastery', 'Trade Cart', 'Ships']
+            unit_bank = {0: range(0, len(DATA.civs[1].units)), 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [128, 204], 6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
+            current_graphics = [''] * len(graphic_titles)
+
+            # Scan the units for their graphics
+            '''for i, graphic_set in enumerate(graphic_sets):
+                try:
+                    # Select the unit to test
+                    test_unit = unit_bank[i][0] if i > 0 else 463
+
+                    for key, value in graphic_set.items():
+                        if DATA.civs[new_civ.index].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
+                            current_graphics[i] = value
+                            break
+                except Exception as e:
+                    pass'''
+
+            new_civ.graphics = current_graphics
+
+            # Add the civ to the list
             CIVS.append(new_civ)
 
         # Populate civ dropdown
@@ -329,6 +404,35 @@ class MyApp(QtWidgets.QMainWindow):
         for unit_name in ALL_CASTLE_UNITS:
             self.dropdown_unique_units.addItem(unit_name.title(), userData=get_unit_id(unit_name, False))
 
+        # Populate graphics dropdowns
+        self.dropdown_general_graphics.clear()
+        for name, value in GRAPHICS_GENERAL.items():
+            self.dropdown_general_graphics.addItem(name, userData=value)
+
+        self.dropdown_castle_graphics.clear()
+        for name, value in GRAPHICS_CASTLE.items():
+            self.dropdown_castle_graphics.addItem(name, userData=value)
+
+        self.dropdown_wonder_graphics.clear()
+        for name, value in GRAPHICS_WONDER.items():
+            self.dropdown_wonder_graphics.addItem(name, userData=value)
+
+        self.dropdown_monk_graphics.clear()
+        for name, value in GRAPHICS_MONK.items():
+            self.dropdown_monk_graphics.addItem(name, userData=value)
+
+        self.dropdown_monastery_graphics.clear()
+        for name, value in GRAPHICS_MONASTERY.items():
+            self.dropdown_monastery_graphics.addItem(name, userData=value)
+
+        self.dropdown_tradecart_graphics.clear()
+        for name, value in GRAPHICS_TRADECART.items():
+            self.dropdown_tradecart_graphics.addItem(name, userData=value)
+
+        self.dropdown_ships_graphics.clear()
+        for name, value in GRAPHICS_SHIPS.items():
+            self.dropdown_ships_graphics.addItem(name, userData=value)
+
         # Connect signals
         self.dropdown_civ_name.currentIndexChanged.connect(self.dropdown_civ_name_changed)
         self.dropdown_language.currentIndexChanged.connect(self.dropdown_language_changed)
@@ -337,6 +441,82 @@ class MyApp(QtWidgets.QMainWindow):
 
         # Run once at startup
         self.dropdown_civ_name_changed(self.dropdown_civ_name.currentIndex())
+
+    def save_mod(self):
+        if MOD_FOLDER and '*' in self.windowTitle():
+            print('Saving mod...')
+            DATA.save(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+            print('Mod saved!')
+
+            # Change the name in the strings
+            with open(MODDED_STRINGS, 'r+', encoding='utf-8') as file:
+                lines = file.readlines()  # Read all lines
+                for i, line in enumerate(lines):
+                    try:
+                        lines[i] = lines[i][:5] + f' "{CIVS[i].name}"\n'  # Modify the specific line
+                    except:
+                        break
+
+                file.seek(0)  # Move to the beginning of the file
+                file.writelines(lines)  # Write all lines back
+
+            # Remove save asterisk
+            self.setWindowTitle(self.windowTitle().replace('*', ''))
+
+    def open_mod(self):
+        # Get mod location
+        global MOD_FOLDER
+        MOD_FOLDER = r'/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test'
+
+        # Load the mod
+        print('Loading file...')
+        global DATA
+        DATA = DatFile.parse(rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat')
+        print('Mod loaded!')
+        self.load_mod()
+
+    def change_name(self):
+        # Gather the names
+        old_name = CURRENT_CIV.name
+        new_name = self.input_civ_name.text()
+
+        # Compare the names
+        if (old_name.lower() == new_name.lower() or 
+            any(civ.name.lower() == new_name.lower() for civ in CIVS)):
+            self.input_civ_name.setText(old_name)
+            return
+        
+        # Change the name in the DAT file
+        DATA.civs[CURRENT_CIV.index].name = new_name
+
+        # Update object name
+        CURRENT_CIV.name = new_name # Update the selected civ name
+
+        # Repopulate the civ objects
+        self.dropdown_civ_name.clear()
+        for civ in CIVS:
+            self.dropdown_civ_name.addItem(civ.name)
+
+        # Change name of tech tree, team bonus, civilization bonus effects, and unique units
+        for i, effect in enumerate(DATA.effects):
+            if effect.name == f'{old_name} Tech Tree':
+                effect.name = f'{new_name} Tech Tree'
+            elif effect.name == f'{old_name} Team Bonus':
+                effect.name = f'{new_name} Team Bonus'
+            elif f'{old_name.upper()}' in effect.name:
+                name_list = effect.name.split(':')
+                name_list[0] = new_name.upper()
+                effect.name = ':'.join(name_list)
+
+        # Change the name of the bonus techs and unique units
+        for i, tech in enumerate(DATA.techs):
+            if f'{old_name.upper()}' in tech.name:
+                name_list = tech.name.split(':')
+                name_list[0] = new_name.upper()
+                tech.name = ':'.join(name_list)
+
+        if not self.windowTitle().endswith('*'):
+            self.setWindowTitle(f'{self.windowTitle()}*')
 
     def dropdown_civ_name_changed(self, index):
         from PyQt5 import QtCore
@@ -354,6 +534,11 @@ class MyApp(QtWidgets.QMainWindow):
             rebuilt.append(f"<b>{part}</b>" if bold_on else part)
             bold_on = not bold_on
         description_html = "".join(rebuilt)
+
+        # Update icon
+        icon_file_name = CURRENT_CIV.name.lower()
+        icon_names = ['gaia', 'britons', 'franks', 'goths', 'teutons', 'japanese', 'chinese', 'byzantines', 'persians', 'saracens', 'turks', 'vikings', 'mongols', 'celts', 'spanish', 'aztecs', 'mayans', 'huns', 'koreans', 'italians', 'indians', 'inca', 'magyars', 'slavs', 'portuguese', 'ethiopians', 'malians', 'berber', 'khmer', 'malay', 'burmese', 'vietnamese', 'bulgarians', 'tatars', 'cumans', 'lithuanians', 'burgundians', 'sicilians', 'poles', 'bohemians', 'dravidians', 'bengalis', 'gurjaras', 'romans', 'armenians', 'georgians', 'achaemenids', 'athenians', 'spartans', 'shu', 'wu', 'wei', 'jurchens', 'khitans']
+        self.image_civ_icon.setPixmap(QtGui.QPixmap(f'{MOD_FOLDER}/resources/_common/wpfg/resources/civ_techtree/menu_techtree_{icon_names[CURRENT_CIV.index]}.png'))
 
         # Update description text box
         self.textbox_description.setHtml(description_html)
@@ -395,6 +580,84 @@ class MyApp(QtWidgets.QMainWindow):
         self.input_imperial_tech_name.setText(CURRENT_CIV.unique_techs[1].split('|')[0])
         self.input_imperial_tech_description.setText(CURRENT_CIV.unique_techs[1].split('|')[1])
 
+        # Define which test unit corresponds to each category
+        self.dropdown_general_graphics.setCurrentIndex(
+            self.dropdown_general_graphics.findData(CURRENT_CIV.graphics[0])
+        )
+        self.dropdown_castle_graphics.setCurrentIndex(
+            self.dropdown_castle_graphics.findData(CURRENT_CIV.graphics[1])
+        )
+        self.dropdown_wonder_graphics.setCurrentIndex(
+            self.dropdown_wonder_graphics.findData(CURRENT_CIV.graphics[2])
+        )
+        self.dropdown_monk_graphics.setCurrentIndex(
+            self.dropdown_monk_graphics.findData(CURRENT_CIV.graphics[3])
+        )
+        self.dropdown_monastery_graphics.setCurrentIndex(
+            self.dropdown_monastery_graphics.findData(CURRENT_CIV.graphics[4])
+        )
+        self.dropdown_tradecart_graphics.setCurrentIndex(
+            self.dropdown_tradecart_graphics.findData(CURRENT_CIV.graphics[5])
+        )
+        self.dropdown_ships_graphics.setCurrentIndex(
+            self.dropdown_ships_graphics.findData(CURRENT_CIV.graphics[6])
+        )
+
+        '''unit_bank = {
+            0: [463],  # General (use Villager or similar)
+            1: [82, 1430],  # Castle
+            2: [276, 1445],  # Wonder
+            3: [125, 286, 922, 1025, 1327],  # Monk
+            4: [30, 31, 32, 104, 1421],  # Monastery
+            5: [128, 204],  # Trade Cart
+            6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442],  # Ships
+        }
+
+        dropdowns = [
+            self.dropdown_general_graphics,
+            self.dropdown_castle_graphics,
+            self.dropdown_wonder_graphics,
+            self.dropdown_monk_graphics,
+            self.dropdown_monastery_graphics,
+            self.dropdown_tradecart_graphics,
+            self.dropdown_ships_graphics
+        ]
+
+        graphic_dicts = [
+            GRAPHICS_GENERAL,
+            GRAPHICS_CASTLE,
+            GRAPHICS_WONDER,
+            GRAPHICS_MONK,
+            GRAPHICS_MONASTERY,
+            GRAPHICS_TRADECART,
+            GRAPHICS_SHIPS
+        ]
+
+        for i, (dropdown, gdict) in enumerate(zip(dropdowns, graphic_dicts)):
+            try:
+                test_unit = unit_bank[i][0]
+                current_graphic = DATA.civs[CURRENT_CIV.index].units[test_unit].standing_graphic
+
+                # Find which entry in gdict matches
+                for name, value in gdict.items():
+                    if DATA.civs[CURRENT_CIV.index].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
+                        target_value = value
+                        break
+                else:
+                    target_value = None
+
+                # Update dropdown selection
+                if target_value is not None:
+                    idx = dropdown.findData(target_value)
+                    if idx >= 0:
+                        dropdown.blockSignals(True)
+                        dropdown.setCurrentIndex(idx)
+                        dropdown.blockSignals(False)
+            except Exception as e:
+                etype, evalue, etb = sys.exc_info()
+                print(f"[ERROR] {etype.__name__}: {e}")
+                print("".join(traceback.format_exception(etype, evalue, etb)))'''
+
     def dropdown_language_changed(self, index):
         pass
 
@@ -410,7 +673,4 @@ if __name__ == "__main__":
     window = MyApp()
     window.show()
     sys.exit(app.exec_())
-
-    # Refresh the description
-    dropdown
 
