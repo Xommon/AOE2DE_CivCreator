@@ -73,18 +73,21 @@ from PyQt5.QtWidgets import QUndoCommand
 
 from PyQt5.QtWidgets import QUndoCommand
 
-class RenameCivCommand(QUndoCommand):
-    def __init__(self, app, old_name, new_name, description="Rename Civ"):
-        super().__init__(description)
-        self.app = app          # reference to your MyApp
+class RenameCivCommand(QtWidgets.QUndoCommand):
+    def __init__(self, app, civ_pos, civ_data_index, old_name, new_name, description="Rename Civ"):
+        super().__init__()              # ✅ no extra args
+        self.setText(description)       # ✅ proper way to set Undo menu text
+        self.app = app
+        self.civ_pos = civ_pos
+        self.civ_data_index = civ_data_index
         self.old_name = old_name
         self.new_name = new_name
 
     def undo(self):
-        self.app._apply_civ_rename(self.new_name, self.old_name)
+        self.app._apply_civ_rename(self.civ_pos, self.civ_data_index, self.new_name, self.old_name)
 
     def redo(self):
-        self.app._apply_civ_rename(self.old_name, self.new_name)
+        self.app._apply_civ_rename(self.civ_pos, self.civ_data_index, self.old_name, self.new_name)
 
 class MyApp(QtWidgets.QMainWindow):
     def __init__(self):
@@ -99,6 +102,9 @@ class MyApp(QtWidgets.QMainWindow):
 
         # Program buttons
         self.button_civ_name.clicked.connect(self.change_name)
+
+        # Allow description textbox to wordwrap
+        self.textbox_description.setWordWrap(True)
 
         # Define undo stack
         self.undoStack = QtWidgets.QUndoStack(self)
@@ -509,15 +515,19 @@ class MyApp(QtWidgets.QMainWindow):
         print('Mod loaded!')
         self.load_mod()
 
-    def _apply_civ_rename(self, old_name, new_name):
-        # Change the name in the DAT file
-        DATA.civs[CURRENT_CIV.index].name = new_name
-        CURRENT_CIV.name = new_name
+    def _apply_civ_rename(self, civ_pos, civ_data_index, old_name, new_name):
+        # Update civ data
+        DATA.civs[civ_data_index].name = new_name
+        CIVS[civ_pos].name = new_name
 
-        # Repopulate the dropdown
-        self.dropdown_civ_name.clear()
-        for civ in CIVS:
-            self.dropdown_civ_name.addItem(civ.name)
+        # Update dropdown without changing selection
+        self.dropdown_civ_name.blockSignals(True)
+        self.dropdown_civ_name.setItemText(civ_pos, new_name)
+        self.dropdown_civ_name.blockSignals(False)
+
+        # If this civ is selected, update input field
+        if self.dropdown_civ_name.currentIndex() == civ_pos:
+            self.input_civ_name.setText(new_name)
 
         # Update effects
         for effect in DATA.effects:
@@ -526,33 +536,36 @@ class MyApp(QtWidgets.QMainWindow):
             elif effect.name == f'{old_name} Team Bonus':
                 effect.name = f'{new_name} Team Bonus'
             elif f'{old_name.upper()}' in effect.name:
-                name_list = effect.name.split(':')
-                name_list[0] = new_name.upper()
-                effect.name = ':'.join(name_list)
+                parts = effect.name.split(':')
+                parts[0] = new_name.upper()
+                effect.name = ':'.join(parts)
 
         # Update techs
         for tech in DATA.techs:
             if f'{old_name.upper()}' in tech.name:
-                name_list = tech.name.split(':')
-                name_list[0] = new_name.upper()
-                tech.name = ':'.join(name_list)
+                parts = tech.name.split(':')
+                parts[0] = new_name.upper()
+                tech.name = ':'.join(parts)
 
-        # Mark window dirty
+        # Mark dirty
         if not self.windowTitle().endswith('*'):
-            self.setWindowTitle(f'{self.windowTitle()}*')
+            self.setWindowTitle(self.windowTitle() + '*')
 
     def change_name(self):
         old_name = CURRENT_CIV.name
         new_name = self.input_civ_name.text()
 
-        if (old_name.lower() == new_name.lower() or 
-            any(civ.name.lower() == new_name.lower() for civ in CIVS)):
+        if (old_name.lower() == new_name.lower()
+            or any(civ.name.lower() == new_name.lower() for civ in CIVS)):
             self.input_civ_name.setText(old_name)
             return
 
-        # Push a rename command onto the stack
-        cmd = RenameCivCommand(self, old_name, new_name)
+        civ_pos = self.dropdown_civ_name.currentIndex()
+        civ_data_index = CURRENT_CIV.index
+
+        cmd = RenameCivCommand(self, civ_pos, civ_data_index, old_name, new_name)
         self.undoStack.push(cmd)
+
 
     def dropdown_civ_name_changed(self, index):
         from PyQt5 import QtCore
@@ -577,7 +590,7 @@ class MyApp(QtWidgets.QMainWindow):
         self.image_civ_icon.setPixmap(QtGui.QPixmap(f'{MOD_FOLDER}/resources/_common/wpfg/resources/civ_techtree/menu_techtree_{icon_names[CURRENT_CIV.index]}.png'))
 
         # Update description text box
-        self.textbox_description.setHtml(description_html)
+        self.textbox_description.setText(description_html)
 
         # Update name text box
         self.input_civ_name.setText(CURRENT_CIV.name)
