@@ -69,6 +69,22 @@ from main_window import Ui_MainWindow
 import unicodedata
 from PyQt5 import QtCore
 from PyQt5 import QtGui
+from PyQt5.QtWidgets import QUndoCommand
+
+from PyQt5.QtWidgets import QUndoCommand
+
+class RenameCivCommand(QUndoCommand):
+    def __init__(self, app, old_name, new_name, description="Rename Civ"):
+        super().__init__(description)
+        self.app = app          # reference to your MyApp
+        self.old_name = old_name
+        self.new_name = new_name
+
+    def undo(self):
+        self.app._apply_civ_rename(self.new_name, self.old_name)
+
+    def redo(self):
+        self.app._apply_civ_rename(self.old_name, self.new_name)
 
 class MyApp(QtWidgets.QMainWindow):
     def __init__(self):
@@ -83,6 +99,24 @@ class MyApp(QtWidgets.QMainWindow):
 
         # Program buttons
         self.button_civ_name.clicked.connect(self.change_name)
+
+        # Define undo stack
+        self.undoStack = QtWidgets.QUndoStack(self)
+
+        # Hook Undo/Redo menu actions
+        self.actionUndo.setText("Undo")
+        self.actionRedo.setText("Redo")
+        self.actionUndo.setShortcut("Ctrl+Z")
+        self.actionRedo.setShortcut("Ctrl+Y")
+
+        self.actionUndo.triggered.connect(self.undoStack.undo)
+        self.actionRedo.triggered.connect(self.undoStack.redo)
+
+        # auto enable/disable
+        self.undoStack.canUndoChanged.connect(self.actionUndo.setEnabled)
+        self.undoStack.canRedoChanged.connect(self.actionRedo.setEnabled)
+        self.actionUndo.setEnabled(False)
+        self.actionRedo.setEnabled(False)
 
     def load_mod(self):
         # Enable app
@@ -475,30 +509,18 @@ class MyApp(QtWidgets.QMainWindow):
         print('Mod loaded!')
         self.load_mod()
 
-    def change_name(self):
-        # Gather the names
-        old_name = CURRENT_CIV.name
-        new_name = self.input_civ_name.text()
-
-        # Compare the names
-        if (old_name.lower() == new_name.lower() or 
-            any(civ.name.lower() == new_name.lower() for civ in CIVS)):
-            self.input_civ_name.setText(old_name)
-            return
-        
+    def _apply_civ_rename(self, old_name, new_name):
         # Change the name in the DAT file
         DATA.civs[CURRENT_CIV.index].name = new_name
+        CURRENT_CIV.name = new_name
 
-        # Update object name
-        CURRENT_CIV.name = new_name # Update the selected civ name
-
-        # Repopulate the civ objects
+        # Repopulate the dropdown
         self.dropdown_civ_name.clear()
         for civ in CIVS:
             self.dropdown_civ_name.addItem(civ.name)
 
-        # Change name of tech tree, team bonus, civilization bonus effects, and unique units
-        for i, effect in enumerate(DATA.effects):
+        # Update effects
+        for effect in DATA.effects:
             if effect.name == f'{old_name} Tech Tree':
                 effect.name = f'{new_name} Tech Tree'
             elif effect.name == f'{old_name} Team Bonus':
@@ -508,15 +530,29 @@ class MyApp(QtWidgets.QMainWindow):
                 name_list[0] = new_name.upper()
                 effect.name = ':'.join(name_list)
 
-        # Change the name of the bonus techs and unique units
-        for i, tech in enumerate(DATA.techs):
+        # Update techs
+        for tech in DATA.techs:
             if f'{old_name.upper()}' in tech.name:
                 name_list = tech.name.split(':')
                 name_list[0] = new_name.upper()
                 tech.name = ':'.join(name_list)
 
+        # Mark window dirty
         if not self.windowTitle().endswith('*'):
             self.setWindowTitle(f'{self.windowTitle()}*')
+
+    def change_name(self):
+        old_name = CURRENT_CIV.name
+        new_name = self.input_civ_name.text()
+
+        if (old_name.lower() == new_name.lower() or 
+            any(civ.name.lower() == new_name.lower() for civ in CIVS)):
+            self.input_civ_name.setText(old_name)
+            return
+
+        # Push a rename command onto the stack
+        cmd = RenameCivCommand(self, old_name, new_name)
+        self.undoStack.push(cmd)
 
     def dropdown_civ_name_changed(self, index):
         from PyQt5 import QtCore
