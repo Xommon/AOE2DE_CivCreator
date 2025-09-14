@@ -26,6 +26,7 @@ pyuic5 -x main_window.ui -o main_window.py
 '''
 
 import os
+from html import escape
 import shutil
 import time
 import pickle
@@ -89,6 +90,21 @@ class RenameCivCommand(QtWidgets.QUndoCommand):
     def redo(self):
         self.app._apply_civ_rename(self.civ_pos, self.civ_data_index, self.old_name, self.new_name)
 
+class ChangeTitleCommand(QtWidgets.QUndoCommand):
+    def __init__(self, app, civ, old_title, new_title, description="Change Title"):
+        super().__init__()
+        self.setText(description)
+        self.app = app
+        self.civ = civ
+        self.old_title = old_title
+        self.new_title = new_title
+
+    def undo(self):
+        self.app._apply_title_change(self.civ, self.new_title, self.old_title)
+
+    def redo(self):
+        self.app._apply_title_change(self.civ, self.old_title, self.new_title)
+
 class MyApp(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -102,6 +118,12 @@ class MyApp(QtWidgets.QMainWindow):
 
         # Program buttons
         self.button_civ_name.clicked.connect(self.change_name)
+        self.button_civ_name.clicked.connect(self.change_name)
+        self.input_civ_name.returnPressed.connect(self.change_name)
+
+        self.button_title.clicked.connect(self.change_title)
+        self.button_title.clicked.connect(self.change_title)
+        self.input_title.returnPressed.connect(self.change_title)
 
         # Allow description textbox to wordwrap
         self.textbox_description.setWordWrap(True)
@@ -139,8 +161,9 @@ class MyApp(QtWidgets.QMainWindow):
 
         # Create the civ class
         class Civ:
-            def __init__(self, index, name, description, tech_tree_index, team_bonus_index, unique_unit_index, language, unique_techs, graphics):
-                self.index = index
+            def __init__(self, data_index, talofa_index, name, description, tech_tree_index, team_bonus_index, unique_unit_index, language, unique_techs, graphics):
+                self.data_index = data_index
+                self.talofa_index = talofa_index
                 self.name = name
                 self.description = description
                 self.tech_tree_index = tech_tree_index
@@ -296,6 +319,7 @@ class MyApp(QtWidgets.QMainWindow):
             global DISABLED_CIVS
             DISABLED_CIVS = ['gaia', 'athenians', 'achaemenids', 'spartans']
             if civ.name.lower() in DISABLED_CIVS:
+                talofa_index = i
                 continue
 
             # Get the total amount of civs
@@ -303,8 +327,7 @@ class MyApp(QtWidgets.QMainWindow):
             TOTAL_CIVS_COUNT = len(DATA.civs) - len(DISABLED_CIVS)
 
             # Create new civ object
-            new_civ = Civ(-1, '', '', -1, -1, -1, '', [], [])
-            new_civ.index = i
+            new_civ = Civ(i, talofa_index, '', '', -1, -1, -1, '', [], [])
 
             # Get the stats for the civ
             with open(MODDED_STRINGS, 'r') as file:
@@ -365,7 +388,7 @@ class MyApp(QtWidgets.QMainWindow):
 
             # Get the language
             for sound_item in DATA.sounds[303].items:
-                if sound_item.civilization == new_civ.index:
+                if sound_item.civilization == new_civ.data_index:
                     new_civ.language = sound_item.filename.split('_')[0]
 
             # Load architecture sets
@@ -398,7 +421,7 @@ class MyApp(QtWidgets.QMainWindow):
                     test_unit = unit_bank[i][0] if i > 0 else 463
 
                     for key, value in graphic_set.items():
-                        if DATA.civs[new_civ.index].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
+                        if DATA.civs[new_civ.data_index].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
                             current_graphics[i] = value
                             break
                 except Exception as e:
@@ -551,6 +574,35 @@ class MyApp(QtWidgets.QMainWindow):
         if not self.windowTitle().endswith('*'):
             self.setWindowTitle(self.windowTitle() + '*')
 
+    def _apply_title_change(self, civ, old_title, new_title):
+        # Update civ object
+        desc_lines = civ.description.split('\\n')
+        if not desc_lines:
+            return
+        desc_lines[0] = new_title
+        civ.description = '\\n'.join(desc_lines)
+
+        # Build HTML version
+        description_html = civ.description.replace("\\n", "<br>").replace("\n", "<br>")
+
+        # Convert toggle <b> into paired <b>...</b>
+        parts = description_html.split("<b>")
+        rebuilt, bold_on = [], False
+        for part in parts:
+            rebuilt.append(f"<b>{part}</b>" if bold_on else part)
+            bold_on = not bold_on
+        description_html = "".join(rebuilt)
+
+        # Refresh UI if this civ is currently selected
+        if self.dropdown_civ_name.currentIndex() == civ.talofa_index:
+            self.textbox_description.setTextFormat(QtCore.Qt.RichText)
+            self.textbox_description.setText(description_html)
+            self.input_title.setText(new_title)
+
+        # Mark window as dirty (unsaved changes)
+        if not self.windowTitle().endswith('*'):
+            self.setWindowTitle(self.windowTitle() + '*')
+
     def change_name(self):
         old_name = CURRENT_CIV.name
         new_name = self.input_civ_name.text()
@@ -561,15 +613,47 @@ class MyApp(QtWidgets.QMainWindow):
             return
 
         civ_pos = self.dropdown_civ_name.currentIndex()
-        civ_data_index = CURRENT_CIV.index
+        civ_data_index = CURRENT_CIV.data_index
 
         cmd = RenameCivCommand(self, civ_pos, civ_data_index, old_name, new_name)
         self.undoStack.push(cmd)
 
+    def change_title(self):
+        desc_lines = CURRENT_CIV.description.split('\\n')
+        old_title = desc_lines[0].strip()
+        new_title = self.input_title.text().strip()
+        desc_lines[0] = new_title
+        new_description = '\\n'.join(desc_lines)
+
+        if old_title == new_title:
+            return
+
+        # Push to undo stack
+        cmd = ChangeTitleCommand(self, CURRENT_CIV, old_title, new_title)
+        self.undoStack.push(cmd)
+
+        # Update the civ object
+        CURRENT_CIV.description = new_description
+
+        # Build HTML version
+        description_html = CURRENT_CIV.description.replace("\\n", "<br>").replace("\n", "<br>")
+
+        # Convert toggle <b> into paired <b>...</b>
+        parts = description_html.split("<b>")
+        rebuilt, bold_on = [], False
+        for part in parts:
+            rebuilt.append(f"<b>{part}</b>" if bold_on else part)
+            bold_on = not bold_on
+        description_html = "".join(rebuilt)
+
+        # Update description text box (use HTML!)
+        self.textbox_description.setTextFormat(QtCore.Qt.RichText)
+        self.textbox_description.setText(description_html)
+
+        # Update title text box
+        self.input_title.setText(new_title)
 
     def dropdown_civ_name_changed(self, index):
-        from PyQt5 import QtCore
-
         # Get current civ
         global CURRENT_CIV
         CURRENT_CIV = CIVS[index]
@@ -587,10 +671,13 @@ class MyApp(QtWidgets.QMainWindow):
         # Update icon
         icon_file_name = CURRENT_CIV.name.lower()
         icon_names = ['gaia', 'britons', 'franks', 'goths', 'teutons', 'japanese', 'chinese', 'byzantines', 'persians', 'saracens', 'turks', 'vikings', 'mongols', 'celts', 'spanish', 'aztecs', 'mayans', 'huns', 'koreans', 'italians', 'indians', 'inca', 'magyars', 'slavs', 'portuguese', 'ethiopians', 'malians', 'berber', 'khmer', 'malay', 'burmese', 'vietnamese', 'bulgarians', 'tatars', 'cumans', 'lithuanians', 'burgundians', 'sicilians', 'poles', 'bohemians', 'dravidians', 'bengalis', 'gurjaras', 'romans', 'armenians', 'georgians', 'achaemenids', 'athenians', 'spartans', 'shu', 'wu', 'wei', 'jurchens', 'khitans']
-        self.image_civ_icon.setPixmap(QtGui.QPixmap(f'{MOD_FOLDER}/resources/_common/wpfg/resources/civ_techtree/menu_techtree_{icon_names[CURRENT_CIV.index]}.png'))
+        self.image_civ_icon.setPixmap(QtGui.QPixmap(f'{MOD_FOLDER}/resources/_common/wpfg/resources/civ_techtree/menu_techtree_{icon_names[CURRENT_CIV.data_index]}.png'))
 
         # Update description text box
         self.textbox_description.setText(description_html)
+
+        # Update title text box
+        self.input_title.setText(self.textbox_description.text().split('<br>')[0])
 
         # Update name text box
         self.input_civ_name.setText(CURRENT_CIV.name)
@@ -608,7 +695,7 @@ class MyApp(QtWidgets.QMainWindow):
         self.dropdown_language.blockSignals(False)
 
         # Update scout unit
-        value = int(DATA.civs[CURRENT_CIV.index].resources[263])
+        value = int(DATA.civs[CURRENT_CIV.data_index].resources[263])
         su_index = self.dropdown_scout_units.findData(value)
         if su_index > -1:
             self.dropdown_scout_units.blockSignals(True)
@@ -685,11 +772,11 @@ class MyApp(QtWidgets.QMainWindow):
         for i, (dropdown, gdict) in enumerate(zip(dropdowns, graphic_dicts)):
             try:
                 test_unit = unit_bank[i][0]
-                current_graphic = DATA.civs[CURRENT_CIV.index].units[test_unit].standing_graphic
+                current_graphic = DATA.civs[CURRENT_CIV.data_index].units[test_unit].standing_graphic
 
                 # Find which entry in gdict matches
                 for name, value in gdict.items():
-                    if DATA.civs[CURRENT_CIV.index].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
+                    if DATA.civs[CURRENT_CIV.data_index].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
                         target_value = value
                         break
                 else:
