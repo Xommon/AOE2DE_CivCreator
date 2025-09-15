@@ -105,6 +105,52 @@ class ChangeTitleCommand(QtWidgets.QUndoCommand):
     def redo(self):
         self.app._apply_title_change(self.civ, self.old_title, self.new_title)
 
+class ChangeLanguageCommand(QtWidgets.QUndoCommand):
+    def __init__(self, app, civ_index, sound_ids, old_lang, new_lang, description="Change Language"):
+        super().__init__()
+        self.setText(description)
+        self.app = app
+        self.civ_index = civ_index
+        self.sound_ids = sound_ids
+        self.old_lang = old_lang
+        self.new_lang = new_lang
+
+    def undo(self):
+        self.app._apply_language_change(self.civ_index, self.sound_ids, self.new_lang, self.old_lang)
+
+    def redo(self):
+        self.app._apply_language_change(self.civ_index, self.sound_ids, self.old_lang, self.new_lang)
+
+class ChangeScoutUnitCommand(QtWidgets.QUndoCommand):
+    def __init__(self, app, civ_index, old_value, new_value, description="Change Scout Unit"):
+        super().__init__()
+        self.setText(description)
+        self.app = app
+        self.civ_index = civ_index
+        self.old_value = old_value
+        self.new_value = new_value
+
+    def undo(self):
+        self.app._apply_scout_unit_change(self.civ_index, self.new_value, self.old_value)
+
+    def redo(self):
+        self.app._apply_scout_unit_change(self.civ_index, self.old_value, self.new_value)
+
+class ChangeUniqueUnitCommand(QtWidgets.QUndoCommand):
+    def __init__(self, app, civ_data_index, old_value, new_value, description="Change Unique Unit"):
+        super().__init__()
+        self.setText(description)
+        self.app = app
+        self.civ_data_index = civ_data_index   # ✅ always store data_index, not talofa_index
+        self.old_value = old_value             # tuple (castle_unit_id, imperial_unit_id, imperial_upgrade_id)
+        self.new_value = new_value
+
+    def undo(self):
+        self.app._apply_unique_unit_change(self.civ_data_index, self.new_value, self.old_value)
+
+    def redo(self):
+        self.app._apply_unique_unit_change(self.civ_data_index, self.old_value, self.new_value)
+
 class MyApp(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -161,17 +207,19 @@ class MyApp(QtWidgets.QMainWindow):
 
         # Create the civ class
         class Civ:
-            def __init__(self, data_index, talofa_index, name, description, tech_tree_index, team_bonus_index, unique_unit_index, language, unique_techs, graphics):
+            def __init__(self, data_index, talofa_index, name, description, tech_tree_index, team_bonus_index, scout_unit_index, castle_unit_effect_index, imperial_unit_effect_index, language, unique_techs, graphics):
                 self.data_index = data_index
                 self.talofa_index = talofa_index
                 self.name = name
                 self.description = description
                 self.tech_tree_index = tech_tree_index
                 self.team_bonus_index = team_bonus_index
-                self.unique_unit_index = unique_unit_index
+                self.scout_unit_index = scout_unit_index
                 self.language = language
                 self.unique_techs = unique_techs
                 self.graphics = graphics
+                self.castle_unit_effect_index = castle_unit_effect_index
+                self.imperial_unit_effect_index = imperial_unit_effect_index
 
         def get_unit_name(unit_id):
             with open(ORIGINAL_STRINGS, 'r', encoding='utf-8') as file:
@@ -327,7 +375,7 @@ class MyApp(QtWidgets.QMainWindow):
             TOTAL_CIVS_COUNT = len(DATA.civs) - len(DISABLED_CIVS)
 
             # Create new civ object
-            new_civ = Civ(i, talofa_index, '', '', -1, -1, -1, '', [], [])
+            new_civ = Civ(i, talofa_index, '', '', -1, -1, int(civ.resources[263]), -1, -1, '', [], [])
 
             # Get the stats for the civ
             with open(MODDED_STRINGS, 'r') as file:
@@ -377,14 +425,16 @@ class MyApp(QtWidgets.QMainWindow):
                         # Parse unique techs from description
                         new_civ.unique_techs = parse_unique_techs(new_civ.description)
 
-            # Get the tech tree, team bonus, and unique unit
+            # Get the tech tree, team bonus, castle unit, and imperial unit
             for effect_index, effect in enumerate(DATA.effects):
                 if effect.name.lower() == f'{civ.name.lower()} tech tree':
                     new_civ.tech_tree_index = effect_index
                 elif effect.name.lower() == f'{civ.name.lower()} team bonus':
                     new_civ.team_bonus_index = effect_index
                 elif effect.name.lower() == f'{civ.name.lower()}: (castle unit)':
-                    new_civ.unique_unit_index = effect.effect_commands[0].a
+                    new_civ.castle_unit_effect_index = effect_index
+                elif effect.name.lower() == f'{civ.name.lower()}: (imperial unit)':
+                    new_civ.imperial_unit_effect_index = effect_index
 
             # Get the language
             for sound_item in DATA.sounds[303].items:
@@ -462,10 +512,12 @@ class MyApp(QtWidgets.QMainWindow):
 
         # Populate unique unit dropdown
         global ALL_CASTLE_UNITS
-        ALL_CASTLE_UNITS = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer', "amazon warrior", "amazon archer", "camel raider", "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr", "qizilbash warrior", 'genitour', 'naasiri', 'elephant gunner', 'flamethrower', 'weichafe', 'destroyer', 'lightning warrior', 'cossack']
+        ALL_CASTLE_UNITS = ["longbowman", "throwing axeman", "berserk", "teutonic knight", "samurai", "chu ko nu", "cataphract", "war elephant", "mameluke", "janissary", "huskarl", "mangudai", "woad raider", "conquistador", "jaguar warrior", "plumed archer", "tarkan", "war wagon", "genoese crossbowman", "ghulam", "kamayuk", "magyar huszar", "boyar", "organ gun", "shotel warrior", "gbeto", "camel archer", "ballista elephant", "karambit warrior", "arambai", "rattan archer", "konnik", "keshik", "kipchak", "leitis", "coustillier", "serjeant", "obuch", "hussite wagon", "urumi swordsman", "ratha (melee)", "chakram thrower", "centurion", "composite bowman", "monaspa", 'iron pagoda', 'liao dao', 'white feather guard', 'tiger cavalry', 'fire archer', "amazon warrior", "amazon archer", "qizilbash warrior", 'genitour', 'naasiri', 'elephant gunner', 'flamethrower', 'weichafe', 'destroyer', 'lightning warrior', 'cossack']
+        # "crusader", "tomahawk warrior", "ninja", "scimitar warrior", "drengr",
         self.dropdown_unique_units.clear()
         for unit_name in ALL_CASTLE_UNITS:
-            self.dropdown_unique_units.addItem(unit_name.title(), userData=get_unit_id(unit_name, False))
+            unique_units_ids = f'{get_unit_id(unit_name, False)}|{get_unit_id(f'elite {unit_name}', False)}'
+            self.dropdown_unique_units.addItem(unit_name.title(), userData=unique_units_ids)
 
         # Populate graphics dropdowns
         self.dropdown_general_graphics.clear()
@@ -499,7 +551,7 @@ class MyApp(QtWidgets.QMainWindow):
         # Connect signals
         self.dropdown_civ_name.currentIndexChanged.connect(self.dropdown_civ_name_changed)
         self.dropdown_language.currentIndexChanged.connect(self.dropdown_language_changed)
-        self.dropdown_scout_units.currentIndexChanged.connect(self.dropdown_scout_units_changed)
+        self.dropdown_scout_units.currentIndexChanged.connect(self.dropdown_scout_unit_changed)
         self.dropdown_unique_units.currentIndexChanged.connect(self.dropdown_unique_units_changed)
 
         # Run once at startup
@@ -603,6 +655,82 @@ class MyApp(QtWidgets.QMainWindow):
         if not self.windowTitle().endswith('*'):
             self.setWindowTitle(self.windowTitle() + '*')
 
+    def _apply_language_change(self, civ_index, sound_ids, old_lang, new_lang):
+        # Update filenames
+        for sound_id in sound_ids:
+            for item in DATA.sounds[sound_id].items:
+                if item.civilization == civ_index:
+                    parts = item.filename.split('_')
+                    if parts:
+                        parts[0] = new_lang
+                        item.filename = '_'.join(parts)
+
+        # Update CURRENT_CIV.language if it's the civ being modified
+        for civ in CIVS:
+            if civ.data_index == civ_index:
+                civ.language = new_lang
+                # If it's the civ currently displayed, refresh dropdown
+                if civ is CURRENT_CIV:
+                    self.dropdown_language.blockSignals(True)
+                    self.dropdown_language.setCurrentText(new_lang)
+                    self.dropdown_language.blockSignals(False)
+                break
+
+        # Mark unsaved changes
+        if not self.windowTitle().endswith('*'):
+            self.setWindowTitle(self.windowTitle() + '*')
+
+    def _apply_scout_unit_change(self, civ_index, old_value, new_value):
+        # Update the data file
+        DATA.civs[civ_index].resources[263] = int(new_value)
+
+        # Update CURRENT_CIV if it matches
+        if CURRENT_CIV.data_index == civ_index:
+            CURRENT_CIV.scout_unit_index = int(new_value)  # optional, if you track this field
+            # Update dropdown without firing signal
+            self.dropdown_scout_units.blockSignals(True)
+            self.dropdown_scout_units.setCurrentIndex(
+                self.dropdown_scout_units.findData(new_value)
+            )
+            self.dropdown_scout_units.blockSignals(False)
+
+        # Mark unsaved changes
+        if not self.windowTitle().endswith("*"):
+            self.setWindowTitle(self.windowTitle() + "*")
+
+    def _apply_unique_unit_change(self, civ_data_index, old_value, new_value):
+        # Unpack tuple
+        castle_id, imperial_id, imperial_upgrade = new_value
+
+        # ✅ Find civ object by data_index, not by assuming position
+        civ = next((c for c in CIVS if c.data_index == civ_data_index), None)
+        if civ is None:
+            return  # safety guard
+
+        # ✅ Apply to DATA effects
+        DATA.effects[civ.castle_unit_effect_index].effect_commands[0].a = castle_id
+        DATA.effects[civ.imperial_unit_effect_index].effect_commands[0].a = imperial_id
+        DATA.effects[civ.imperial_unit_effect_index].effect_commands[0].b = imperial_upgrade
+
+        # ✅ If CURRENT_CIV is the one being modified, update & refresh dropdown
+        if CURRENT_CIV.data_index == civ_data_index:
+            CURRENT_CIV.unique_unit_index = castle_id
+
+            uu_key = f"{castle_id}|{imperial_upgrade}"
+            idx = self.dropdown_unique_units.findData(uu_key)
+            if idx >= 0:
+                self.dropdown_unique_units.blockSignals(True)
+                self.dropdown_unique_units.setCurrentIndex(idx)
+                self.dropdown_unique_units.blockSignals(False)
+
+        # ✅ Refresh UI if this civ is currently selected
+        if self.dropdown_civ_name.currentIndex() == civ.talofa_index:
+            self.dropdown_civ_name_changed(civ.talofa_index)
+
+        # ✅ Mark as unsaved
+        if not self.windowTitle().endswith("*"):
+            self.setWindowTitle(self.windowTitle() + "*")
+
     def change_name(self):
         old_name = CURRENT_CIV.name
         new_name = self.input_civ_name.text()
@@ -646,12 +774,49 @@ class MyApp(QtWidgets.QMainWindow):
             bold_on = not bold_on
         description_html = "".join(rebuilt)
 
-        # Update description text box (use HTML!)
+        # Update description text box
         self.textbox_description.setTextFormat(QtCore.Qt.RichText)
         self.textbox_description.setText(description_html)
 
         # Update title text box
         self.input_title.setText(new_title)
+
+    def dropdown_language_changed(self):
+        sound_ids = [303, 301, 295, 299, 455, 448, 297, 298, 300, 302,
+                    435, 434, 437, 442, 438, 487, 440, 441, 443, 444,
+                    420, 421, 422, 423, 424, 479, 480]
+
+        old_lang = None
+        civ_index = CURRENT_CIV.data_index
+
+        # Peek at the current language prefix from one of the civ's sounds
+        for sound_id in sound_ids:
+            for item in DATA.sounds[sound_id].items:
+                if item.civilization == civ_index:
+                    old_lang = item.filename.split('_')[0]
+                    break
+            if old_lang:
+                break
+
+        new_lang = self.dropdown_language.currentText()
+
+        if old_lang == new_lang:
+            return
+
+        cmd = ChangeLanguageCommand(self, civ_index, sound_ids, old_lang, new_lang)
+        self.undoStack.push(cmd)
+
+    def dropdown_scout_unit_changed(self):
+        civ_index = CURRENT_CIV.data_index
+        old_value = CURRENT_CIV.scout_unit_index
+        new_value = int(self.dropdown_scout_units.currentData())
+
+
+        if old_value == new_value:
+            return
+
+        cmd = ChangeScoutUnitCommand(self, civ_index, old_value, new_value)
+        self.undoStack.push(cmd)
 
     def dropdown_civ_name_changed(self, index):
         # Get current civ
@@ -703,9 +868,10 @@ class MyApp(QtWidgets.QMainWindow):
             self.dropdown_scout_units.blockSignals(False)
 
         # Update unique unit
-        value = CURRENT_CIV.unique_unit_index
+        uu_ec = DATA.effects[CURRENT_CIV.imperial_unit_effect_index].effect_commands[0]
+        value = f'{uu_ec.a}|{uu_ec.b}'
         uu_index = self.dropdown_unique_units.findData(value)
-        if su_index > -1:
+        if uu_index > -1: 
             self.dropdown_unique_units.blockSignals(True)
             self.dropdown_unique_units.setCurrentIndex(uu_index)
             self.dropdown_unique_units.blockSignals(False)
@@ -794,15 +960,26 @@ class MyApp(QtWidgets.QMainWindow):
                 print(f"[ERROR] {etype.__name__}: {e}")
                 print("".join(traceback.format_exception(etype, evalue, etb)))'''
 
-    def dropdown_language_changed(self, index):
-        pass
+    def dropdown_unique_units_changed(self):
+        civ_index = CURRENT_CIV.data_index
 
-    def dropdown_scout_units_changed(self, index):
-        pass
+        # Old values from DATA
+        old_castle = DATA.effects[CURRENT_CIV.castle_unit_effect_index].effect_commands[0].a
+        old_imperial = DATA.effects[CURRENT_CIV.imperial_unit_effect_index].effect_commands[0].a
+        old_upgrade = DATA.effects[CURRENT_CIV.imperial_unit_effect_index].effect_commands[0].b
+        old_value = (old_castle, old_imperial, old_upgrade)
 
-    def dropdown_unique_units_changed(self, index):
-        pass
+        # New values from dropdown
+        unique_units_ids = self.dropdown_unique_units.currentData().split('|')
+        castle_id = int(unique_units_ids[0])
+        elite_id = int(unique_units_ids[1])
+        new_value = (castle_id, castle_id, elite_id)   # imperial unit starts as same as castle
 
+        if old_value == new_value:
+            return
+
+        cmd = ChangeUniqueUnitCommand(self, civ_index, old_value, new_value)
+        self.undoStack.push(cmd)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
