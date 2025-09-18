@@ -678,7 +678,7 @@ def update_tech_tree_graphic(current_civ_name):
     ]
 
     # Canoes / Galleys
-    if 240 in disabled_triggers:
+    if get_tech_id('canoe (make avail)') not in disabled_triggers:
         tech_ids += [(539, 164), (21, 178), (442, 178)] # Canoes
     else:
         tech_ids += [(539, 87), (21, 25), (442, 60)] # Galleys
@@ -2788,45 +2788,47 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     # 0: Canoe
     canoe_tech = copy.deepcopy(DATA.techs[151])
     canoe_tech.name = 'Canoe (make avail)'
-    canoe_effect = genieutils.effect.Effect(name='Canoe (make avail)', effect_commands=[genieutils.effect.EffectCommand(2, 539, 1, -1, -1), genieutils.effect.EffectCommand(3, 539, custom_unit_starting_index, -1, -1)])
+    canoe_effect = genieutils.effect.Effect(name='Canoe (make avail)', effect_commands=[genieutils.effect.EffectCommand(3, 539, custom_unit_starting_index, -1, -1)])
     DATA.effects.append(canoe_effect)
     canoe_tech.effect_id = len(DATA.effects)-1
     DATA.techs.append(canoe_tech)
 
     # 1: War Canoe
-    war_canoe_tech = copy.deepcopy(DATA.techs[34])
-    change_string(84000, 'War Canoe')
-    change_string(85000, 'Upgrade to War Canoe')
-    change_string(86000, r'Upgrade to <b>War Canoe<b> (<cost>)\nUpgrades your Canoes and lets you create War Canoes, which are stronger.')
-    war_canoe_tech.language_dll_name = 84000
-    war_canoe_tech.language_dll_description = 85000
-    war_canoe_tech.language_dll_help = 86000
-    war_canoe_tech.required_techs = (102, custom_tech_starting_index, -1, -1, -1, -1)
-    war_canoe_tech.required_tech_count = 2
-    war_canoe_tech.resource_costs[0].amount = 200
-    war_canoe_tech.resource_costs[0].type = 1
-    war_canoe_tech.resource_costs[1].amount = 100
-    war_canoe_tech.research_locations[0].research_time = 30
-    war_canoe_tech.icon_id = 105
+    war_canoe_tech = copy.deepcopy(DATA.techs[0])
+    war_canoe_tech.name = 'War Canoe'
+    #change_string(84000, 'War Canoe')
+    #change_string(85000, 'Upgrade to War Canoe')
+    #change_string(86000, r'Upgrade to <b>War Canoe<b> (<cost>)\nUpgrades your Canoes and lets you create War Canoes, which are stronger.')
+    #war_canoe_tech.language_dll_name = 84000
+    #war_canoe_tech.language_dll_description = 85000
+    #war_canoe_tech.language_dll_help = 86000
+    war_canoe_tech.required_techs = (34, -1, -1, -1, -1, -1)
+    war_canoe_tech.required_tech_count = 1
+    #war_canoe_tech.resource_costs[0].amount = 200
+    #war_canoe_tech.resource_costs[0].type = 1
+    #war_canoe_tech.resource_costs[1].amount = 100
+    #war_canoe_tech.research_locations[0].research_time = 30
+    #war_canoe_tech.icon_id = 105
     war_canoe_effect = genieutils.effect.Effect(name='War Canoe', effect_commands=[genieutils.effect.EffectCommand(3, 539, custom_unit_starting_index+1, -1, -1), genieutils.effect.EffectCommand(3, custom_unit_starting_index, custom_unit_starting_index+1, -1, -1)])
     DATA.effects.append(war_canoe_effect)
     war_canoe_tech.effect_id = len(DATA.effects)-1
     DATA.techs.append(war_canoe_tech)
 
     # 2: Elite War Canoe
-    elite_war_canoe_tech = copy.deepcopy(DATA.techs[34])
-    change_string(81000, 'Elite War Canoe')
-    change_string(82000, 'Upgrade to Elite War Canoe')
-    change_string(83000, r'Upgrade to <b>Elite War Canoe<b> (<cost>)\nUpgrades your War Canoes and lets you create Elite War Canoes, which are stronger.')
-    elite_war_canoe_tech.language_dll_name = 81000
-    elite_war_canoe_tech.language_dll_description = 82000
-    elite_war_canoe_tech.language_dll_help = 83000
-    elite_war_canoe_tech.required_techs = (103, custom_tech_starting_index+1, -1, -1, -1, -1)
-    elite_war_canoe_tech.required_tech_count = 2
-    elite_war_canoe_tech.resource_costs[0].amount = 300
-    elite_war_canoe_tech.resource_costs[1].amount = 250
-    elite_war_canoe_tech.research_locations[0].research_time = 45
-    elite_war_canoe_tech.icon_id = 105
+    elite_war_canoe_tech = copy.deepcopy(DATA.techs[0])
+    elite_war_canoe_tech.name = 'Elite War Canoe'
+    #change_string(81000, 'Elite War Canoe')
+    #change_string(82000, 'Upgrade to Elite War Canoe')
+    #change_string(83000, r'Upgrade to <b>Elite War Canoe<b> (<cost>)\nUpgrades your War Canoes and lets you create Elite War Canoes, which are stronger.')
+    #elite_war_canoe_tech.language_dll_name = 81000
+    #elite_war_canoe_tech.language_dll_description = 82000
+    #elite_war_canoe_tech.language_dll_help = 83000
+    elite_war_canoe_tech.required_techs = (35, -1, -1, -1, -1, -1)
+    elite_war_canoe_tech.required_tech_count = 1
+    #elite_war_canoe_tech.resource_costs[0].amount = 300
+    #elite_war_canoe_tech.resource_costs[1].amount = 250
+    #elite_war_canoe_tech.research_locations[0].research_time = 45
+    #elite_war_canoe_tech.icon_id = 105
     elite_war_canoe_effect = genieutils.effect.Effect(name='Elite War Canoe', effect_commands=[genieutils.effect.EffectCommand(3, 539, custom_unit_starting_index+2, -1, -1), genieutils.effect.EffectCommand(3, custom_unit_starting_index, custom_unit_starting_index+2, -1, -1), genieutils.effect.EffectCommand(3, custom_unit_starting_index+1, custom_unit_starting_index+2, -1, -1)])
     DATA.effects.append(elite_war_canoe_effect)
     elite_war_canoe_tech.effect_id = len(DATA.effects)-1
@@ -2868,9 +2870,11 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
     # Set civilisations to canoe docks by disabling all other warships
     for tech_tree_effect_id in tech_tree_indexes:
-        if tech_tree_effect_id in [447, 449, 3, 648, 42, 710, 448, 646]: # Canoe dock
-            for tech_id in [240, 34, 35, 604, 243, 246, 605, 244, 37, 376]:
-                    DATA.effects[tech_tree_effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
+        if tech_tree_effect_id in [447, 449, 3, 648, 42, 710, 646]: # Canoe dock
+            for tech_id in [604, 243, 246, 605, 244, 37, 376]:
+                DATA.effects[tech_tree_effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
+            #for tech_id in [240, 34, 35]:
+            #    DATA.effects[tech_tree_effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))
         else: # Ship dock
             for tech_id in [custom_tech_starting_index, custom_tech_starting_index+1, custom_tech_starting_index+2]:
                 DATA.effects[tech_tree_effect_id].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, float(tech_id)))

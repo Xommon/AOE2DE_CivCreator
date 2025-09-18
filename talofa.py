@@ -151,6 +151,34 @@ class ChangeUniqueUnitCommand(QtWidgets.QUndoCommand):
     def redo(self):
         self.app._apply_unique_unit_change(self.civ_data_index, self.old_value, self.new_value)
 
+class ChangeGraphicsCommand(QtWidgets.QUndoCommand):
+    def __init__(self, app, civ_index, category, old_units, new_units, description=None):
+        desc = description or f"Change {category} Graphics"
+        super().__init__(desc)
+        self.app = app
+        self.civ_index = civ_index
+        self.category = category
+        self.old_units = old_units  # dict {unit_id: unit_obj}
+        self.new_units = new_units  # dict {unit_id: unit_obj}
+
+    def undo(self):
+        self._apply(self.old_units)
+
+    def redo(self):
+        self._apply(self.new_units)
+
+    def _apply(self, units_dict):
+        for unit_id, unit_obj in units_dict.items():
+            DATA.civs[self.civ_index].units[unit_id] = copy.deepcopy(unit_obj)
+
+        # refresh CURRENT_CIV UI if this civ is active
+        if CURRENT_CIV.data_index == self.civ_index:
+            self.app.dropdown_civ_name_changed(CURRENT_CIV.talofa_index)
+
+        # mark unsaved
+        if not self.app.windowTitle().endswith("*"):
+            self.app.setWindowTitle(self.app.windowTitle() + "*")
+
 class MyApp(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -333,11 +361,18 @@ class MyApp(QtWidgets.QMainWindow):
             return techs
         
         # Update graphics
-        GRAPHICS_GENERAL = {'Austronesian': 29, 'Byzantine': 7, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Mesoamerican': 15, 'Middle Eastern': 9, 'South Asian': 20, 'Southeast Asian': 28, 'West African': 26, 'Western European': 1}
+        global GRAPHICS_GENERAL
+        global GRAPHICS_CASTLE
+        global GRAPHICS_WONDER
+        global GRAPHICS_MONK
+        global GRAPHICS_MONASTERY
+        global GRAPHICS_TRADECART
+        global GRAPHICS_SHIPS
+        GRAPHICS_GENERAL = {'Austronesian': 29, 'Byzantines': 7, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Mesoamerican': 15, 'Middle Eastern': 9, 'South Asian': 20, 'Southeast Asian': 28, 'West African': 26, 'Western European': 1}
         GRAPHICS_CASTLE = {'Armenians': 44, 'Aztecs': 15, 'Bengalis': 41, 'Berbers': 27, 'Bohemians': 39, 'Britons': 1, 'Bulgarians': 32, 'Burgundians': 36, 'Burmese': 30, 'Byzantines': 7, 'Celts': 13, 'Chinese': 6, 'Cumans': 34, 'Dravidians': 40, 'Ethiopians': 25, 'Franks': 2, 'Georgians': 45, 'Goths': 3, 'Gurjaras': 42, 'Hindustanis': 20, 'Huns': 17, 'Inca': 21, 'Italians': 19, 'Japanese': 5, 'Jurchens': 52, 'Khitan': 53, 'Khmer': 28, 'Koreans': 18, 'Lithuanians': 35, 'Magyars': 22, 'Malay': 29, 'Malians': 26, 'Maya': 16, 'Mongols': 12, 'Persians': 8, 'Poles': 38, 'Portuguese': 24, 'Romans': 43, 'Saracens': 9, 'Shu': 49, 'Sicilians': 37, 'Slavs': 23, 'Spanish': 14, 'Tatars': 33, 'Teutons': 4, 'Turks': 10, 'Vikings': 11, 'Vietnamese': 31, 'Wei': 51, 'Wu': 50}
         GRAPHICS_WONDER = {'Armenians': 44, 'Aztecs': 15, 'Bengalis': 41, 'Berbers': 27, 'Bohemians': 39, 'Britons': 1, 'Bulgarians': 32, 'Burgundians': 36, 'Burmese': 30, 'Byzantines': 7, 'Celts': 13, 'Chinese': 6, 'Cumans': 34, 'Dravidians': 40, 'Ethiopians': 25, 'Franks': 2, 'Georgians': 45, 'Goths': 3, 'Gurjaras': 42, 'Hindustanis': 20, 'Huns': 17, 'Inca': 21, 'Italians': 19, 'Japanese': 5, 'Jurchens': 52, 'Khitan': 53, 'Khmer': 28, 'Koreans': 18, 'Lithuanians': 35, 'Magyars': 22, 'Malay': 29, 'Malians': 26, 'Maya': 16, 'Mongols': 12, 'Persians': 8, 'Poles': 38, 'Portuguese': 24, 'Romans': 43, 'Saracens': 9, 'Shu': 49, 'Sicilians': 37, 'Slavs': 23, 'Spanish': 14, 'Tatars': 33, 'Teutons': 4, 'Turks': 10, 'Vikings': 11, 'Vietnamese': 31, 'Wei': 51, 'Wu': 50}
         GRAPHICS_MONK = {'African': 25, 'Buddhist': 5, 'Catholic': 14, 'Christian': 0, 'Hindu': 40, 'Mesoamerican': 15, 'Muslim': 9, 'Orthodox': 23, 'Pagan': 35, 'Tengri': 12}
-        GRAPHICS_MONASTERY = {'Byzantine': 7, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'East African': 25, 'Eastern European': 23, 'Mediterranean': 14, 'Mesoamerican': 15, 'Middle Eastern': 9, 'Pagan': 35, 'South Asian': 40, 'Southeast Asian': 28, 'Southeast European': 44, 'Tengri': 12, 'West African': 26, 'Western European': 1}
+        GRAPHICS_MONASTERY = {'Byzantines': 7, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'East African': 25, 'Eastern European': 23, 'Mediterranean': 14, 'Mesoamerican': 15, 'Middle Eastern': 9, 'Pagan': 35, 'South Asian': 40, 'Southeast Asian': 28, 'Southeast European': 44, 'Tengri': 12, 'West African': 26, 'Western European': 1}
         GRAPHICS_TRADECART = {'Camel': 9, 'Horse': 1, 'Human': 15, 'Ox': 25, 'Water Buffalo': 5}
         GRAPHICS_SHIPS = {'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Mesoamerican': 15, 'Middle Eastern': 9, 'Southeast Asian': 28, 'West African': 25, 'Western European': 1}
 
@@ -358,6 +393,20 @@ class MyApp(QtWidgets.QMainWindow):
         populate_dropdown_from_dict(self.dropdown_monastery_graphics, GRAPHICS_MONASTERY)
         populate_dropdown_from_dict(self.dropdown_tradecart_graphics, GRAPHICS_TRADECART)
         populate_dropdown_from_dict(self.dropdown_ships_graphics, GRAPHICS_SHIPS)
+
+        # Load architecture sets
+        global ARCHITECTURE_SETS
+        ARCHITECTURE_SETS = []
+        try:
+            with open(f"{MOD_FOLDER}/{MOD_NAME}.pkl", "rb") as file:
+                while True:
+                    try:
+                        units = pickle.load(file)
+                        ARCHITECTURE_SETS.append(units)
+                    except EOFError:
+                        break
+        except FileNotFoundError:
+            print(f"[ERROR] Could not find architecture pickle: {MOD_FOLDER}/{MOD_NAME}.pkl")
 
         # Load all current civs
         global CIVS
@@ -441,41 +490,26 @@ class MyApp(QtWidgets.QMainWindow):
                 if sound_item.civilization == new_civ.data_index:
                     new_civ.language = sound_item.filename.split('_')[0]
 
-            # Load architecture sets
-            global ARCHITECTURE_SETS
-            ARCHITECTURE_SETS = []
-            '''try:
-                with open(f"{MOD_FOLDER}/{MOD_NAME}.pkl", "rb") as file:
-                    while True:
-                        try:
-                            units = pickle.load(file)
-                            ARCHITECTURE_SETS.append(units)
-                        except EOFError:
-                            break
-            except FileNotFoundError:
-                print(f"[ERROR] Could not find architecture pickle: {MOD_FOLDER}/{MOD_NAME}.pkl")
-                ARCHITECTURE_SETS = []'''
-
             # Sort each dictionary by key alphabetically
             graphic_sets = [dict(sorted(g.items())) for g in graphic_sets]
 
             # Get current graphics
-            graphic_titles = ["General", "Castle", "Wonder", 'Monk', 'Monastery', 'Trade Cart', 'Ships']
-            unit_bank = {0: range(0, len(DATA.civs[1].units)), 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [128, 204], 6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
-            current_graphics = [''] * len(graphic_titles)
+            global UNIT_BANK
+            UNIT_BANK = {0: range(0, len(DATA.civs[1].units)), 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [128, 204], 6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
+            current_graphics = [''] * len(UNIT_BANK.items())
 
             # Scan the units for their graphics
-            '''for i, graphic_set in enumerate(graphic_sets):
+            for i, graphic_set in enumerate(graphic_sets):
                 try:
                     # Select the unit to test
-                    test_unit = unit_bank[i][0] if i > 0 else 463
+                    test_unit = UNIT_BANK[i][0] if i > 0 else 463
 
                     for key, value in graphic_set.items():
                         if DATA.civs[new_civ.data_index].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
                             current_graphics[i] = value
                             break
                 except Exception as e:
-                    pass'''
+                    pass
 
             new_civ.graphics = current_graphics
 
@@ -553,6 +587,27 @@ class MyApp(QtWidgets.QMainWindow):
         self.dropdown_language.currentIndexChanged.connect(self.dropdown_language_changed)
         self.dropdown_scout_units.currentIndexChanged.connect(self.dropdown_scout_unit_changed)
         self.dropdown_unique_units.currentIndexChanged.connect(self.dropdown_unique_units_changed)
+        self.dropdown_general_graphics.currentIndexChanged.connect(
+            lambda: self.graphics_dropdown_changed(self.dropdown_general_graphics, 0)
+        )
+        self.dropdown_castle_graphics.currentIndexChanged.connect(
+            lambda: self.graphics_dropdown_changed(self.dropdown_castle_graphics, 1)
+        )
+        self.dropdown_wonder_graphics.currentIndexChanged.connect(
+            lambda: self.graphics_dropdown_changed(self.dropdown_wonder_graphics, 2)
+        )
+        self.dropdown_monk_graphics.currentIndexChanged.connect(
+            lambda: self.graphics_dropdown_changed(self.dropdown_monk_graphics, 3)
+        )
+        self.dropdown_monastery_graphics.currentIndexChanged.connect(
+            lambda: self.graphics_dropdown_changed(self.dropdown_monastery_graphics, 4)
+        )
+        self.dropdown_tradecart_graphics.currentIndexChanged.connect(
+            lambda: self.graphics_dropdown_changed(self.dropdown_tradecart_graphics, 5)
+        )
+        self.dropdown_ships_graphics.currentIndexChanged.connect(
+            lambda: self.graphics_dropdown_changed(self.dropdown_ships_graphics, 6)
+        )
 
         # Run once at startup
         self.dropdown_civ_name_changed(self.dropdown_civ_name.currentIndex())
@@ -731,6 +786,26 @@ class MyApp(QtWidgets.QMainWindow):
         if not self.windowTitle().endswith("*"):
             self.setWindowTitle(self.windowTitle() + "*")
 
+    def _apply_general_graphics_change(self, civ_index, old_value, new_value):
+        # Replace unit graphics with those from the chosen architecture set
+        for unit_id, unit in enumerate(DATA.civs[civ_index].units):
+            if unit_id not in [item for key in sorted(UNIT_BANK) if key >= 1 for item in UNIT_BANK[key]]:
+                DATA.civs[civ_index].units[unit_id] = ARCHITECTURE_SETS[new_value][unit_id]
+
+        # Update CURRENT_CIV if needed
+        if CURRENT_CIV.data_index == civ_index:
+            CURRENT_CIV.graphics[0] = new_value
+            # Refresh dropdown without firing signal
+            self.dropdown_general_graphics.blockSignals(True)
+            idx = self.dropdown_general_graphics.findData(new_value)
+            if idx >= 0:
+                self.dropdown_general_graphics.setCurrentIndex(idx)
+            self.dropdown_general_graphics.blockSignals(False)
+
+        # Mark unsaved changes
+        if not self.windowTitle().endswith("*"):
+            self.setWindowTitle(self.windowTitle() + "*")
+
     def change_name(self):
         old_name = CURRENT_CIV.name
         new_name = self.input_civ_name.text()
@@ -780,6 +855,40 @@ class MyApp(QtWidgets.QMainWindow):
 
         # Update title text box
         self.input_title.setText(new_title)
+
+    def graphics_dropdown_changed(self, dropdown, category_index):
+        civ_index = CURRENT_CIV.data_index
+        model_civ_index = dropdown.currentData()
+
+        # Decide which units to affect
+        if category_index == 0:
+            # General: everything except units in other banks
+            excluded = [item for key, val in UNIT_BANK.items() if key >= 1 for item in val]
+            affected_units = [uid for uid in range(len(DATA.civs[civ_index].units)) if uid not in excluded]
+        else:
+            affected_units = UNIT_BANK.get(category_index, [])
+
+        old_units, new_units = {}, {}
+        for uid in affected_units:
+            try:
+                old_unit = DATA.civs[civ_index].units[uid]
+                new_unit = ARCHITECTURE_SETS[model_civ_index][uid]
+                # Only include if both have a valid standing_graphic
+                if getattr(old_unit, "standing_graphic", None) is not None and getattr(new_unit, "standing_graphic", None) is not None:
+                    old_units[uid] = copy.deepcopy(old_unit)
+                    new_units[uid] = copy.deepcopy(new_unit)
+            except Exception:
+                continue  # skip invalid units safely
+
+        if not old_units:
+            return  # nothing valid to change
+
+        # If all are identical already, skip
+        if all(old_units[uid].standing_graphic == new_units[uid].standing_graphic for uid in old_units):
+            return
+
+        cmd = ChangeGraphicsCommand(self, civ_index, category_index, old_units, new_units)
+        self.undoStack.push(cmd)
 
     def dropdown_language_changed(self):
         sound_ids = [303, 301, 295, 299, 455, 448, 297, 298, 300, 302,
