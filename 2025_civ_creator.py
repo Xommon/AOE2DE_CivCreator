@@ -1821,7 +1821,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     DATA.effects[4].name = 'Inca Team Bonus'
 
     # Add the graphics to the .dat file
-    starting_graphic_index = len(DATA.graphics)
+    '''starting_graphic_index = len(DATA.graphics)
     DATA.graphics.append(Graphic(name='SEE_Dock2', file_name='b_byzantinedock_x1', particle_effect_name='', slp=6067, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=60, angle_count=1, speed_multiplier=0.0, frame_duration=0.15000000596046448, replay_delay=0.0, sequence_type=5, id=12733, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=220, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12734, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=4411, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=-120, display_angle=-1, padding_2=0)], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_Dock2(Base)', file_name='b_byzantinedock_x1', particle_effect_name='', slp=6067, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12734, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
     DATA.graphics.append(Graphic(name='SEE_ArcheryRange2', file_name='b_feudalarcherybyz_x1', particle_effect_name='', slp=6064, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12735, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
@@ -1973,7 +1973,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 unit.standing_graphic = (g0 + starting_graphic_index, -1)  # ordered tuple
 
             if g1 > -1:
-                unit.dying_graphic = g1 + starting_graphic_index
+                unit.dying_graphic = g1 + starting_graphic_index'''
 
     # Genie elements
     AttackOrArmor = genieutils.unit.AttackOrArmor
@@ -2162,7 +2162,18 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 ("type_50", "attack_graphic"),
                 ("type_50", "attack_graphic_2"),
                 ("dead_fish", "walking_graphic"),
-                ("dead_fish", "running_graphic")
+                ("dead_fish", "running_graphic"),
+                ("creatable", "garrison_graphic"),
+                ("creatable", "spawning_graphic"),
+                ("creatable", "upgrade_graphic"),
+                ("creatable", "hero_glow_graphic"),
+                ("creatable", "idle_attack_graphic"),
+                ("creatable", "special_graphic"),
+                ("bird", "tasks", "working_graphic_id"),
+                ("bird", "tasks", "carrying_graphic_id"),
+                ("bird", "tasks", "moving_graphic_id"),
+                ("bird", "tasks", "proceeding_graphic_id"),
+                ("selection_graphics",),
             ]
 
             for attr_path in attributes:
@@ -2355,6 +2366,11 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
     # Create units unique to Talofa
     for civ in DATA.civs:
+        # Change sound for dock to port
+        for unit_id in [45, 47, 51, 113, 805, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 2173]:
+            civ.units[unit_id].selection_sound = 708
+            civ.units[unit_id].train_sound = 708
+
         # Canoe
         custom_unit_starting_index = len(civ.units)
         canoe = copy.deepcopy(DATA.civs[1].units[778])
@@ -3072,7 +3088,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         'West African': 26, 'Austronesian': 29, 'Central Asian': 33,
         'Central European': 4, 'East Asian': 5, 'Eastern European': 23,# 'Islander': 25,
         'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15,
-        'South Asian': 20, 'Southeast Asian': 28, 'Southeast European': 7, 'Western European': 1
+        'South Asian': 20, 'Southeast Asian': 28, 'Southeast European': 47, 'Western European': 1,
+        'Mespotamian': 46,
     }
     monk_sets = {
         'Christian': 0, 'Mesoamerican': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40,
@@ -3082,7 +3099,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5,
         'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15,
         'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25,
-        'Southeast European': 7, 'Tengri': 12, 'Pagan': 35
+        'Southeast European': 7, 'Tengri': 12, 'Pagan': 35, 'Mespotamian': 46
     }
     trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
     ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5,
@@ -3109,7 +3126,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
     # Units affected by each group (same as your menu)
     unit_banks = {
-        0: range(0, len(DATA.civs[1].units)),            # General (all)
+        0: [20, 132, 498, 1413, 1414, 10, 14, 87, 1415, 1416, 86, 101, 153, 1417, 1418, 49, 150, 1425, 1426, 18, 19, 103, 105, 1419, 1420, 47, 51, 133, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 209, 210, 1427, 1428, 79, 190, 234, 236, 235, 82, 1430, 191, 192, 463, 464, 465, 1434, 1435, 71, 141, 142, 444, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617, 584, 585, 586, 587, 562, 563, 564, 565, 84, 116, 137, 1422, 1423, 1424, 1646, 129, 130, 131, 1411, 1412, 117, 155, 1508, 1509, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192, 1406, 1500, 1501, 1502, 1503, 1504, 1505, 1506, 1507, 110, 179, 1647],            # General (all)
         1: [82, 1430],                                   # Castle units (building and rubble)
         2: [276, 1445],                                  # Wonder units
         3: [125, 286, 922, 1025, 1327],                  # Monk units (variants)
@@ -3128,7 +3145,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         4:  [-1, -1, -1, -1, -1, -1, -1],
         5:  [-1, -1, -1, -1, -1, -1, -1],
         6:  [-1, -1, -1, -1, -1, -1, -1],
-        7:  [-1, -1, -1, -1, -1, -1, -1],
+        7:  [47, -1, -1, -1, -1, -1, -1],
         8:  [33, -1, -1, -1, 33, 1, 33],
         9:  [-1, -1, -1, -1, -1, -1, -1],
         10: [-1, -1, -1, -1, -1, -1, -1],
@@ -3165,8 +3182,8 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         41: [-1, -1, -1, 9, -1, -1, -1],
         42: [-1, -1, -1, 40, -1, 9, -1],
         43: [-1, -1, -1, -1, -1, -1, -1],
-        44: [-1, -1, -1, -1, -1, -1, -1],
-        45: [-1, -1, -1, -1, -1, -1, -1],
+        44: [47, -1, -1, -1, -1, -1, -1],
+        45: [47, -1, -1, -1, -1, -1, -1],
         49: [-1, -1, -1, -1, -1, -1, -1],
         50: [-1, -1, -1, -1, -1, -1, -1],
         51: [-1, -1, -1, -1, -1, -1, -1],
@@ -3739,7 +3756,7 @@ def main():
 
                             # Determine which architecture set is currently being used
                             # KEY: (house: 463)
-                            architecture_sets = {8916: 'West African', 10909: 'Austronesian', 11909: 'Central Asian', 2206: 'Central European', 2207: 'East Asian', 7909: 'Eastern European', 9202: 'Mediterranean', 2208: 'Middle Eastern', 6909: 'Mesoamerican', 9909: 'South Asian', 10916: 'Southeast Asian', 15814: 'Southeast European', 2209: 'Western European'}
+                            architecture_sets = {8916: 'West African', 10909: 'Austronesian', 11909: 'Central Asian', 2206: 'Central European', 2207: 'East Asian', 7909: 'Eastern European', 9202: 'Mediterranean', 2208: 'Middle Eastern', 6909: 'Mesoamerican', 9909: 'South Asian', 10916: 'Southeast Asian', 14251: 'Southeast European', 2209: 'Western European', 14728: 'Persian'}
                             try:
                                 if DATA.civs[selected_civ_index + 1].units[463].standing_graphic[0] in architecture_sets:
                                     return architecture_sets[DATA.civs[selected_civ_index + 1].units[463].standing_graphic[0]]
@@ -4412,13 +4429,13 @@ def main():
                         elif selection == '5':
                             save = ''
                             # Gather all graphics
-                            general_architecture_sets = {'Southeast European': 7, 'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1}
+                            general_architecture_sets = {'Southeast European': 47, 'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1, 'Mesopotamian': 46}
                             monk_sets = {'Christian': 0, 'Mesoamerican': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40, 'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35}
-                            monastery_sets = {'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Tengri': 12, 'Pagan': 35}
+                            monastery_sets = {'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Tengri': 12, 'Pagan': 35, 'Mesopotamian': 46}
                             trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
                             ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5, "Eastern European": 23, "Mediterranean": 14, "Mesoamerican": 15, "Middle Eastern": 9, "Southeast Asian": 28, "Western European": 1}
-                            castle_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6, "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11, "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17, "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22, "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27, "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32, "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37, "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42, "Romans": 43, "Armenians": 44, "Georgians": 45, "Shu": 49, "Wu": 50, "Wei": 51, "Jurchens": 52, "Khitans": 53}
-                            wonder_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6, "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11, "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17, "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22, "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27, "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32, "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37, "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42, "Romans": 43, "Armenians": 44, "Georgians": 45, "Shu": 49, "Wu": 50, "Wei": 51, "Jurchens": 52, "Khitans": 53}
+                            castle_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6, "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11, "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17, "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22, "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27, "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32, "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37, "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42, "Romans": 43, "Armenians": 44, "Georgians": 45, 'Athenians': 47, 'Achaemenids': 46, "Shu": 49, "Wu": 50, "Wei": 51, "Jurchens": 52, "Khitans": 53}
+                            wonder_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6, "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11, "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17, "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22, "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27, "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32, "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37, "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42, "Romans": 43, "Armenians": 44, "Georgians": 45, 'Athenians': 47, 'Achaemenids': 46, "Shu": 49, "Wu": 50, "Wei": 51, "Jurchens": 52, "Khitans": 53}
                             
                             # Custom Castles
                             for custom_castle in ['Poenari Castle']:
@@ -4436,7 +4453,7 @@ def main():
 
                             # Get current graphics
                             graphic_titles = ["General", "Castle", "Wonder", 'Monk', 'Monastery', 'Trade Cart', 'Ships']
-                            unit_bank = {0: range(0, len(DATA.civs[1].units)), 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [128, 204], 6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
+                            unit_bank = {0: [20, 132, 498, 1413, 1414, 10, 14, 87, 1415, 1416, 86, 101, 153, 1417, 1418, 49, 150, 1425, 1426, 18, 19, 103, 105, 1419, 1420, 47, 51, 133, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 209, 210, 1427, 1428, 79, 190, 234, 236, 235, 82, 1430, 191, 192, 463, 464, 465, 1434, 1435, 71, 141, 142, 444, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617, 584, 585, 586, 587, 562, 563, 564, 565, 84, 116, 137, 1422, 1423, 1424, 1646, 129, 130, 131, 1411, 1412, 117, 155, 1508, 1509, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192, 1406, 1500, 1501, 1502, 1503, 1504, 1505, 1506, 1507, 110, 179, 1647], 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [128, 204], 6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
                             current_graphics = [''] * len(graphic_titles)
 
                             while True:
@@ -4444,7 +4461,7 @@ def main():
                                 try:
                                     for i, graphic_set in enumerate(graphic_sets):
                                         try:
-                                            test_unit = unit_bank[i][0] if i > 0 else 463
+                                            test_unit = unit_bank[i][0]
 
                                             for key, value in graphic_set.items():
                                                 if DATA.civs[selected_civ_index + 1].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
@@ -4530,12 +4547,42 @@ def main():
                                 # Convert unit graphics
                                 if change > -1:
                                     for unit_id in unit_bank[selection]:
-                                        try:
-                                            # Change all units that are not in the other unit lists
-                                            if selection > 0 or unit_id not in [item for key in sorted(unit_bank) if key >= 1 for item in unit_bank[key]]:
-                                                DATA.civs[selected_civ_index + 1].units[unit_id] = ARCHITECTURE_SETS[change][unit_id]
-                                        except:
-                                            pass
+                                        # list of attributes you want to copy
+                                        ATTRS = [
+                                            "standing_graphic",
+                                            "damage_graphics",
+                                            "dying_graphic",
+                                            "undead_graphic",
+                                            "garrison_graphic",
+                                            "spawning_graphic",
+                                            "upgrade_graphic",
+                                            "hero_glow_graphic",
+                                            "idle_attack_graphic",
+                                            "special_graphic",
+                                            "attack_graphic",
+                                            "attack_graphic_2",
+                                            "working_graphic_id",
+                                            "carrying_graphic_id",
+                                            "moving_graphic_id",
+                                            "proceeding_graphic_id",
+                                            "selection_graphics",
+                                            "building",
+                                        ]
+
+                                        if selection > 0 or unit_id not in [item for key in sorted(unit_bank) if key >= 1 for item in unit_bank[key]]:
+                                            for attr in ATTRS:
+                                                try:
+                                                    setattr(
+                                                        DATA.civs[selected_civ_index + 1].units[unit_id],
+                                                        attr,
+                                                        getattr(ARCHITECTURE_SETS[change][unit_id], attr)
+                                                    )
+                                                except:
+                                                    pass
+
+                                        # Change icon
+                                        if selection > 0:
+                                            DATA.civs[selected_civ_index + 1].units[unit_id].icon_id = ARCHITECTURE_SETS[change][unit_id].icon_id
 
                                     print(f"Graphics changed for {selected_civ_name}.")
                                     save = '*'
@@ -4665,7 +4712,7 @@ def main():
                                     'Mangonel*7/Onager*7/Siege Onager*7': [358, 257, 320],
                                     'Rocket Cart*7/Heavy Rocket Cart*7': [979, 980],
                                     'Scorpion*8/Heavy Scorpion*8': [94, 239],
-                                    'War Chariot*8/Elite War Charior*8': [1065, 1171],
+                                    'War Chariot*8': [1962],
                                     'Siege Tower': [603],
                                     'Flaming Camel*9': [703],
                                     'Traction Trebuchet*9': [1025],

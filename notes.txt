@@ -41,7 +41,7 @@ Austronesian                Architecture     The Feudal/Castle/Imperial graphics
 ===== BASEGAME CIVILISATION CHANGES =====
 Civilisation        Type        Changes
 ------------------- ----------- ---------------------------------------------------------------------------
-Armenians           ---
+Armenians           Cosmetic    Architecture set to Southeast European
 Aztecs              Gameplay    Warships disabled, Canoes enabled
 Bengalis            Cosmetic    Monk graphic set to Muslim
 Berbers             Cosmetic    Architecture set to West African
@@ -63,7 +63,7 @@ Cumans              Gameplay    Farm disabled, Pasture enabled
 Dravidians          Cosmetic    Trade Cart graphic set to Water Buffalo
 Ethiopians          ---
 Franks              Cosmetic    Monk graphic set to Catholic
-Georgians           ---
+Georgians           Cosmetic    Architecture set to Southeast European
 Goths               Cosmetic    Architecture set to Mediterranean
                     Audio       Language set to Gothic
 Gurjaras            Cosmetic    Monk graphic set to Hindu

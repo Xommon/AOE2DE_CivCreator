@@ -24,4 +24,4 @@ time.sleep(1)
 
 # Edit code after here
 
-print(DATA.effects[997])
+print(DATA.civs[1].units[125])
