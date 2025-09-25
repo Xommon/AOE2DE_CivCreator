@@ -53,11 +53,14 @@ Bulgarians          Gameplay    Cannon Galleon disabled, Dromon enabled
 Burmese             Cosmetic    Monk graphic set to Buddhist
                     Gameplay    Cavalry Archers disabled, Elephant Archers enabled
                     Gameplay    Battering Rams disabled, Armored Elephants enabled (Siege Elephant disabled)
+                    Gameplay    Trade Cog disabled, Junk enabled
 Burgundians         ---
 Byzantines          Cosmetic    Architecture set to Southeast European
                     Audio       Language set to Greek
 Celts               Cosmetic    Monk graphic set to Catholic
 Chinese             Gameplay    Dragon Ship disabled, Fast Fire Ship enabled
+                    Gameplay    Trade Cog disabled, Junk enabled
+                    Cosmetic    Monastery graphic set to "East Asian"
 Cumans              Gameplay    Farm disabled, Pasture enabled
                     Gameplay    Warships disabled, Canoes enabled
 Dravidians          Cosmetic    Trade Cart graphic set to Water Buffalo
@@ -76,15 +79,19 @@ Huns                Gameplay    Farm disabled, Pasture enabled
                     Audio       Language set to Chuvash
 Inca                Gameplay    Warships disabled, Canoes enabled
 Italians            Audio       Language set to Italian
-Japanese            ---
+Japanese            Cosmetic    Monastery graphic set to "Shinto"
+                    Gameplay    Trade Cog disabled, Junk enabled
 Jurchens            Audio       Language set to Jurchen
+                    Cosmetic    Monastery graphic set to "East Asian"
+                    Gameplay    Trade Cog disabled, Junk enabled
 Khmer               Cosmetic    Monk graphic set to Hindu
                     Gameplay    Warships disabled, Canoes enabled
                     Gameplay    Cavalry Archers disabled, Elephant Archers enabled
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
+                    Gameplay    Trade Cog disabled, Junk enabled
 Khitans             Text        Bonus Text Removed: "Pastures replace Farms"
                     Audio       Language set to Khitan
-Koreans             ---
+Koreans             Cosmetic    Monastery graphic set to "East Asian"
 Lithuanians         Cosmetic    Architecture set to Central European
                     Cosmetic    Monk graphic set to Pagan
                     Cosmetic    Monastery graphic set to Pagan
@@ -94,9 +101,11 @@ Malay               Cosmetic    Architecture set to Austronesian
                     Gameplay    Warships disabled, Canoes enabled
                     Gameplay    Cavalry Archers disabled, Elephant Archers enabled
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
+                    Gameplay    Trade Cog disabled, Junk enabled
 Malians             Gameplay    Warships disabled, Canoes enabled
 Maya                Gameplay    Warships disabled, Canoes enabled
 Mongols             Gameplay    Farm disabled, Pasture enabled
+                    Gameplay    Trade Cog disabled, Junk enabled
 Persians            Cosmetic    Architecture set to Central Asian
                     Cosmetic    Trade Cart graphic set to Horse
                     Text        Bonus Text Removed: "Can build Caravanserai in Imperial Age"
@@ -104,7 +113,7 @@ Poles               Cosmetic    Architecture set to Central European
 Portuguese          ---
 Romans              ---
 Saracens            Gameplay    Scout Unit set to Camel Scout
-Shu                 ---
+Shu                 Gameplay    Trade Cog disabled, Junk enabled
 Sicilians           ---
 Slavs               ---
 Spanish             ---
@@ -114,8 +123,10 @@ Turks               ---
 Vietnamese          Cosmetic    Ship graphic set to Southeast Asian
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
                     Gameplay    Lou Chuan enabled
+                    Gameplay    Trade Cog disabled, Junk enabled
 Vikings             Cosmetic    Monk graphic set to Pagan
                     Cosmetic    Monastery graphic set to Pagan
                     Gameplay    Cannon Galleons disabled, Dromon enabled
-Wei                 ---
+Wei                 Gameplay    Trade Cog disabled, Junk enabled
 Wu                  Audio       Language set to Cantonese
+                    Gameplay    Trade Cog disabled, Junk enabled

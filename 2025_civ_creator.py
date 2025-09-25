@@ -5,6 +5,9 @@
 # Advanced Genie Editor
 wine /home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/Tools_Builds/AdvancedGenieEditor3.exe
 
+# Test Mod Folder
+/home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test
+
 # .DAT File
 /home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test/resources/_common/dat/empires2_x2_p1.dat
 
@@ -683,8 +686,8 @@ def update_tech_tree_graphic(current_civ_name):
     else:
         tech_ids += [(539, 87), (21, 25), (442, 60)] # Galleys
 
-    # Trade Cog
-    tech_ids += [(17, 23)]
+    # Trade Cog / Junks
+    tech_ids += [(17, 23)] # Trade Cog / Junk
 
     # Harbor (Malay)
     if current_civ_name == 'Malay':
@@ -798,11 +801,18 @@ def update_tech_tree_graphic(current_civ_name):
             block['Name String ID'] = imperial_tech.language_dll_name + 10000
             block['Help String ID'] = imperial_tech.language_dll_name + 100000
         # Demolition ships
-        if 240 in disabled_triggers and (block['Name'] == 'Demolition Raft' or block['Name'] == 'Demolition Ship' or block['Name'] == 'Heavy Demolition Ship'):
+        if 605 in disabled_triggers and (block['Name'] == 'Demolition Raft' or block['Name'] == 'Demolition Ship' or block['Name'] == 'Heavy Demolition Ship'):
             block['Node Status'] = 'NotAvailable'
         # Transport Ship
         if block['Name'] == 'Transport Ship':
             block['Node Status'] = 'ResearchedCompleted'
+        # Junk
+        if get_tech_id('junk (make avail)') not in disabled_triggers and block['Name'] == 'Trade Cog':
+            block['Name'] = 'Junk'
+            block['Picture Index'] = 211
+            block['Name String ID'] = 5092
+            block['Help String ID'] = 105092
+            block['Node Type'] = 'RegionalUnit'
 
     # Add blocks to the tech tree
     if blocks:
@@ -1212,9 +1222,9 @@ def create_bonus(bonus_string, civ_id):
         # Build the bonus response
         bonus_response = ''
         if bonus_string.lower() == 'start with two scouts':
-            bonus_response = rf"T(639, 307, -1, -1, -1, -1)~2|E1~234~0~-1~1|E7~{DATA.civs[civ_id + 1].resources[263]}~619~1~-1"
+            bonus_response = rf"T(639, 307, -1, -1, -1, -1)~2|E1~234~0~-1~1|E7~{int(DATA.civs[civ_id + 1].resources[263])}~619~1~-1"
         elif bonus_string.lower() == 'start with three scouts':
-            bonus_response = rf"T(639, 307, -1, -1, -1, -1)~2|E1~234~0~-1~1|E7~{DATA.civs[civ_id + 1].resources[263]}~619~2~-1"
+            bonus_response = rf"T(639, 307, -1, -1, -1, -1)~2|E1~234~0~-1~1|E7~{int(DATA.civs[civ_id + 1].resources[263])}~619~2~-1"
         elif re.search(r'^(.*?)\s+free\b', bonus_string, re.IGNORECASE):
             # Free techs
             tech_names = [
@@ -2189,6 +2199,54 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 except:
                     pass
 
+    # Change the Monastery graphics for the Chinese, Koreans, and Jurchens
+    graphic_replacements = [2060, 2060, 2060, 2060, 145]
+    unit_ids = [30, 31, 32, 104, 1421]
+
+    for civ_id in [6, 18, 52]:
+        for unit_id, replacement_id in zip(unit_ids, graphic_replacements):
+            target_unit = DATA.civs[civ_id].units[unit_id]
+            source_unit = DATA.civs[civ_id].units[replacement_id]
+
+            # Change icon
+            if unit_id >= 125 and unit_id <= 1327:
+                target_unit.icon_id = source_unit.icon_id
+
+            attributes = [
+                ("standing_graphic",),
+                ("dying_graphic",),
+                ("undead_graphic",),
+                ("damage_graphics",),
+                ("type_50", "attack_graphic"),
+                ("type_50", "attack_graphic_2"),
+                ("dead_fish", "walking_graphic"),
+                ("dead_fish", "running_graphic"),
+                ("creatable", "garrison_graphic"),
+                ("creatable", "spawning_graphic"),
+                ("creatable", "upgrade_graphic"),
+                ("creatable", "hero_glow_graphic"),
+                ("creatable", "idle_attack_graphic"),
+                ("creatable", "special_graphic"),
+                ("bird", "tasks", "working_graphic_id"),
+                ("bird", "tasks", "carrying_graphic_id"),
+                ("bird", "tasks", "moving_graphic_id"),
+                ("bird", "tasks", "proceeding_graphic_id"),
+                ("selection_graphics",),
+            ]
+
+            for attr_path in attributes:
+                try:
+                    src = source_unit
+                    tgt = target_unit
+
+                    for attr in attr_path[:-1]:
+                        src = getattr(src, attr)
+                        tgt = getattr(tgt, attr)
+
+                    setattr(tgt, attr_path[-1], getattr(src, attr_path[-1]))
+                except:
+                    pass
+
     '''# Create an Islander architecture from the feudal African buildings and temporarily assign it to the Ethiopians
     islander_changes = {
         #Archery Range
@@ -2646,23 +2704,32 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         civ.units.append(imperial_elephant_archer)
 
         # Lightning Warrior
-        lightning_warrior = copy.deepcopy(DATA.civs[1].units[749])
+        '''lightning_warrior = copy.deepcopy(DATA.civs[1].units[749])
         change_string(118000, 'Lightning Warrior')
         change_string(119000, 'Create Lightning Warrior')
         lightning_warrior.language_dll_name = 118000
         lightning_warrior.language_dll_creation = 119000
-        #lightning_warrior.type_50.attacks.clear()
-        #lightning_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(4, 5))
-        #lightning_warrior.type_50.displayed_attack = 5
-        lightning_warrior.hit_points = 40
-        lightning_warrior.name = 'Lightning Warrior'
+
+        lightning_warrior.type_50.attacks.clear()
+        lightning_warrior.type_50.attacks.append(AttackOrArmor(4, 5
+        lightning_warrior.type_50.displayed_attack = 5
+
+        lightning_warrior.type_50.armours.clear()
+        lightning_warrior.type_50.armours.append(AttackOrArmor(3, 0))
+        lightning_warrior.type_50.armours.append(AttackOrArmor(4, 0))
+        lightning_warrior.type_50.displayed_melee_armour = 0
+        lightning_warrior.creatable.displayed_pierce_armor = 0
+
+        lightning_warrior.hit_points = 35
         lightning_warrior.speed = 1.35
-        lightning_warrior.type_50.reload_time = 1
+        lightning_warrior.type_50.reload_time = 0.85
         lightning_warrior.creatable.hero_mode = 0
         lightning_warrior.creatable.train_locations[0].unit_id = 82
-        lightning_warrior.creatable.train_locations[0].train_time = 14
+        lightning_warrior.creatable.train_locations[0].train_time = 11
         lightning_warrior.creatable.train_locations[0].button_id = 1
         lightning_warrior.creatable.train_locations[0].hot_key_id = 16107
+        lightning_warrior.creatable.resource_costs[1].amount = 30
+        lightning_warrior.name = 'Lightning Warrior'
         civ.units.append(lightning_warrior)
 
         # Elite Lightning Warrior
@@ -2671,12 +2738,11 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         change_string(121000, 'Create Elite Lightning Warrior')
         elite_lightning_warrior.language_dll_name = 120000
         elite_lightning_warrior.language_dll_creation = 121000
-        #elite_lightning_warrior.type_50.attacks[0] = 6
+        elite_lightning_warrior.type_50.attacks[0] = 6
         elite_lightning_warrior.type_50.displayed_attack = 6
-        elite_lightning_warrior.type_50.reload_time = 0.85
         elite_lightning_warrior.hit_points = 45
         elite_lightning_warrior.name = 'Elite Lightning Warrior'
-        civ.units.append(elite_lightning_warrior)
+        civ.units.append(elite_lightning_warrior)'''
 
         # Destroyer
         destroyer = copy.deepcopy(DATA.civs[1].units[1074])
@@ -2758,6 +2824,18 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         fire_tower.creatable.train_locations[0].hot_key_id = 16156
         fire_tower.name = 'Fire Tower'
         civ.units.append(fire_tower)
+
+        # Junk
+        junk = copy.deepcopy(DATA.civs[1].units[15])
+        junk.creatable.train_locations = DATA.civs[1].units[17].creatable.train_locations
+        junk.creatable.resource_costs = DATA.civs[1].units[17].creatable.resource_costs
+        junk.speed = 1.45
+        junk.line_of_sight = 6
+        junk.bird.search_radius = 6
+        junk.type_50.armours[1].amount = 6
+        junk.creatable.displayed_pierce_armor = 6
+        junk.name = 'Junk'
+        civ.units.append(junk)
 
         # Yurt
         '''yurt = copy.deepcopy(DATA.civs[1].units[1835])
@@ -2849,6 +2927,19 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     DATA.effects.append(elite_war_canoe_effect)
     elite_war_canoe_tech.effect_id = len(DATA.effects)-1
     DATA.techs.append(elite_war_canoe_tech)
+
+    # 3: Junk
+    junk_tech = copy.deepcopy(DATA.techs[0])
+    junk_tech.name = 'Junk (make avail)'
+    junk_effect = genieutils.effect.Effect(name='Junk (make avail)', effect_commands=[genieutils.effect.EffectCommand(3, 17, custom_unit_starting_index+21, -1, -1)])
+    DATA.effects.append(junk_effect)
+    junk_tech.effect_id = len(DATA.effects)-1
+    DATA.techs.append(junk_tech)
+    DATA.effects[482].effect_commands.append(genieutils.effect.EffectCommand(5, custom_unit_starting_index+21, -1, 5, 1.2))
+    DATA.effects[482].effect_commands.append(genieutils.effect.EffectCommand(5, custom_unit_starting_index+21, -1, 13, 1.2))
+    for effect in DATA.effects:
+        if "tech tree" in effect.name.lower() and not any(ex in effect.name.lower() for ex in ["chinese", "japanese", "koreans", "jurchens", "wu", "wei", "shu", "vietnamese", "malay", "burmese", "khmer", "mongols"]):
+            effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, custom_tech_starting_index+3))
 
     '''imperial_elephant_archer_tech = copy.deepcopy(DATA.techs[481])
     change_string(87000, 'Imperial Elephant Archer')
@@ -3096,10 +3187,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35
     }
     monastery_sets = {
-        'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5,
+        'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 6,
         'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15,
         'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25,
-        'Southeast European': 7, 'Tengri': 12, 'Pagan': 35, 'Mespotamian': 46
+        'Southeast European': 7, 'Tengri': 12, 'Pagan': 35, 'Mespotamian': 46, 'Shinto': 5
     }
     trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
     ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5,
@@ -3982,43 +4073,52 @@ def main():
 
                                     # Team bonus: t:<desc> / team bonus:<desc> / team:<desc>
                                     elif bonus_selection.lower().startswith(('team bonus:', 't:', 'team:')):
-                                        team_text_original = bonus_selection.split(':', 1)[1].strip().capitalize()
+                                        team_text_original = bonus_selection.split(':', 1)[1].strip()
                                         team_text = team_text_original.lower()
 
                                         # Generate team bonus effect
                                         bonus_tech, bonus_effect = create_bonus(team_text, selected_civ_index)
 
-                                        if bonus_effect and bonus_effect[0].effect_commands == []:
+                                        # Only bail if create_bonus returned nothing at all
+                                        if not bonus_effect:
+                                            print(colour(Fore.RED, 'ERROR: Could not generate team bonus effect.'))
                                             break
+
                                         if ' age' in team_text_original.lower():
                                             print(colour(Fore.RED, 'ERROR: Team Bonus cannot contain Age parameters.'))
                                             break
 
-                                        # Find the existing team effect
+                                        # Find the existing team effect (case-insensitive match)
                                         team_bonus_effect = None
                                         for effect in DATA.effects:
-                                            if effect.name == f'{selected_civ_name.title()} Team Bonus':
+                                            if effect.name.lower() == f'{selected_civ_name.lower()} team bonus':
                                                 team_bonus_effect = effect
                                                 break
 
                                         # Update effect in memory
                                         if team_bonus_effect:
                                             team_bonus_effect.effect_commands = bonus_effect[0].effect_commands
+                                        else:
+                                            print(colour(Fore.YELLOW, f'WARNING: No effect found for {selected_civ_name} Team Bonus'))
 
                                         # Update team bonus text in working_description
                                         team_label_idx = None
                                         for i, line in enumerate(working_description):
-                                            if line.strip().lower() == 'team bonus':
+                                            if line.strip().lower().startswith('team bonus'):
                                                 team_label_idx = i
                                                 break
+
                                         if team_label_idx is not None and team_label_idx + 1 < len(working_description):
-                                            working_description[team_label_idx + 1] = team_text_original
+                                            working_description[team_label_idx + 1] = team_text_original.capitalize()
 
                                             # Persist change to MOD_STRINGS
                                             with open(MOD_STRINGS, 'r+', encoding='utf-8') as f:
                                                 lines = f.readlines()
                                                 line_index = selected_civ_index + len(DATA.civs) - 1
-                                                # Write description back with escaped \n sequences
+
+                                                # Debug: show which line is about to be replaced
+                                                print(f'Updating MOD_STRINGS line {line_index}: {lines[line_index]}')
+
                                                 lines[line_index] = f'{lines[line_index][:6]}"{"\\\\n".join(working_description)}"\n'
                                                 f.seek(0)
                                                 f.writelines(lines)
@@ -4431,7 +4531,7 @@ def main():
                             # Gather all graphics
                             general_architecture_sets = {'Southeast European': 47, 'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1, 'Mesopotamian': 46}
                             monk_sets = {'Christian': 0, 'Mesoamerican': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40, 'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35}
-                            monastery_sets = {'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Tengri': 12, 'Pagan': 35, 'Mesopotamian': 46}
+                            monastery_sets = {'Shinto': 5, 'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 6, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Tengri': 12, 'Pagan': 35, 'Mesopotamian': 46}
                             trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
                             ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5, "Eastern European": 23, "Mediterranean": 14, "Mesoamerican": 15, "Middle Eastern": 9, "Southeast Asian": 28, "Western European": 1}
                             castle_sets = {"Britons": 1, "Franks": 2, "Goths": 3, "Teutons": 4, "Japanese": 5, "Chinese": 6, "Byzantines": 7, "Persians": 8, "Saracens": 9, "Turks": 10, "Vikings": 11, "Mongols": 12, "Celts": 13, "Spanish": 14, "Aztecs": 15, "Maya": 16, "Huns": 17, "Koreans": 18, "Italians": 19, "Hindustanis": 20, "Inca": 21, "Magyars": 22, "Slavs": 23, "Portuguese": 24, "Ethiopians": 25, "Malians": 26, "Berbers": 27, "Khmer": 28, "Malay": 29, "Burmese": 30, "Vietnamese": 31, "Bulgarians": 32, "Tatars": 33, "Cumans": 34, "Lithuanians": 35, "Burgundians": 36, "Sicilians": 37, "Poles": 38, "Bohemians": 39, "Dravidians": 40, "Bengalis": 41, "Gurjaras": 42, "Romans": 43, "Armenians": 44, "Georgians": 45, 'Athenians': 47, 'Achaemenids': 46, "Shu": 49, "Wu": 50, "Wei": 51, "Jurchens": 52, "Khitans": 53}

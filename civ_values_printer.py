@@ -24,4 +24,11 @@ time.sleep(1)
 
 # Edit code after here
 
-print(DATA.civs[1].units[125])
+unit = DATA.civs[1].units[93]
+unit.type_50.attacks.clear()
+unit.type_50.attacks.append(genieutils.unit.AttackOrArmor(4, 4))
+unit.type_50.armours.clear()
+unit.type_50.armours.append(genieutils.unit.AttackOrArmor(3, 0))
+unit.type_50.armours.append(genieutils.unit.AttackOrArmor(3, 1))
+print(unit.type_50.attacks)
+print(unit.type_50.armours)
