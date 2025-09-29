@@ -47,6 +47,7 @@ import string
 import pyperclip
 from prompt_toolkit import prompt
 import platform
+import glob
 import subprocess
 from threading import Thread
 import sys
@@ -77,6 +78,47 @@ class ProgressTracker:
     def __init__(self, total):
         self.total = total
         self.current = 0
+
+def update_hud_style(civ_index, general_architecture_index):
+    json_path = os.path.join(MOD_FOLDER, "resources/_common/dat/civilizations.json")
+
+    # Load JSON
+    with open(json_path, "r", encoding="utf-8") as file:
+        civs = json.load(file)
+
+    # Make sure index is valid
+    if civ_index < 0 or civ_index >= len(civs):
+        raise IndexError(f"Civ index {civ_index} out of range (0–{len(civs)-1})")
+
+    civ = civs[civ_index]
+
+    # Update hud_style
+    if general_architecture_index in [1, 4]:
+        civ["hud_style"] = "CivWest"
+    elif general_architecture_index in [5]:
+        civ["hud_style"] = "CivAsia"
+    elif general_architecture_index in [14]:
+        civ["hud_style"] = "CivMedi"
+    elif general_architecture_index in [9]:
+        civ["hud_style"] = "CivOrie"
+    elif general_architecture_index in [23]:
+        civ["hud_style"] = "CivSlav"
+    elif general_architecture_index in [33]:
+        civ["hud_style"] = "CivNomad"
+    elif general_architecture_index in [15]:
+        civ["hud_style"] = "CivMeso"
+    elif general_architecture_index in [26]:
+        civ["hud_style"] = "CivAfri"
+    elif general_architecture_index in [28, 29, 20]:  # Southeast Asian
+        civ["hud_style"] = "CivSeas"
+    elif general_architecture_index in [46]:  # Central Asian, South Asian (alt Persians)
+        civ["hud_style"] = "CivPersian"
+    elif general_architecture_index in [47, 55]:  # Greeks, Mesopotamian overlap
+        civ["hud_style"] = "CivGreek"
+
+    # Save changes
+    with open(json_path, "w", encoding="utf-8") as file:
+        json.dump(civs, file, indent=3, ensure_ascii=False)
 
 def import_tech_tree():
     import json
@@ -831,6 +873,37 @@ def update_tech_tree_graphic(current_civ_name):
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'w', encoding="utf-8") as file:
         json.dump(json_tree, file, ensure_ascii=False, indent=2)
 
+    def reset_unique_unit_images_by_index(mod_folder, civ_index, castle_unit):
+        json_path = os.path.join(mod_folder, "resources/_common/dat/civilizations.json")
+
+        # Load JSON
+        with open(json_path, "r", encoding="utf-8") as file:
+            civs = json.load(file)
+
+        # Make sure index is valid
+        if civ_index < 0 or civ_index >= len(civs):
+            raise IndexError(f"Civ index {civ_index} out of range (0–{len(civs)-1})")
+
+        civ = civs[civ_index]
+
+        # Format the icon_id as a 3-digit number
+        icon_id = castle_unit.icon_id
+        icon_str = f"{icon_id:03d}"
+
+        # Replace unique_unit_image_paths with the new one
+        civ["unique_unit_image_paths"] = [
+            f"/resources/uniticons/{icon_str}_50730.png"
+        ]
+
+        # Write back to file
+        with open(json_path, "w", encoding="utf-8") as file:
+            json.dump(civs, file, indent=3, ensure_ascii=False)
+
+        print(f"✅ Civ index {civ_index} updated with icon {icon_str}_50730.png")
+
+    # Replace icons in description
+    reset_unique_unit_images_by_index(MOD_FOLDER, current_civ_index, castle_unit)
+
 def get_effect_id(name):
     for i, effect in enumerate(DATA.effects):
         if effect.name.lower() == name.lower():
@@ -1480,7 +1553,7 @@ def open_mod(mod_folder):
         "foot archers": ['C0', 'U-7', 'U-6', 'U-1155'],
         "skirmishers": ['U7', 'U6', 'U1155'],
         "mounted archers": ['C36'],
-        "mounted": ['C36', 'C12', 'C23'],
+        "mounted units": ['C36', 'C12', 'C23'],
         "trade units": ['C2', 'C19'],
         "infantry": ['C6'],
         "cavalry": ['C12'],
@@ -1594,9 +1667,9 @@ def open_mod(mod_folder):
     #print(UNIT_CATEGORIES)
 
     # Update the tech trees
-    for civ in DATA.civs:
+    '''for civ in DATA.civs:
         if civ.name not in ['Achaemenids', 'Athenians', 'Spartans', 'Gaia']:
-            update_tech_tree_graphic(civ.name)
+            update_tech_tree_graphic(civ.name)'''
 
     # Tell the user that the mod was loaded
     print('Mod loaded!')
@@ -1609,8 +1682,13 @@ def open_mod(mod_folder):
     #    print(f"{attr}: {value}")
     time.sleep(1)
     
+import os
+import shutil
+import pickle
+import platform
+
 def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
-    # Announce revert
+    # Handle revert
     if revert:
         _mod_name = _mod_name.split('/')[-1]
         print(f'Reverting {_mod_name}...')
@@ -1621,11 +1699,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         # Delete existing mod folder
         shutil.rmtree(_mod_folder)
 
-        # Move back a folder
+        # Move back one folder
         _mod_folder = os.path.dirname(_mod_folder)
 
     # Get local mods folder
-    import platform
     if _mod_folder == '':
         local_mods_folder = input("\nEnter local mods folder location: ")
         if local_mods_folder == '':
@@ -1647,7 +1724,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     else:
         aoe2_folder = _aoe2_folder
 
-    # Get name for mod
+    # Get mod name
     if _mod_name == '':
         mod_name = input("Enter new mod name: ")
         if mod_name == '':
@@ -1655,22 +1732,22 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     else:
         mod_name = _mod_name
 
-    mod_folder = local_mods_folder + '/' + mod_name
-
-    # Create new folder and change directory to it
-    os.makedirs(mod_name, exist_ok=True)
-    os.chdir(mod_name)
+    # Define main mod folder and UI mod folder
     MOD_FOLDER = os.path.abspath(os.path.join(local_mods_folder, mod_name))
+    MOD_UI_FOLDER = os.path.abspath(os.path.join(local_mods_folder, f"{mod_name}-ui"))
 
-    # Ensure the mod folder exists
-    os.makedirs(MOD_FOLDER, exist_ok=True)
+    # Ensure fresh mod folders
+    for folder in [MOD_FOLDER, MOD_UI_FOLDER]:
+        if os.path.exists(folder):
+            shutil.rmtree(folder)
+        os.makedirs(folder, exist_ok=True)
 
-    # Save important links
+    # Save important links in main mod folder
     with open(f'{MOD_FOLDER}/links.pkl', 'wb') as file:
         pickle.dump(aoe2_folder, file)
         file.write(b'\n')
 
-    # Files or folders to copy
+    # Files or folders to copy into the main mod folder
     files_to_copy = [
         'resources/_common/dat/civilizations.json', 
         'resources/_common/dat/civTechTrees.json', 
@@ -1682,12 +1759,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         'widgetui/textures/menu/civs',
     ]
 
-    # Copy each file or folder
     for item in files_to_copy:
         source_path = os.path.join(aoe2_folder, item)
         destination_path = os.path.join(MOD_FOLDER, item)
 
-        # Make sure the destination directory exists
         os.makedirs(os.path.dirname(destination_path), exist_ok=True)
 
         if os.path.isfile(source_path):
@@ -1695,12 +1770,67 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elif os.path.isdir(source_path):
             shutil.copytree(source_path, destination_path, dirs_exist_ok=True)
 
+    # Files or folders to copy into the UI-only mod folder
+    ui_files_to_copy = [
+        'widgetui/textures/ingame/icons/civ_techtree_buttons',
+        'widgetui/textures/menu/civs',
+    ]
+
+    for item in ui_files_to_copy:
+        source_path = os.path.join(aoe2_folder, item)
+        destination_path = os.path.join(MOD_UI_FOLDER, item)
+
+        os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+
+        if os.path.isfile(source_path):
+            shutil.copy(source_path, destination_path)
+        elif os.path.isdir(source_path):
+            shutil.copytree(source_path, destination_path, dirs_exist_ok=True)
+
+    # Replace civ icons
+    MOD_FOLDER = os.path.abspath(os.path.join(local_mods_folder, mod_name))
+    MOD_UI_FOLDER = os.path.abspath(os.path.join(local_mods_folder, f"{mod_name}-ui"))
+
+    source_icons_folder = os.path.join("Images", "CivIcons")
+    if not os.path.exists(source_icons_folder):
+        print(f"⚠️ No CivIcons folder found at {source_icons_folder}")
+        return
+
+    # Get all .png files in Images/CivIcons
+    icon_files = glob.glob(os.path.join(source_icons_folder, "*.png"))
+
+    for icon_path in icon_files:
+        civ_name = os.path.splitext(os.path.basename(icon_path))[0]  # filename without .png
+
+        # === Replace in civ icon folders ===
+        civ_targets = [
+            os.path.join(MOD_FOLDER, "widgetui/textures/menu/civs", f"{civ_name}.png"),
+            os.path.join(MOD_UI_FOLDER, "widgetui/textures/menu/civs", f"{civ_name}.png"),
+        ]
+
+        for tgt in civ_targets:
+            if os.path.exists(os.path.dirname(tgt)):
+                shutil.copy(icon_path, tgt)
+
+        # === Replace in civ techtree/button folders ===
+        tech_targets = [
+            os.path.join(MOD_FOLDER, "resources/_common/wpfg/resources/civ_techtree"),
+            os.path.join(MOD_FOLDER, "widgetui/textures/ingame/icons/civ_techtree_buttons"),
+            os.path.join(MOD_UI_FOLDER, "widgetui/textures/ingame/icons/civ_techtree_buttons"),
+        ]
+
+        for folder in tech_targets:
+            if os.path.exists(folder):
+                for suffix in ["", "_hover", "_pressed"]:
+                    tgt = os.path.join(folder, f"menu_techtree_{civ_name}{suffix}.png")
+                    shutil.copy(icon_path, tgt)
+
     # Define original strings
     global ORIGINAL_STRINGS
-    ORIGINAL_STRINGS = rf'{mod_folder}/resources/en/strings/key-value/key-value-strings-utf8.txt'
+    ORIGINAL_STRINGS = rf'{MOD_FOLDER}/resources/en/strings/key-value/key-value-strings-utf8.txt'
 
     # Open .dat file
-    with_real_progress(lambda progress: load_dat(progress, rf'{mod_folder}/resources/_common/dat/empires2_x2_p1.dat'), 'Creating Mod', total_steps=100)
+    with_real_progress(lambda progress: load_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Creating Mod', total_steps=100)
 
     # Clean-up JSON file
     with open(rf'{MOD_FOLDER}/resources/_common/dat/civTechTrees.json', 'r', encoding='utf-8') as file:
@@ -1777,7 +1907,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             sound_count = int(sound_ids[sound_id][-1])
 
             # Add the sound items to the sound
-            language_presets = {1: "English", 2: "French", 3: "Gothic", 4: "German", 5: "Japanese", 6: "Mandarin", 7: "Greek", 8: "Persian", 9: "Arabic", 10: "Turkish", 11: "Norse", 12: "Mongolian", 13: "Gaelic", 14: "Spanish", 15: "Yucatec", 16: "Kaqchikel", 17: "Chuvash", 18: "Korean", 19: "Italian", 20: "Hindustani", 21: "Quechua", 22: "Hungarian", 23: "Russian", 24: "Portuguese", 25: "Amharic", 26: "Maninka", 27: "Taqbaylit", 28: "Khmer", 29: "Malaysian", 30: "Burmese", 31: "Vietnamese", 32: "Bulgarian", 33: "Chagatai", 34: "Cuman", 35: "Lithuanian", 36: "Burgundian", 37: "Sicilian", 38: "Polish", 39: "Czech", 40: "Tamil", 41: "Bengali", 42: "Gujarati", 43: "Vulgar Latin", 44: "Armenian", 45: "Georgian", 49: "Mandarin", 50: "Cantonese", 51: "Mandarin", 52: "Jurchen", 53: "Khitan"}
+            language_presets = {1: "English", 2: "French", 3: "Gothic", 4: "German", 5: "Japanese", 6: "Mandarin", 7: "Greek", 8: "Persian", 9: "Arabic", 10: "Turkish", 11: "Norse", 12: "Mongolian", 13: "Gaelic", 14: "Spanish", 15: "Yucatec", 16: "Kaqchikel", 17: "Chuvash", 18: "Korean", 19: "Italian", 20: "Hindustani", 21: "Quechua", 22: "Hungarian", 23: "Russian", 24: "Portuguese", 25: "Amharic", 26: "Maninka", 27: "Taqbaylit", 28: "Khmer", 29: "Malaysian", 30: "Burmese", 31: "Vietnamese", 32: "Bulgarian", 33: "Chagatai", 34: "Cuman", 35: "Lithuanian", 36: "Burgundian", 37: "Sicilian", 38: "Polish", 39: "Czech", 40: "Tamil", 41: "Bengali", 42: "Gujarati", 43: "Vulgar Latin", 44: "Armenian", 45: "Georgian", 49: "Tangut", 50: "Bai", 51: "Tibetan", 52: "Jurchen", 53: "Khitan"}
             for i in range(sound_count):
                 # Correct the name
                 if civ_id not in language_presets:
@@ -1829,161 +1959,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     DATA.civs[21].name = 'Inca'
     DATA.effects[3].name = 'Inca Tech Tree'
     DATA.effects[4].name = 'Inca Team Bonus'
-
-    # Add the graphics to the .dat file
-    '''starting_graphic_index = len(DATA.graphics)
-    DATA.graphics.append(Graphic(name='SEE_Dock2', file_name='b_byzantinedock_x1', particle_effect_name='', slp=6067, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=60, angle_count=1, speed_multiplier=0.0, frame_duration=0.15000000596046448, replay_delay=0.0, sequence_type=5, id=12733, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=220, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12734, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=4411, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=-120, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Dock2(Base)', file_name='b_byzantinedock_x1', particle_effect_name='', slp=6067, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12734, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_ArcheryRange2', file_name='b_feudalarcherybyz_x1', particle_effect_name='', slp=6064, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12735, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_ArcheryRange3', file_name='b_castlearcherybyz_x1', particle_effect_name='', slp=6019, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12736, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_BombardTower', file_name='b_bombaredtowerbyz_x1', particle_effect_name='', slp=6035, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12737, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Barracks3', file_name='b_castlebarracksbyz_x1', particle_effect_name='', slp=6066, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12738, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Barracks2', file_name='b_feudalbarracksbyz_x1', particle_effect_name='', slp=6066, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12739, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Blacksmith2', file_name='b_feudalblacksmithbyz_x1', particle_effect_name='', slp=6065, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12740, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=5314, padding_1=0, sprite_ptr=0, offset_x=-86, offset_y=-110, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Blacksmith3', file_name='b_castleblacksmithbyz_x1', particle_effect_name='', slp=100, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12741, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=5314, padding_1=0, sprite_ptr=0, offset_x=-86, offset_y=-110, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_SiegeWorkshop', file_name='b_castlesiegeworkshopbyz_x1', particle_effect_name='', slp=6017, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12742, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Stable2', file_name='b_feudalstablebyz_x1', particle_effect_name='', slp=6066, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12743, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Stable3', file_name='b_castlestablebyz_x1', particle_effect_name='', slp=6022, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12744, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_University3', file_name='b_castleuniversitybyz_x1', particle_effect_name='', slp=1362, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12745, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_University4', file_name='b_imperialuniversitybyz_x1', particle_effect_name='', slp=0, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12746, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Market2', file_name='b_feudalmarketbyz_x1', particle_effect_name='', slp=6071, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12747, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Monastary', file_name='b_monasterybyz_x1', particle_effect_name='', slp=6027, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12748, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_WatchTower', file_name='b_towerbyz_x1', particle_effect_name='', slp=6028, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12749, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_GuardTower', file_name='b_guardtowerbyz_x1', particle_effect_name='', slp=6031, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12750, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Keep', file_name='b_keeptowerbyz_x1', particle_effect_name='', slp=6033, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12751, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Market4', file_name='b_imperialmarketbyz_x1', particle_effect_name='', slp=6020, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12752, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_House2', file_name='b_feudalhouse_x1', particle_effect_name='', slp=6068, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=3, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=6, id=12753, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_House3', file_name='b_imperialhouses_x1', particle_effect_name='', slp=6025, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=3, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=6, id=12754, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Mill2', file_name='b_feudalmill_x1', particle_effect_name='', slp=6069, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=1, frame_count=12, angle_count=1, speed_multiplier=0.0, frame_duration=0.25, replay_delay=0.0, sequence_type=5, id=12755, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[GraphicAngleSound(frame_num=10, sound_id=307, wwise_sound_id=-1994566283, frame_num_2=55, sound_id_2=307, wwise_sound_id_2=-1994566283, frame_num_3=-1, sound_id_3=-1, wwise_sound_id_3=0)]))
-    DATA.graphics.append(Graphic(name='SEE_Mill3', file_name='b_millcastle_x1', particle_effect_name='', slp=748, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=1, frame_count=12, angle_count=1, speed_multiplier=0.0, frame_duration=0.25, replay_delay=0.0, sequence_type=5, id=12756, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[GraphicAngleSound(frame_num=10, sound_id=307, wwise_sound_id=-1994566283, frame_num_2=55, sound_id_2=307, wwise_sound_id_2=-1994566283, frame_num_3=-1, sound_id_3=-1, wwise_sound_id_3=0)]))
-    DATA.graphics.append(Graphic(name='SEE_StoneWall', file_name='b_normalwallframes_x1', particle_effect_name='', slp=7124, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=5, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12757, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_FortifiedWall', file_name='b_fortifiedwall_x1', particle_effect_name='', slp=7126, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=5, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12758, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_StoneWall(Construction)', file_name='b_stonewallconstruction_x1', particle_effect_name='', slp=7129, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=4, angle_count=5, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12759, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12211, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_FortifiedWall(Construction)', file_name='b_fortifiedwallconstruction_x1', particle_effect_name='', slp=7131, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=4, angle_count=5, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12760, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12211, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Dock3', file_name='b_castledockbyz_x1', particle_effect_name='', slp=2260, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=60, angle_count=1, speed_multiplier=0.0, frame_duration=0.15000000596046448, replay_delay=0.0, sequence_type=5, id=12761, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=241, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12762, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=4411, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=-120, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Dock3(Base)', file_name='b_castledockbyz_x1', particle_effect_name='', slp=6012, is_loaded=0, old_color_flag=1, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12762, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_House3(Rubble)', file_name='b_medi_house_age3_rubble_x1', particle_effect_name='', slp=2238, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=3, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12763, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12180, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12181, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_House2(Rubble)', file_name='b_medi_house_age2_rubble_x1', particle_effect_name='', slp=2238, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=3, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=2, id=12764, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12180, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12181, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Stable3(Rubble)', file_name='b_medi_stable_age3_rubble_x1', particle_effect_name='', slp=1012, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12765, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12182, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12183, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Stable2(Rubble)', file_name='b_medi_stable_age2_rubble_x1', particle_effect_name='', slp=1012, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12766, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12182, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12183, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Barracks3(Rubble)', file_name='b_medi_barracks_age3_rubble_x1', particle_effect_name='', slp=136, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12767, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12182, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12183, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Barracks2(Rubble)', file_name='b_medi_barracks_age2_rubble_x1', particle_effect_name='', slp=136, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12768, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12182, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12183, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_ArcheryRange3(Rubble)', file_name='b_medi_archery_range_age3_rubble_x1', particle_effect_name='', slp=27, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12769, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12182, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12183, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_ArcheryRange2(Rubble)', file_name='b_medi_archery_range_age2_rubble_x1', particle_effect_name='', slp=27, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12770, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12182, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12183, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_SiegeWorkshop(Rubble)', file_name='b_medi_siege_workshop_age3_rubble_x1', particle_effect_name='', slp=949, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12771, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12184, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12185, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Market3(Rubble)', file_name='b_medi_market_age3_rubble_x1', particle_effect_name='', slp=811, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12772, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12184, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12185, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Market2(Rubble)', file_name='b_medi_market_age2_rubble_x1', particle_effect_name='', slp=811, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12773, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12184, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12185, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Market4(Rubble)', file_name='b_medi_market_age4_rubble_x1', particle_effect_name='', slp=2270, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12774, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12184, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12185, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Blacksmith3(Rubble)', file_name='b_medi_blacksmith_age3_rubble_x1', particle_effect_name='', slp=6010, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12775, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12182, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12183, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Blacksmith2(Rubble)', file_name='b_medi_blacksmith_age2_rubble_x1', particle_effect_name='', slp=6210, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12776, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12182, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12183, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Mill3(Rubble)', file_name='b_medi_mill_age3_rubble_x1', particle_effect_name='', slp=744, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12777, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12180, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12181, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Mill2(Rubble)', file_name='b_medi_mill_age2_rubble_x1', particle_effect_name='', slp=744, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12778, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12180, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12181, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Monastery(Rubble)', file_name='b_medi_monastery_age3_rubble_x1', particle_effect_name='', slp=276, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12779, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12182, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12183, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_University3(Rubble)', file_name='b_medi_university_age3_rubble_x1', particle_effect_name='', slp=1358, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12780, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12180, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12181, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_University4(Rubble)', file_name='b_medi_university_age4_rubble_x1', particle_effect_name='', slp=1370, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12781, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12180, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12181, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Castle3(Rubble)', file_name='b_medi_castle_age3_rubble_x1', particle_effect_name='', slp=298, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12782, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12180, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12181, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Tower3(Rubble)', file_name='b_medi_tower_age3_rubble_x1', particle_effect_name='', slp=6029, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12783, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12178, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12179, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Tower2(Rubble)', file_name='b_medi_tower_age2_rubble_x1', particle_effect_name='', slp=6030, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12784, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12178, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12179, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Tower4(Rubble)', file_name='b_medi_tower_age4_rubble_x1', particle_effect_name='', slp=6032, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12785, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12178, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12179, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_BombardTower(Rubble)', file_name='b_medi_tower_bombard_rubble_x1', particle_effect_name='', slp=6034, is_loaded=0, old_color_flag=0, layer=6, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=678, wwise_sound_id=1668689960, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12786, mirroring_mode=0, editor_flag=0, deltas=[GraphicDelta(graphic_id=-1, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12178, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0), GraphicDelta(graphic_id=12179, padding_1=0, sprite_ptr=0, offset_x=0, offset_y=0, display_angle=-1, padding_2=0)], angle_sounds=[]))
-    DATA.graphics.append(Graphic(name='SEE_Castle', file_name='b_byzantinecastle_x1', particle_effect_name='', slp=6021, is_loaded=0, old_color_flag=0, layer=20, player_color=-1, transparent_selection=1, coordinates=(0, 0, 0, 0), sound_id=-1, wwise_sound_id=0, angle_sounds_used=0, frame_count=1, angle_count=1, speed_multiplier=0.0, frame_duration=0.0, replay_delay=0.0, sequence_type=0, id=12732, mirroring_mode=0, editor_flag=0, deltas=[], angle_sounds=[]))
-    
-    # Damage Graphics
-    base_see_graphics = []
-    for graphic in base_see_graphics:
-        pass
-
-    # Change the Byzantines to this new architecture style
-    southeast_european_graphics = {
-        # Archery Range
-        87: [2, 37],   # AR2, AR2 rubble
-        10: [3, 36],   # AR3, AR3 rubble
-        14: [3, 36],
-
-        # Barracks
-        20:  [5, 34],
-        132: [5, 34],
-        498: [6, 35],
-
-        # Stable
-        86:  [11, 32],
-        101: [10, 33],
-        153: [11, 32],
-
-        # Siege Workshop
-        49:  [9, 38],
-        150: [9, 38],
-
-        # Blacksmith
-        103: [7, 43],  # BS2, BS2 rubble
-        105: [8, 42],  # BS3, BS3 rubble
-        18:  [8, 42],
-        19:  [8, 42],
-
-        # Dock (animated standing; no rubble)
-        133: [1, -1],   # Age 2
-        806: [1, -1],   # Age 2
-        2120: [1, -1],  # Age 2
-        2144: [1, -1],  # Age 2
-        47:  [29, -1],  # Age 3
-        51:  [29, -1],  # Age 3
-        807: [29, -1],  # Age 3
-        808: [29, -1],  # Age 3
-        2121: [29, -1], # Age 3
-        2122: [29, -1], # Age 3
-        2145: [29, -1], # Age 3
-        2146: [29, -1], # Age 3
-
-        # University (fixed)
-        209: [12, 47], # Uni3, Uni3 rubble
-        210: [13, 48], # Uni4, Uni4 rubble
-
-        # Towers (fixed)
-        79:  [16, 51], # Watch → Tower2 rubble
-        234: [17, 50], # Guard → Tower3 rubble
-        235: [18, 52], # Keep → Tower4 rubble
-        236: [4,  53], # Bombard → Bombard rubble
-
-        # Walls (standing only)
-        117: [24, -1], # Stone Wall frames
-        115: [25, -1], # Fortified Wall
-
-        # Castle
-        82:  [54, 49], # Castle, Castle rubble
-
-        # Monastery
-        30:  [15, 46],
-        31:  [15, 46],
-        32:  [15, 46],
-        104: [15, 46],
-
-        # House
-        191: [21, 30],
-        192: [21, 30],
-        463: [20, 31],
-        464: [21, 30],
-        465: [21, 30],
-
-        # Mill
-        129: [22, 45], # Mill2, Mill2 rubble
-        130: [23, 44], # Mill3, Mill3 rubble
-        131: [23, 44],
-
-        # Market
-        84:  [14, 40], # Market2, Market2 rubble
-        116: [14, 39],  # Market3 needs a standing SEE_Market3
-        137: [19, 41], # Market4, Market4 rubble
-    }
-
-    for i, unit in enumerate(DATA.civs[7].units):
-        if i in southeast_european_graphics:
-            g0, g1 = southeast_european_graphics[i]
-
-            if g0 > -1:
-                unit.standing_graphic = (g0 + starting_graphic_index, -1)  # ordered tuple
-
-            if g1 > -1:
-                unit.dying_graphic = g1 + starting_graphic_index'''
 
     # Genie elements
     AttackOrArmor = genieutils.unit.AttackOrArmor
@@ -2067,6 +2042,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     for tech_id in [788, 789, 791]:
         DATA.techs[tech_id].effect_id = -1
 
+    # Disable the three kingdoms heros
+    for tech_id in [1066, 1038, 1083]:
+        DATA.techs[tech_id].effect_id = -1
+
     '''# Make the Imperial Skirmisher potentially available to all civs
     DATA.techs[656].effect_id = -1
     DATA.techs[655].research_locations[0].button_id = 7
@@ -2138,6 +2117,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
     # Saracens start with Camel Scout
     DATA.civs[9].resources[263] = 1755
+    DATA.civs[20].resources[263] = 1755
 
     # Enable Dromon for Vikings and Bulgarians
     for tech_tree in [276, 706]:
@@ -2151,101 +2131,68 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 37))
         DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 376))
 
+    # Replace unit graphics
+    def replace_graphics_for_civs(civ_ids, unit_ids, replacement_ids):
+        attributes = [
+            ("standing_graphic",),
+            ("dying_graphic",),
+            ("undead_graphic",),
+            ("damage_graphics",),
+            ("type_50", "attack_graphic"),
+            ("type_50", "attack_graphic_2"),
+            ("dead_fish", "walking_graphic"),
+            ("dead_fish", "running_graphic"),
+            ("creatable", "garrison_graphic"),
+            ("creatable", "spawning_graphic"),
+            ("creatable", "upgrade_graphic"),
+            ("creatable", "hero_glow_graphic"),
+            ("creatable", "idle_attack_graphic"),
+            ("creatable", "special_graphic"),
+            ("bird", "tasks", "working_graphic_id"),
+            ("bird", "tasks", "carrying_graphic_id"),
+            ("bird", "tasks", "moving_graphic_id"),
+            ("bird", "tasks", "proceeding_graphic_id"),
+            ("selection_graphics",),
+        ]
+
+        # Expand to all civs if civ_ids == [-1]
+        if civ_ids == [-1]:
+            civ_ids = range(len(DATA.civs))
+
+        for civ_id in civ_ids:
+            # If unit_ids == [-1], expand to all units of this civ
+            if unit_ids == [-1]:
+                current_unit_ids = range(len(DATA.civs[civ_id].units))
+            else:
+                current_unit_ids = unit_ids
+
+            for unit_id, replacement_id in zip(current_unit_ids, replacement_ids):
+                if unit_id >= len(DATA.civs[civ_id].units) or replacement_id >= len(DATA.civs[civ_id].units):
+                    continue  # skip invalid indexes
+
+                target_unit = DATA.civs[civ_id].units[unit_id]
+                source_unit = DATA.civs[civ_id].units[replacement_id]
+
+                # Copy icon if this is a creatable unit (>=125 and <=1327)
+                if 125 <= unit_id <= 1327:
+                    target_unit.icon_id = source_unit.icon_id
+
+                for attr_path in attributes:
+                    try:
+                        src = source_unit
+                        tgt = target_unit
+                        for attr in attr_path[:-1]:
+                            src = getattr(src, attr)
+                            tgt = getattr(tgt, attr)
+                        setattr(tgt, attr_path[-1], getattr(src, attr_path[-1]))
+                    except AttributeError:
+                        continue
+
     # Change the Monastery and Monk graphics for the Vikings and Lithuanians
-    graphic_replacements = [1712, 1712, 1712, 1712, 1526, 1940, 1941, 1941, 1941, 1941]
-    unit_ids = [30, 31, 32, 104, 1421, 125, 286, 922, 1025, 1327]
-
-    for civ_id in [11, 35]:
-        for unit_id, replacement_id in zip(unit_ids, graphic_replacements):
-            target_unit = DATA.civs[civ_id].units[unit_id]
-            source_unit = DATA.civs[civ_id].units[replacement_id]
-
-            # Change icon
-            if unit_id >= 125 and unit_id <= 1327:
-                target_unit.icon_id = source_unit.icon_id
-
-            attributes = [
-                ("standing_graphic",),
-                ("dying_graphic",),
-                ("undead_graphic",),
-                ("damage_graphics",),
-                ("type_50", "attack_graphic"),
-                ("type_50", "attack_graphic_2"),
-                ("dead_fish", "walking_graphic"),
-                ("dead_fish", "running_graphic"),
-                ("creatable", "garrison_graphic"),
-                ("creatable", "spawning_graphic"),
-                ("creatable", "upgrade_graphic"),
-                ("creatable", "hero_glow_graphic"),
-                ("creatable", "idle_attack_graphic"),
-                ("creatable", "special_graphic"),
-                ("bird", "tasks", "working_graphic_id"),
-                ("bird", "tasks", "carrying_graphic_id"),
-                ("bird", "tasks", "moving_graphic_id"),
-                ("bird", "tasks", "proceeding_graphic_id"),
-                ("selection_graphics",),
-            ]
-
-            for attr_path in attributes:
-                try:
-                    src = source_unit
-                    tgt = target_unit
-
-                    for attr in attr_path[:-1]:
-                        src = getattr(src, attr)
-                        tgt = getattr(tgt, attr)
-
-                    setattr(tgt, attr_path[-1], getattr(src, attr_path[-1]))
-                except:
-                    pass
+    replace_graphics_for_civs([11, 35], [30, 31, 32, 104, 1421, 125, 286, 922, 1025, 1327], [1712, 1712, 1712, 1712, 1526, 1940, 1941, 1941, 1941, 1941])
 
     # Change the Monastery graphics for the Chinese, Koreans, and Jurchens
-    graphic_replacements = [2060, 2060, 2060, 2060, 145]
-    unit_ids = [30, 31, 32, 104, 1421]
-
-    for civ_id in [6, 18, 52]:
-        for unit_id, replacement_id in zip(unit_ids, graphic_replacements):
-            target_unit = DATA.civs[civ_id].units[unit_id]
-            source_unit = DATA.civs[civ_id].units[replacement_id]
-
-            # Change icon
-            if unit_id >= 125 and unit_id <= 1327:
-                target_unit.icon_id = source_unit.icon_id
-
-            attributes = [
-                ("standing_graphic",),
-                ("dying_graphic",),
-                ("undead_graphic",),
-                ("damage_graphics",),
-                ("type_50", "attack_graphic"),
-                ("type_50", "attack_graphic_2"),
-                ("dead_fish", "walking_graphic"),
-                ("dead_fish", "running_graphic"),
-                ("creatable", "garrison_graphic"),
-                ("creatable", "spawning_graphic"),
-                ("creatable", "upgrade_graphic"),
-                ("creatable", "hero_glow_graphic"),
-                ("creatable", "idle_attack_graphic"),
-                ("creatable", "special_graphic"),
-                ("bird", "tasks", "working_graphic_id"),
-                ("bird", "tasks", "carrying_graphic_id"),
-                ("bird", "tasks", "moving_graphic_id"),
-                ("bird", "tasks", "proceeding_graphic_id"),
-                ("selection_graphics",),
-            ]
-
-            for attr_path in attributes:
-                try:
-                    src = source_unit
-                    tgt = target_unit
-
-                    for attr in attr_path[:-1]:
-                        src = getattr(src, attr)
-                        tgt = getattr(tgt, attr)
-
-                    setattr(tgt, attr_path[-1], getattr(src, attr_path[-1]))
-                except:
-                    pass
+    replace_graphics_for_civs([6, 18, 52], [30, 31, 32, 104, 1421], [2060, 2060, 2060, 2060, 145])
 
     '''# Create an Islander architecture from the feudal African buildings and temporarily assign it to the Ethiopians
     islander_changes = {
@@ -2381,6 +2328,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     DATA.techs[1012].civ = -1
     DATA.techs[1008].name = 'Pasture'
     DATA.effects[1008].name = 'Pasture'
+    for civ in DATA.civs:
+        civ.units[1890].resource_storages[0].type = 4
+        civ.units[1890].resource_storages[0].amount = 0
+        civ.units[1890].resource_storages[0].flag = 4
     DATA.effects[1008].effect_commands[0] = genieutils.effect.EffectCommand(3, 50, 1889, -1, -1)
     for effect in [effect_ for effect_ in DATA.effects if "tech tree" in effect_.name.lower()]:
         name = effect.name.lower()
@@ -2429,7 +2380,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             civ.units[unit_id].selection_sound = 708
             civ.units[unit_id].train_sound = 708
 
-        # Canoe
+        # 0: Canoe
         custom_unit_starting_index = len(civ.units)
         canoe = copy.deepcopy(DATA.civs[1].units[778])
         canoe.creatable.train_locations[0].unit_id = 45
@@ -2441,7 +2392,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         canoe.bird.search_radius = 7
         civ.units.append(canoe)
 
-        # War Canoe
+        # 1: War Canoe
         war_canoe = copy.deepcopy(canoe)
         change_string(90000, 'War Canoe')
         change_string(91000, 'Create War Canoe')
@@ -2468,7 +2419,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         war_canoe.type_50.displayed_reload_time = 2
         civ.units.append(war_canoe)
 
-        # Elite War Canoe
+        # 2: Elite War Canoe
         elite_war_canoe = copy.deepcopy(war_canoe)
         change_string(92000, 'Elite War Canoe')
         change_string(93000, 'Create Elite War Canoe')
@@ -2497,7 +2448,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.type_50.displayed_reload_time = 2
         civ.units.append(elite_war_canoe)
 
-        # Naasiri
+        # 3: Naasiri
         naasiri = copy.deepcopy(DATA.civs[1].units[2327])
         change_string(94000, 'Naasiri')
         change_string(95000, 'Create Naasiri')
@@ -2513,7 +2464,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         naasiri.creatable.train_time = 22
         civ.units.append(naasiri)
 
-        # Elite Naasiri
+        # 4: Elite Naasiri
         elite_naasiri = copy.deepcopy(naasiri)
         change_string(96000, 'Elite Naasiri')
         change_string(97000, 'Create Elite Naasiri')
@@ -2525,7 +2476,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_naasiri.hit_points = 110
         civ.units.append(elite_naasiri)
 
-        # Elephant Gunner
+        # 5: Elephant Gunner
         elephant_gunner = copy.deepcopy(DATA.civs[1].units[875])
         change_string(98000, 'Elephant Gunner')
         change_string(99000, 'Create Elephant Gunner')
@@ -2551,7 +2502,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elephant_gunner.class_ = 23
         civ.units.append(elephant_gunner)
 
-        # Elite Elephant Gunner
+        # 6: Elite Elephant Gunner
         elite_elephant_gunner = copy.deepcopy(elephant_gunner)
         change_string(100000, 'Elite Elephant Gunner')
         change_string(101000, 'Create Elite Elephant Gunner')
@@ -2564,7 +2515,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_elephant_gunner.class_ = 23
         civ.units.append(elite_elephant_gunner)
 
-        # Flamethrower
+        # 7: Flamethrower
         flamethrower = copy.deepcopy(DATA.civs[1].units[188])
         flamethrower.creatable.train_locations[0].unit_id = 82
         flamethrower.creatable.train_locations[0].button_id = 1
@@ -2573,7 +2524,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         flamethrower.creatable.train_locations[0].hot_key_id = 16107
         civ.units.append(flamethrower)
 
-        # Elite Flamethrower
+        # 8: Elite Flamethrower
         elite_flamethrower = copy.deepcopy(flamethrower)
         change_string(102000, 'Elite Flamethrower')
         change_string(103000, 'Create Elite Flamethrower')
@@ -2585,10 +2536,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_flamethrower.name = 'Elite Flamethrower'
         civ.units.append(elite_flamethrower)
 
-        # Weichafe
+        # 9: Bolas Warrior
         weichafe = copy.deepcopy(DATA.civs[1].units[2320])
-        change_string(104000, 'Weichafe')
-        change_string(105000, 'Create Weichafe')
+        change_string(104000, 'Bolas Warrior')
+        change_string(105000, 'Create Bolas Warrior')
         weichafe.language_dll_name = 104000
         weichafe.language_dll_creation = 105000
         weichafe.creatable.train_locations[0].unit_id = 82
@@ -2606,14 +2557,14 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         weichafe.bird.tasks = DATA.civs[1].units[1959].bird.tasks
         for i in range(6, 20):
             weichafe.bird.tasks[i].work_value_1 = -0.25
-        weichafe.name = 'Weichafe'
+        weichafe.name = 'Bolas Warrior'
         weichafe.creatable.train_locations[0].hot_key_id = 16107
         civ.units.append(weichafe)
 
-        # Elite Weichafe
+        # 10: Elite Bolas Warrior
         elite_weichafe = copy.deepcopy(weichafe)
-        change_string(106000, 'Elite Weichafe')
-        change_string(107000, 'Create Elite Weichafe')
+        change_string(106000, 'Elite Bolas Warrior')
+        change_string(107000, 'Create Elite Bolas Warrior')
         elite_weichafe.language_dll_name = 106000
         elite_weichafe.language_dll_creation = 107000
         elite_weichafe.class_ = 0
@@ -2623,10 +2574,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_weichafe.type_50.displayed_range = 5
         elite_weichafe.line_of_sight = 7
         elite_weichafe.bird.search_radius = 7
-        elite_weichafe.name = 'Elite Weichafe'
+        elite_weichafe.name = 'Elite Bolas Warrior'
         civ.units.append(elite_weichafe)
 
-        # Crusader
+        # 11: Crusader
         crusader = copy.deepcopy(DATA.civs[1].units[1723])
         change_string(108000, 'Crusader')
         change_string(109000, 'Create Crusader')
@@ -2640,7 +2591,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         crusader.creatable.train_locations[0].hot_key_id = 16107
         civ.units.append(crusader)
 
-        # Elite Crusader
+        # 12: Elite Crusader
         elite_crusader = copy.deepcopy(crusader)
         change_string(110000, 'Elite Crusader')
         change_string(111000, 'Elite Create Crusader')
@@ -2652,7 +2603,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_crusader.name = 'Elite Crusader'
         civ.units.append(elite_crusader)
 
-        # Tomahawk Warrior
+        # 13: Tomahawk Warrior
         tomahawk_warrior = copy.deepcopy(DATA.civs[1].units[1374])
         change_string(112000, 'Tomahawk Warrior')
         change_string(113000, 'Create Tomahawk Warrior')
@@ -2663,7 +2614,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         tomahawk_warrior.creatable.train_locations[0].hot_key_id = 16107
         civ.units.append(tomahawk_warrior)
 
-        # Elite Tomahawk Warrior
+        # 14: Elite Tomahawk Warrior
         elite_tomahawk_warrior = copy.deepcopy(tomahawk_warrior)
         change_string(114000, 'Elite Tomahawk Warrior')
         change_string(115000, 'Create Elite Tomahawk Warrior')
@@ -2676,7 +2627,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_tomahawk_warrior.name = 'Elite Tomahawk Warrior'
         civ.units.append(elite_tomahawk_warrior)
 
-        # Imperial Elephant Archer
+        # 15: Imperial Elephant Archer
         imperial_elephant_archer = copy.deepcopy(DATA.civs[1].units[875])
         change_string(116000, 'Imperial Elephant Archer')
         change_string(117000, 'Create Imperial Elephant Archer')
@@ -2703,7 +2654,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         imperial_elephant_archer.creatable.train_locations[0].button_id = civ.units[875].creatable.train_locations[0].button_id
         civ.units.append(imperial_elephant_archer)
 
-        # Lightning Warrior
+        # 16: Lightning Warrior
         '''lightning_warrior = copy.deepcopy(DATA.civs[1].units[749])
         change_string(118000, 'Lightning Warrior')
         change_string(119000, 'Create Lightning Warrior')
@@ -2711,7 +2662,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         lightning_warrior.language_dll_creation = 119000
 
         lightning_warrior.type_50.attacks.clear()
-        lightning_warrior.type_50.attacks.append(AttackOrArmor(4, 5
+        lightning_warrior.type_50.attacks.append(AttackOrArmor(4, 5))
         lightning_warrior.type_50.displayed_attack = 5
 
         lightning_warrior.type_50.armours.clear()
@@ -2732,19 +2683,19 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         lightning_warrior.name = 'Lightning Warrior'
         civ.units.append(lightning_warrior)
 
-        # Elite Lightning Warrior
+        # 17: Elite Lightning Warrior
         elite_lightning_warrior = copy.deepcopy(lightning_warrior)
         change_string(120000, 'Elite Lightning Warrior')
         change_string(121000, 'Create Elite Lightning Warrior')
         elite_lightning_warrior.language_dll_name = 120000
         elite_lightning_warrior.language_dll_creation = 121000
-        elite_lightning_warrior.type_50.attacks[0] = 6
-        elite_lightning_warrior.type_50.displayed_attack = 6
+        elite_lightning_warrior.type_50.attacks[0].amount = 7
+        elite_lightning_warrior.type_50.displayed_attack = 7
         elite_lightning_warrior.hit_points = 45
         elite_lightning_warrior.name = 'Elite Lightning Warrior'
         civ.units.append(elite_lightning_warrior)'''
 
-        # Destroyer
+        # 18: Destroyer
         destroyer = copy.deepcopy(DATA.civs[1].units[1074])
         change_string(122000, 'Destroyer')
         change_string(123000, 'Create Destroyer')
@@ -2764,7 +2715,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         destroyer.creatable.train_locations[0].hot_key_id = 16107
         civ.units.append(destroyer)
 
-        # Elite Destroyer
+        # 19: Elite Destroyer
         elite_destroyer = copy.deepcopy(destroyer)
         change_string(124000, 'Elite Destroyer')
         change_string(125000, 'Create Elite Destroyer')
@@ -2777,7 +2728,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_destroyer.name = 'Elite Destroyer'
         civ.units.append(elite_destroyer)
 
-        # Cossack
+        # 20: Cossack
         cossack = copy.deepcopy(DATA.civs[1].units[1186])
         change_string(126000, 'Cossack')
         change_string(127000, 'Create Cossack')
@@ -2800,7 +2751,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         cossack.name = 'Cossack'
         civ.units.append(cossack)
 
-        # Elite Cossack
+        # 21: Elite Cossack
         elite_cossack = copy.deepcopy(cossack)
         change_string(128000, 'Elite Cossack')
         change_string(129000, 'Create Elite Cossack')
@@ -2815,7 +2766,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_cossack.name = 'Elite Cossack'
         civ.units.append(elite_cossack)
 
-        # Fire Tower
+        # 22: Fire Tower
         fire_tower = copy.deepcopy(DATA.civs[1].units[190])
         fire_tower.line_of_sight = 10
         fire_tower.bird.search_radius = 10
@@ -2825,17 +2776,94 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         fire_tower.name = 'Fire Tower'
         civ.units.append(fire_tower)
 
-        # Junk
-        junk = copy.deepcopy(DATA.civs[1].units[15])
+        # 23: Junk
+        junk = copy.deepcopy(DATA.civs[1].units[17])
+        junk.language_dll_name = 5092
+        junk.language_dll_creation = 6092
         junk.creatable.train_locations = DATA.civs[1].units[17].creatable.train_locations
         junk.creatable.resource_costs = DATA.civs[1].units[17].creatable.resource_costs
+        junk.hit_points = 75
         junk.speed = 1.45
         junk.line_of_sight = 6
         junk.bird.search_radius = 6
         junk.type_50.armours[1].amount = 6
         junk.creatable.displayed_pierce_armor = 6
+        junk.bird.work_rate = 1
         junk.name = 'Junk'
         civ.units.append(junk)
+        replace_graphics_for_civs([-1], [len(DATA.civs[1].units)-1], [15])
+
+        # 24: Imperial Steppe Lancer
+        imperial_steppe_lancer = copy.deepcopy(DATA.civs[1].units[1372])
+        change_string(130000, 'Imperial Steppe Lancer')
+        change_string(131000, 'Create Imperial Steppe Lancer')
+        imperial_steppe_lancer.language_dll_name = 130000
+        imperial_steppe_lancer.language_dll_creation = 131000
+        imperial_steppe_lancer.creatable.train_locations = DATA.civs[1].units[17].creatable.train_locations
+        imperial_steppe_lancer.creatable.resource_costs = DATA.civs[1].units[17].creatable.resource_costs
+        imperial_steppe_lancer.type_50.attacks[0].amount = 13
+        imperial_steppe_lancer.type_50.displayed_attack = 13
+        imperial_steppe_lancer.hit_points = 100
+        imperial_steppe_lancer.type_50.armours[0].amount = 2
+        imperial_steppe_lancer.type_50.armours[1].amount = 3
+        imperial_steppe_lancer.type_50.displayed_melee_armour = 2
+        imperial_steppe_lancer.creatable.displayed_pierce_armor = 3
+        imperial_steppe_lancer.name = 'Imperial Steppe Lancer'
+        civ.units.append(imperial_steppe_lancer)
+
+        # 25: Scout Cavalry
+        scout_cavalry = copy.deepcopy(DATA.civs[1].units[448])
+        scout_cavalry.creatable.train_locations.append(genieutils.unit.TrainLocation(26, 1897, 1, 16675))
+        civ.units.append(scout_cavalry)
+
+        # 26: Light Cavalry
+        light_cavalry = copy.deepcopy(DATA.civs[1].units[546])
+        light_cavalry.creatable.train_locations.append(genieutils.unit.TrainLocation(26, 1897, 1, 16675))
+        civ.units.append(light_cavalry)
+
+        # 27: Hussar
+        hussar = copy.deepcopy(DATA.civs[1].units[441])
+        hussar.creatable.train_locations.append(genieutils.unit.TrainLocation(26, 1897, 1, 16675))
+        civ.units.append(hussar)
+
+        # EDIT: Qizilbash Warrior / Elite Qizilbash Warrior
+        for i in range(len(DATA.civs)):
+            qizilbash_warrior = DATA.civs[i].units[1817]
+            qizilbash_warrior.type_50.max_range = 1
+            qizilbash_warrior.type_50.displayed_range = 1
+            qizilbash_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(30, 2))
+            qizilbash_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(27, 2))
+            elite_qizilbash_warrior = DATA.civs[i].units[1829]
+            elite_qizilbash_warrior.type_50.max_range = 1
+            elite_qizilbash_warrior.type_50.displayed_range = 1
+            elite_qizilbash_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(30, 2))
+            elite_qizilbash_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(27, 2))
+
+        # Cavalry Archer Scout
+        '''cavalry_archer_scout = copy.deepcopy(DATA.civs[1].units[448])
+        change_string(130000, 'Cavalry Archer Scout')
+        change_string(131000, 'Create Cavalry Archer Scout')
+        cavalry_archer_scout.language_dll_name = 130000
+        cavalry_archer_scout.language_dll_creation = 131000
+        cavalry_archer_scout.type_50.max_range = 2
+        cavalry_archer_scout.type_50.displayed_range = 2
+        cavalry_archer_scout.speed = 1.1
+        cavalry_archer_scout.type_50.attacks[1].class_ = 3
+        cavalry_archer_scout.type_50.accuracy_percent = 35
+        cavalry_archer_scout.type_50.armours[2].amount = 0
+        cavalry_archer_scout.creatable.displayed_pierce_armor = 0
+        cavalry_archer_scout.name = 'Cavalry ArcherScout'
+        civ.units.append(cavalry_archer_scout)
+        print(len(DATA.civs[1].units)-1)
+        replace_graphics_for_civs([-1], [len(DATA.civs[1].units)-1], [2308])
+
+        # Edit current effects for the Scout Cavalry Archer
+        DATA.effects[16].effect_commands.append(genieutils.effect.EffectCommand(4, get_unit_id('cavalry archer scout', False), -1, 1, 2))
+        DATA.effects[16].effect_commands.append(genieutils.effect.EffectCommand(4, get_unit_id('cavalry archer scout', False), -1, 5, 0.25))
+        DATA.effects[16].effect_commands.append(genieutils.effect.EffectCommand(4, get_unit_id('cavalry archer scout', False), -1, 23, 2))
+        DATA.effects[16].effect_commands.append(genieutils.effect.EffectCommand(4, get_unit_id('cavalry archer scout', False), -1, 12, 1))
+        DATA.effects[16].effect_commands.append(genieutils.effect.EffectCommand(4, get_unit_id('cavalry archer scout', False), -1, 47, 1))
+        DATA.effects[102].effect_commands.append(genieutils.effect.EffectCommand(3, get_unit_id('cavalry archer scout', False), 39, -1, -1))'''
 
         # Yurt
         '''yurt = copy.deepcopy(DATA.civs[1].units[1835])
@@ -2940,6 +2968,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     for effect in DATA.effects:
         if "tech tree" in effect.name.lower() and not any(ex in effect.name.lower() for ex in ["chinese", "japanese", "koreans", "jurchens", "wu", "wei", "shu", "vietnamese", "malay", "burmese", "khmer", "mongols"]):
             effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, custom_tech_starting_index+3))
+
+    # 4: Imperial Steppe Lancer
+    imperial_steppe_lancer_tech = copy.deepcopy(DATA.techs[715])
+    imperial_steppe_lancer_tech.name = 'Imperial Steppe Lancer'
 
     '''imperial_elephant_archer_tech = copy.deepcopy(DATA.techs[481])
     change_string(87000, 'Imperial Elephant Archer')
@@ -3214,6 +3246,17 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     graphic_titles = ["General", "Castle", "Wonder", "Monk", "Monastery", "Trade Cart", "Ships"]
     graphic_sets = [general_architecture_sets, castle_sets, wonder_sets,
                     monk_sets, monastery_sets, trade_cart_sets, ship_sets]
+    
+    # Load architecture sets
+    global ARCHITECTURE_SETS
+    ARCHITECTURE_SETS = []
+    with open(f'{MOD_FOLDER}/{mod_name}.pkl', 'rb') as file:
+        while True:
+            try:
+                units = pickle.load(file)
+                ARCHITECTURE_SETS.append(units)
+            except EOFError:
+                break
 
     # Units affected by each group (same as your menu)
     unit_banks = {
@@ -3227,15 +3270,14 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             1104, 527, 528, 539, 21, 442]
     }
 
-    # Your presets now need 7 fields (General, Castle, Wonder, Monk, Monastery, Trade Cart, Ships)
-    # Empty string means "no change"
+    # (General, Castle, Wonder, Monk, Monastery, Trade Cart, Ships)
     civ_presets = {
         1:  [-1, -1, -1, -1, -1, -1, -1],
         2:  [-1, -1, -1, 19, -1, -1, -1],
         3:  [19, -1, -1, -1, 19, -1, 19],
         4:  [-1, -1, -1, -1, -1, -1, -1],
         5:  [-1, -1, -1, -1, -1, -1, -1],
-        6:  [-1, -1, -1, -1, -1, -1, -1],
+        6:  [-1, 49, -1, -1, -1, -1, -1], # Chinese
         7:  [47, -1, -1, -1, -1, -1, -1],
         8:  [33, -1, -1, -1, 33, 1, 33],
         9:  [-1, -1, -1, -1, -1, -1, -1],
@@ -3269,30 +3311,24 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         37: [-1, -1, -1, -1, -1, -1, -1],
         38: [4, -1, -1, -1, 4, -1, 4],
         39: [-1, -1, -1, -1, -1, -1, -1],
-        40: [-1, -1, -1, -1, -1, 6, -1],
+        40: [-1, -1, -1, -1, -1, 6, -1], # Dravidians
         41: [-1, -1, -1, 9, -1, -1, -1],
         42: [-1, -1, -1, 40, -1, 9, -1],
         43: [-1, -1, -1, -1, -1, -1, -1],
         44: [47, -1, -1, -1, -1, -1, -1],
         45: [47, -1, -1, -1, -1, -1, -1],
-        49: [-1, -1, -1, -1, -1, -1, -1],
-        50: [-1, -1, -1, -1, -1, -1, -1],
-        51: [-1, -1, -1, -1, -1, -1, -1],
-        52: [-1, -1, -1, -1, -1, 1, -1],
-        53: [-1, -1, -1, -1, -1, 1, -1],
+        49: [-1, 53, 53, -1, 6, 1, -1], # Tanguts (Wei)
+        50: [-1, 6, 50, 6, 6, 6, -1], # Bai (Wu)
+        51: [40, 50, 49, 6, 6, 6, 6], # Tibetans (Shu)
+        52: [-1, -1, -1, -1, -1, 1, -1], # Jurchens
+        53: [-1, 51, 51, -1, -1, 1, -1], # Khitans
     }
 
     # Define the special units
     special_unit_ids = [uid for key, ids in unit_banks.items() if 1 <= key <= 6 for uid in ids]
 
-    for civ_id, civ in enumerate(DATA.civs):
-        # Skip civs that don't have a preset
-        if civ_id not in civ_presets:
-            continue
-
-        # Define the presets
-        presets = civ_presets[civ_id]
-
+    for civ_id, presets in civ_presets.items():
+        # Replace graphics
         for key, unit_bank in unit_banks.items():
             for unit_id in unit_bank:
                 if presets[key] == -1:
@@ -3300,7 +3336,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
 
                 if (key == 0 and unit_id not in special_unit_ids) or key > 0:
                     # General units: apply to all except special units
-                    DATA.civs[civ_id].units[unit_id] = DATA.civs[presets[key]].units[unit_id]
+                    DATA.civs[civ_id].units[unit_id] = ARCHITECTURE_SETS[civ_id][unit_id]
 
     # Edit tech trees for rebalancing/realism
     def edit_tech_tree(tech_tree_id, effect_ids):
@@ -3324,6 +3360,640 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     edit_tech_tree(get_effect_id('Khmer Tech Tree'), [-192, -218, 480, 481, -162, -96, -255, 837, -838])
     edit_tech_tree(get_effect_id('Vietnamese Tech Tree'), [-162, -96, -255, 837, 838])
     edit_tech_tree(get_effect_id('Persians Tech Tree'), [630, 631])
+    edit_tech_tree(get_effect_id('Khitans Tech Tree'), [216, -1005])
+
+    def replace_civ(
+    old_civ_id: int,
+    new_civ_id: int,
+    new_name: str,
+    new_description: str,
+    unique_unit_ids: tuple[int, int],  # (castle_unit_id, imperial_upgrade_id)
+    new_unique_techs: list[dict],      # [{"id": id, "name": str, "desc": str, "help": str, "commands": [...], "costs": {res_id: amount, ...}, "research_time": int}, ...]
+    team_bonus_commands: list,         # [EffectCommand, ...]
+    new_bonuses: list[dict],           # [{"name": str, "required_techs": tuple, "commands": [...]}, ...]
+    string_indexes: tuple[int, int],   # (name_string_id, description_string_id)
+    disabled_techs: list[int],         # tech IDs to disable
+    castle_tech_config: dict = None,   # {"id": int, "costs": {0: food, 1: wood, 2: stone, 3: gold}, "research_time": t}
+    imperial_tech_config: dict = None, # {"id": int, "costs": {0: food, 1: wood, 2: stone, 3: gold}, "research_time": t}
+    ):
+        # -----------------------
+        # helpers
+        # -----------------------
+        def set_resource_costs(tech_obj, costs_dict: dict):
+            """
+            costs_dict keys are resource IDs: 0=food, 1=wood, 2=stone, 3=gold.
+            Updates existing slots by matching .type; if a type is missing, appends a new slot.
+            """
+            if not costs_dict:
+                return
+            # Update existing types
+            remaining = dict(costs_dict)  # copy
+            for rc in tech_obj.resource_costs:
+                if rc.type in remaining:
+                    rc.amount = remaining.pop(rc.type)
+
+            # Append new slots for any resource types not present
+            for res_id, amount in remaining.items():
+                # genieutils.unit.ResourceCost constructor name can vary by binding; adapt if needed
+                tech_obj.resource_costs += (
+                    genieutils.unit.ResourceCost(type=res_id, amount=amount, flag=1),
+                )
+
+            # Optional: zero out any slots with type == -1 if they exist (keeps things clean)
+            # for rc in tech_obj.resource_costs:
+            #     if rc.type == -1:
+            #         rc.amount = 0
+            #         rc.flag = 0
+
+        def set_research_time(tech_obj, t: int):
+            """Be tolerant of schema differences: set both common places."""
+            try:
+                tech_obj.research_time = t
+            except Exception:
+                pass
+            try:
+                if getattr(tech_obj, "research_locations", None):
+                    tech_obj.research_locations[0].research_time = t
+            except Exception:
+                pass
+
+        # -----------------------
+        # Civ name swap
+        # -----------------------
+        old_name = DATA.civs[new_civ_id].name
+        DATA.civs[new_civ_id].name = new_name
+
+        for tech in DATA.techs:
+            if tech.name == f'{old_name.upper()}: (Castle Unit)':
+                tech.name = f'{new_name.upper()}: (Castle Unit)'
+                # Force castle unique unit assignment
+                for effect in DATA.effects:
+                    if effect.name == f'{old_name.upper()}: (Castle Unit)':
+                        effect.name = f'{new_name.upper()}: (Castle Unit)'
+                        if unique_unit_ids and len(unique_unit_ids) >= 1:
+                            effect.effect_commands[0].a = unique_unit_ids[0]
+
+            elif tech.name == f'{old_name.upper()}: (Imperial Unit)':
+                tech.name = f'{new_name.upper()}: (Imperial Unit)'
+                # Force imperial upgrade assignment
+                for effect in DATA.effects:
+                    if effect.name == f'{old_name.upper()}: (Imperial Unit)':
+                        effect.name = f'{new_name.upper()}: (Imperial Unit)'
+                        if unique_unit_ids and len(unique_unit_ids) >= 2:
+                            effect.effect_commands[0].a = unique_unit_ids[0]
+                            effect.effect_commands[0].b = unique_unit_ids[1]
+
+            elif tech.civ == new_civ_id and ':' in tech.name:
+                tech.effect_id = -1
+                tech.name = f'DISABLED: {tech.name.split(":")[1]}'
+
+        # --- Effects cleanup ---
+        for effect in DATA.effects:
+            effect.name = effect.name.replace(DATA.civs[old_civ_id].name.upper(), "DISABLED")
+            effect.name = effect.name.replace(DATA.civs[old_civ_id].name, "Disabled")
+
+            # --- Tech Tree handling ---
+            if effect.name == f'{old_name.title()} Tech Tree':
+                effect.name = f'{new_name.title()} Tech Tree'
+                effect.effect_commands.clear()
+                for tech_id in disabled_techs:
+                    effect.effect_commands.append(
+                        genieutils.effect.EffectCommand(102, -1, -1, -1, tech_id)
+                    )
+
+            # --- Team Bonus handling ---
+            elif effect.name == f'{old_name.title()} Team Bonus':
+                effect.name = f'{new_name.title()} Team Bonus'
+                effect.effect_commands.clear()
+                effect.effect_commands.extend(team_bonus_commands)
+
+            # --- Castle Unit handling ---
+            elif effect.name == f"{old_name.upper()}: (Castle Unit)":
+                effect.name = f"{new_name.upper()}: (Castle Unit)"
+                if unique_unit_ids and len(unique_unit_ids) >= 1:
+                    effect.effect_commands[0].a = unique_unit_ids[0]
+                else:
+                    # Keep original Castle unit
+                    effect.effect_commands[0].a = effect.effect_commands[0].a
+
+            # --- Imperial Unit handling ---
+            elif effect.name == f"{old_name.upper()}: (Imperial Unit)":
+                effect.name = f"{new_name.upper()}: (Imperial Unit)"
+                if unique_unit_ids and len(unique_unit_ids) >= 2:
+                    effect.effect_commands[0].a = unique_unit_ids[0]
+                    effect.effect_commands[0].b = unique_unit_ids[1]
+                else:
+                    # Keep original Castle + Imperial upgrade unit
+                    effect.effect_commands[0].a = effect.effect_commands[0].a
+                    effect.effect_commands[0].b = effect.effect_commands[0].b
+
+        # -----------------------
+        # Strings (name + description)
+        # -----------------------
+        with open(MOD_STRINGS, 'r+', encoding='utf-8') as modded_file:
+            lines = modded_file.readlines()
+            for i, line in enumerate(lines):
+                if line.startswith(f"{string_indexes[0]} "):  # name
+                    lines[i] = f'{string_indexes[0]} "{new_name}"\n'
+                elif line.startswith(f"{string_indexes[1]} "):  # description
+                    lines[i] = f'{string_indexes[1]} "{new_description}"\n'
+            modded_file.seek(0)
+            modded_file.writelines(lines)
+            modded_file.truncate()
+
+        # -----------------------
+        # Add new bonuses (as techs + effects)
+        # -----------------------
+        for bonus in new_bonuses:
+            new_effect = copy.deepcopy(DATA.effects[0])
+            new_effect.effect_commands = bonus["commands"]
+            new_effect.name = f"{new_name.upper()}: {bonus['name']}"
+            DATA.effects.append(new_effect)
+
+            new_tech = copy.deepcopy(DATA.techs[0])
+            new_tech.name = f"{new_name.upper()}: {bonus['name']}"
+            new_tech.required_techs = bonus["required_techs"]
+            new_tech.required_tech_count = len([x for x in bonus["required_techs"] if x != -1])
+            new_tech.civ = new_civ_id
+            new_tech.effect_id = len(DATA.effects) - 1
+            DATA.techs.append(new_tech)
+
+        # -----------------------
+        # Unique techs (names, strings, costs, time, commands, and effect rename)
+        # -----------------------
+        for ut in new_unique_techs:
+            tech = DATA.techs[ut["id"]]
+            change_string(tech.language_dll_name, ut["name"])
+            change_string(tech.language_dll_description, ut["desc"])
+            change_string(tech.language_dll_help - 79000, ut["help"])
+            change_string(tech.language_dll_tech_tree - 140000, ut["name"])
+            tech.name = ut["name"]
+
+            # Costs: dict with resource IDs (0 food, 1 wood, 2 stone, 3 gold)
+            if "costs" in ut and isinstance(ut["costs"], dict):
+                set_resource_costs(tech, ut["costs"])
+
+            # Research time
+            if "research_time" in ut:
+                set_research_time(tech, ut["research_time"])
+
+            # Effect (rename and replace commands)
+            eff = DATA.effects[ut["id"]]
+            eff.name = ut["name"]
+            eff.effect_commands.clear()
+            eff.effect_commands.extend(ut["commands"])
+
+        # -----------------------
+        # Castle Tech config (optional)
+        # -----------------------
+        if castle_tech_config:
+            ctech = DATA.techs[castle_tech_config["id"]]
+            if "costs" in castle_tech_config and isinstance(castle_tech_config["costs"], dict):
+                set_resource_costs(ctech, castle_tech_config["costs"])
+            if "research_time" in castle_tech_config:
+                set_research_time(ctech, castle_tech_config["research_time"])
+
+        # -----------------------
+        # Imperial Tech config (optional)
+        # -----------------------
+        if imperial_tech_config:
+            itech = DATA.techs[imperial_tech_config["id"]]
+            if "costs" in imperial_tech_config and isinstance(imperial_tech_config["costs"], dict):
+                set_resource_costs(itech, imperial_tech_config["costs"])
+            if "research_time" in imperial_tech_config:
+                set_research_time(itech, imperial_tech_config["research_time"])
+
+    # Replace the Shu with Tanguts
+    replace_civ(
+        old_civ_id=49,
+        new_civ_id=49,
+        new_name="Tanguts",
+        new_description=(
+            r"Defensive and Cavalry civilization\n\n"
+            r"• Lumberjacks generate food in addition to wood\n"
+            r"• Town Watch and Town Patrol spawn 4 cows\n"
+            r"• Steppe Lancers cost -30/50% gold in the Castle/Imperial Age\n"
+            r"• Towers built +30/40/50% faster in the Feudal/Castle/Imperial Age\n\n"
+            r"<b>Unique Units:<b>\n"
+            r"Tiger Cavalry (Cavalry)\n\n"
+            r"<b>Unique Techs:<b>\n"
+            r"• Bubazi (Infantry +1 attack, armor, and pierce armor, +20HP, +2 LOS, move +10% faster, and attack +15% faster)\n"
+            r"• Timely Pearl (Enemy siege units train -20% slower)\n\n"
+            r"<b>Team Bonus:<b>\n"
+            "Mounted units and Eagle Warriors +4 line of sight"
+        ),
+        unique_unit_ids=(1949, 1951),
+        new_unique_techs=[
+            {
+                "id": 1070,
+                "name": "Bubazi",
+                "costs": [(0, 350), (3, 250)],
+                "research_time": 35,
+                "desc": r"Research Bubazi (Infantry +1 attack, armor, and pierce armor, +20HP, +2 LOS, and attack +15% faster)",
+                "help": r"Research <b>Bubazi<b> (<cost>)\nInfantry +1 attack, armor, and pierce armor, +20HP, +2 LOS, and attack +15% faster.",
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 6, 9, 1025),
+                    genieutils.effect.EffectCommand(4, -1, 6, 8, 1025),
+                    genieutils.effect.EffectCommand(4, -1, 6, 8, 769),
+                    genieutils.effect.EffectCommand(4, -1, 6, 0, 20),
+                    genieutils.effect.EffectCommand(4, -1, 6, 1, 2),
+                    genieutils.effect.EffectCommand(4, -1, 6, 23, 2),
+                    genieutils.effect.EffectCommand(4, -1, 6, 60, 0.85),
+                ],
+            },
+            {
+                "id": 1069,
+                "name": "Timely Pearl",
+                "costs": [(1, 750), (3, 1250)],
+                "research_time": 60,
+                "desc": r"Research Timely Pearl (Enemy siege units train -20% slower)",
+                "help": r"Research <b>Timely Pearl<b> (<cost>)\nEnemy siege units train -20% slower.",
+                "commands": [
+                    genieutils.effect.EffectCommand(25, -1, 13, 101, 1.2),
+                ],
+            },
+        ],
+        team_bonus_commands=[
+            genieutils.effect.EffectCommand(4, -1, 36, 1, 4),
+            genieutils.effect.EffectCommand(4, -1, 36, 23, 4),
+            genieutils.effect.EffectCommand(4, -1, 12, 1, 4),
+            genieutils.effect.EffectCommand(4, -1, 12, 23, 4),
+            genieutils.effect.EffectCommand(4, -1, 23, 1, 4),
+            genieutils.effect.EffectCommand(4, -1, 23, 23, 4),
+            genieutils.effect.EffectCommand(4, 751, -1, 1, 4),
+            genieutils.effect.EffectCommand(4, 751, -1, 23, 4),
+            genieutils.effect.EffectCommand(4, 752, -1, 1, 4),
+            genieutils.effect.EffectCommand(4, 752, -1, 23, 4),
+            genieutils.effect.EffectCommand(4, 753, -1, 1, 4),
+            genieutils.effect.EffectCommand(4, 753, -1, 23, 4),
+        ],
+        new_bonuses=[
+            {
+                "name": "Lumberjacks generate food in addition to wood",
+                "required_techs": (-1, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 502, -1, -1, 3.5),
+                    genieutils.effect.EffectCommand(1, 33, 0, -1, 16),
+                ],
+            },
+            {
+                "name": "Town Watch and Town Patrol spawn 4 cows",
+                "required_techs": (8, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 234, 0, -1, 1),
+                    genieutils.effect.EffectCommand(7, 705, 619, 4, -1),
+                ],
+            },
+            {
+                "name": "Town Watch and Town Patrol spawn 4 cows",
+                "required_techs": (280, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 234, 0, -1, 1),
+                    genieutils.effect.EffectCommand(7, 705, 619, 4, -1),
+                ],
+            },
+            {
+                "name": "Steppe Lancers cost -50/75% gold in the Castle/Imperial Age",
+                "required_techs": (102, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(5, 1370, -1, 105, 0.5),
+                    genieutils.effect.EffectCommand(5, 1372, -1, 105, 0.5),
+                ],
+            },
+            {
+                "name": "Steppe Lancers cost -50/75% gold in the Castle/Imperial Age",
+                "required_techs": (103, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(5, 1370, -1, 105, 0.5),
+                    genieutils.effect.EffectCommand(5, 1372, -1, 105, 0.5),
+                ],
+            },
+            {
+                "name": "Towers built +30% faster (Feudal Age)",
+                "required_techs": (101, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(5, -1, 52, 101, 0.8),
+                ],
+            },
+            {
+                "name": "Towers built +40% faster (Castle Age)",
+                "required_techs": (102, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(5, -1, 52, 101, 0.875),
+                ],
+            },
+            {
+                "name": "Towers built +50% faster (Imperial Age)",
+                "required_techs": (103, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(5, -1, 52, 101, 0.857142857),
+                ],
+            },
+        ],
+        string_indexes=[10319, 120198],
+        disabled_techs = [15, 37, 64, 84, 85, 188, 221, 237, 244, 264, 265, 272, 316, 320, 321, 373, 376, 384, 433, 434, 439, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 630, 631, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 837, 838, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1008, 1065, 1075, 1037, 429, 602, 166, 209, 255, 219, 377, 35, 1014, 1013, 1012, 1025, 182, 45, 231, 233, 438, custom_tech_starting_index, custom_tech_starting_index+1, custom_tech_starting_index+2]
+    )
+
+    # Replace the Wei with Tibetans
+    replace_civ(
+        old_civ_id=51,
+        new_civ_id=51,
+        new_name="Tibetans",
+        new_description=(
+            r"Monk civilization\n\n"
+            r"• Pastures +45 food per animal\n"
+            r"• Armor upgrades add +5 hit points to affected units\n"
+            r"• Monks +2 range and armor; garrisoned Monks fire arrows\n\n"
+            r"<b>Unique Units:<b>\n"
+            r"Qizilbash Warrior (Cavalry)\n\n"
+            r"<b>Unique Techs:<b>\n"
+            r"• Brog-pa (Pastures provide +5 population space; Scout Cavalry-line can be trained at Pastures)\n"
+            r"• Stod Mkhar (Units and Buildings deal +15% and receive -10% damage when fighting from higher elevation; Buildings +2 line of sight)\n\n"
+            r"<b>Team Bonus:<b>\n"
+            "Monks regenerate 15 HP per second"
+        ),
+        unique_unit_ids=(1817, 1829),
+        new_unique_techs=[
+            {
+                "id": 1061,
+                "name": "Brog-pa",
+                "costs": [(0, 350), (1, 350)],
+                "research_time": 35,
+                "desc": r"Research Brog-pa (Pastures provide 5 population; Scout Cavalry-line can be trained at Pastures)",
+                "help": r"Research <b>Brog-pa<b> (<cost>)\nPastures provide 5 population; Scout Cavalry-line can be trained at Pastures.",
+                "commands": [
+                    genieutils.effect.EffectCommand(3, 448, get_unit_id('scout cavalry', True)[1], -1, -1),
+                    genieutils.effect.EffectCommand(3, 546, get_unit_id('light cavalry', True)[0], -1, -1),
+                    genieutils.effect.EffectCommand(3, 441, get_unit_id('hussar', True)[0], -1, -1),
+                    genieutils.effect.EffectCommand(0, 1890, -1, 21, 5),
+                ],
+            },
+            {
+                "id": 1062,
+                "name": "Stod Mkhar",
+                "costs": [(0, 500), (2, 750)],
+                "research_time": 50,
+                "desc": r"Research Stod Mkhar (Units and Buildings deal +15% and receive -10% damage when fighting from higher elevation; Buildings +2 line of sight)",
+                "help": r"Research <b>Stod Mkhar<b> (<cost>)\nUnits and Buildings deal +15% and receive -10% damage when fighting from higher elevation; Buildings +2 line of sight.",
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 272, 1, -1, 0.15),
+                    genieutils.effect.EffectCommand(1, 273, 1, -1, -0.1),
+                    genieutils.effect.EffectCommand(4, -1, 3, 1, 2),
+                    genieutils.effect.EffectCommand(4, -1, 3, 23, 2),
+                ],
+            },
+        ],
+        team_bonus_commands=[
+            genieutils.effect.EffectCommand(4, -1, 18, 109, 15)
+        ],
+        new_bonuses=[
+            {
+                "name": "Brog-pa + Light Cavalry",
+                "required_techs": (1061, 254, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(3, 448, get_unit_id('light cavalry', True)[0], -1, -1),
+                    genieutils.effect.EffectCommand(3, 546, get_unit_id('light cavalry', True)[0], -1, -1),
+                    genieutils.effect.EffectCommand(3, get_unit_id('scout cavalry', True)[1], get_unit_id('light cavalry', True)[0], -1, -1),
+                ],
+            },
+            {
+                "name": "Brog-pa + Hussar",
+                "required_techs": (1061, 428, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(3, 448, get_unit_id('hussar', True)[0], -1, -1),
+                    genieutils.effect.EffectCommand(3, 546, get_unit_id('hussar', True)[0], -1, -1),
+                    genieutils.effect.EffectCommand(3, 441, get_unit_id('hussar', True)[0], -1, -1),
+                    genieutils.effect.EffectCommand(3, get_unit_id('scout cavalry', True)[1], get_unit_id('hussar', True)[0], -1, -1),
+                    genieutils.effect.EffectCommand(3, get_unit_id('light cavalry', True)[0], get_unit_id('hussar', True)[0], -1, -1),
+                ],
+            },
+            {
+                "name": "Pastures +45 food per animal",
+                "required_techs": (-1, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 288, 0, 288, 1.42857),
+                    genieutils.effect.EffectCommand(0, 1899, -1, 71, 10206),
+                    genieutils.effect.EffectCommand(0, 1899, -1, 72, 10206),
+                    genieutils.effect.EffectCommand(0, 1899, -1, 73, 10205),
+                    genieutils.effect.EffectCommand(0, 1899, -1, 74, 10207),
+                    genieutils.effect.EffectCommand(0, 1900, -1, 71, 10206),
+                    genieutils.effect.EffectCommand(0, 1900, -1, 73, 10205),
+                    genieutils.effect.EffectCommand(0, 1900, -1, 74, 10207),
+                ],
+            },
+            {
+                "name": "Pastures +45 food per animal",
+                "required_techs": (1014, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 288, 0, 288, 0.891891892),
+                ],
+            },
+            {
+                "name": "Pastures +45 food per animal",
+                "required_techs": (1013, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 288, 0, 288, 0.829787234),
+                ],
+            },
+            {
+                "name": "Pastures +45 food per animal",
+                "required_techs": (1012, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 288, 0, 288, 0.8),
+                ],
+            },
+            {
+                "name": "Armor upgrades add +5 hit points to affected units", # Archers
+                "required_techs": (211, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 0, 0, 5),
+                ],
+            },
+            {
+                "name": "Armor upgrades add +5 hit points to affected units", # Archers
+                "required_techs": (212, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 0, 0, 5),
+                ],
+            },
+            {
+                "name": "Armor upgrades add +5 hit points to affected units", # Archers
+                "required_techs": (219, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 0, 0, 5),
+                ],
+            },
+            {
+                "name": "Armor upgrades add +5 hit points to affected units", # Cavalry
+                "required_techs": (81, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 12, 0, 5),
+                    genieutils.effect.EffectCommand(4, -1, 47, 0, 5),
+                ],
+            },
+            {
+                "name": "Armor upgrades add +5 hit points to affected units", # Cavalry
+                "required_techs": (82, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 12, 0, 5),
+                    genieutils.effect.EffectCommand(4, -1, 47, 0, 5),
+                ],
+            },
+            {
+                "name": "Armor upgrades add +5 hit points to affected units", # Cavalry
+                "required_techs": (80, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 12, 0, 5),
+                    genieutils.effect.EffectCommand(4, -1, 47, 0, 5),
+                ],
+            },
+            {
+                "name": "Armor upgrades add +5 hit points to affected units", # Infantry
+                "required_techs": (74, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 6, 0, 5),
+                ],
+            },
+            {
+                "name": "Armor upgrades add +5 hit points to affected units", # Infantry
+                "required_techs": (76, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 6, 0, 5),
+                ],
+            },
+            {
+                "name": "Armor upgrades add +5 hit points to affected units", # Infantry
+                "required_techs": (77, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 6, 0, 5),
+                ],
+            },
+            {
+                "name": "Monks +2 range and armor; garrisoned Monks fire arrows",
+                "required_techs": (102, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 18, 12, 2),
+                    genieutils.effect.EffectCommand(4, -1, 18, 1, 2),
+                    genieutils.effect.EffectCommand(4, -1, 18, 23, 2),
+                    genieutils.effect.EffectCommand(4, -1, 18, 8, 1026),
+                    genieutils.effect.EffectCommand(0, -1, 18, 130, -2.5),
+                ],
+            }
+        ],
+        string_indexes=[10321, 120200],
+        disabled_techs = [37, 64, 84, 85, 166, 188, 209, 221, 236, 237, 244, 265, 272, 320, 373, 375, 376, 377, 384, 433, 434, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 630, 631, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 837, 838, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1005, 1065, 1075, 1268, 1269, 1270, 100, 1037, 192, 218, 429, 215, 437, 235, 257, 255, 1025, 54, 194, 380, 14, 13, 12, 203, 279, 39, 35, 246, 1034, custom_tech_starting_index, custom_tech_starting_index+1, custom_tech_starting_index+2]
+    )
+
+    # Replace the Wu with Bai
+    replace_civ(
+        old_civ_id=50,
+        new_civ_id=50,
+        new_name="Bai",
+        new_description=(
+            r"Infantry and Monk civilization\n\n"
+            r"• First Barracks provides +175 food\n"
+            r"• Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age\n"
+            r"• Infantry +4 armor and pierce armor vs. siege\n"
+            r"• Relics generate stone in addition to gold\n\n"
+            r"<b>Unique Units:<b>\n"
+            r"Fire Archer (Foot Archer), Jian Swordsman (Infantry)\n\n"
+            r"<b>Unique Techs:<b>\n"
+            r"• Great Siege (Fire Archers deal fire damage to ships and buildings)\n"
+            r"• Dharma Protection (Buildings +20% HP; Monks gold cost replaced with food)\n\n"
+            r"<b>Team Bonus:<b>\n"
+            "Houses built +100% faster"
+        ),
+        unique_unit_ids=(1968, 1970),
+        new_unique_techs=[
+            {
+                "id": 1080,
+                "name": "Great Siege",
+                "costs": [(0, 350), (1, 350)],
+                "research_time": 35,
+                "desc": r"Research Great Siege (Fire Archers deal fire damage to ships and buildings)",
+                "help": r"Research <b>Great Siege<b> (<cost>)\nFire Archers deal fire damage to ships and buildings.",
+                "commands": [
+                    genieutils.effect.EffectCommand(0, 1968, -1, 63, 128),
+                    genieutils.effect.EffectCommand(0, 1970, -1, 63, 128),
+                    genieutils.effect.EffectCommand(0, 1968, -1, 16, 1972),
+                    genieutils.effect.EffectCommand(0, 1970, -1, 16, 1972),
+                ],
+            },
+            {
+                "id": 1081,
+                "name": "Dharma Protection",
+                "costs": [(0, 500), (2, 750)],
+                "research_time": 50,
+                "desc": r"Research Dharma Protection (Buildings +20% HP; Monks gold cost replaced with food)",
+                "help": r"Research <b>Dharma Protection<b> (<cost>)\nBuildings +20% HP; Monks gold cost replaced with food.",
+                "commands": [
+                    genieutils.effect.EffectCommand(5, -1, 3, 0, 1.2),
+                    genieutils.effect.EffectCommand(0, 125, -1, 105, 0),
+                    genieutils.effect.EffectCommand(0, 125, -1, 103, 100),
+                ],
+            },
+        ],
+        team_bonus_commands=[
+            genieutils.effect.EffectCommand(4, 70, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 463, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 465, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 464, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 712, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 713, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 714, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 715, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 716, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 717, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 718, -1, 101, 2),
+            genieutils.effect.EffectCommand(4, 719, -1, 101, 2),
+        ],
+        new_bonuses=[
+            {
+                "name": "First Barracks provides +175 food",
+                "required_techs": (122, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 0, 1, -1, 175),
+                ],
+            },
+            {
+                "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
+                "required_techs": (101, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
+                ],
+            },
+            {
+                "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
+                "required_techs": (102, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
+                ],
+            },
+            {
+                "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
+                "required_techs": (103, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
+                ],
+            },
+            {
+                "name": "Infantry +4 armor vs. siege",
+                "required_techs": (-1, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(4, -1, 6, 8, 5124),
+                ],
+            },
+            {
+                "name": "Relics generate stone in addition to gold",
+                "required_techs": (-1, -1, -1, -1, -1, -1),
+                "commands": [
+                    genieutils.effect.EffectCommand(1, 265, -1, -1, 15),
+                ],
+            }
+        ],
+        string_indexes=[10320, 120199],
+        disabled_techs = [35, 37, 54, 64, 84, 85, 166, 188, 194, 209, 218, 235, 236, 237, 244, 246, 255, 265, 272, 320, 373, 375, 376, 377, 384, 433, 434, 437, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 837, 838, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1005, 1025, 1037, 1065, 436, 264, 192, 428, 318, 714, 715, 631, 435, 39, 96, 219, 80, 240, 34, 604, 243, 605, 316, 233, 1008, 1014, 1013, 1012, custom_tech_starting_index, custom_tech_starting_index+1, custom_tech_starting_index+2]
+    )
 
     # Reorder tech trees
     for civ in DATA.civs:
@@ -4556,6 +5226,9 @@ def main():
                             unit_bank = {0: [20, 132, 498, 1413, 1414, 10, 14, 87, 1415, 1416, 86, 101, 153, 1417, 1418, 49, 150, 1425, 1426, 18, 19, 103, 105, 1419, 1420, 47, 51, 133, 806, 807, 808, 2120, 2121, 2122, 2144, 2145, 2146, 209, 210, 1427, 1428, 79, 190, 234, 236, 235, 82, 1430, 191, 192, 463, 464, 465, 1434, 1435, 71, 141, 142, 444, 481, 482, 483, 484, 597, 611, 612, 613, 614, 615, 616, 617, 584, 585, 586, 587, 562, 563, 564, 565, 84, 116, 137, 1422, 1423, 1424, 1646, 129, 130, 131, 1411, 1412, 117, 155, 1508, 1509, 63, 64, 67, 78, 80, 81, 85, 88, 90, 91, 92, 95, 487, 488, 490, 491, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 1192, 1406, 1500, 1501, 1502, 1503, 1504, 1505, 1506, 1507, 110, 179, 1647], 1: [82, 1430], 2: [276, 1445], 3: [125, 286, 922, 1025, 1327], 4: [30, 31, 32, 104, 1421], 5: [128, 204], 6: [1103, 529, 532, 545, 17, 420, 691, 1104, 527, 528, 539, 21, 442]}
                             current_graphics = [''] * len(graphic_titles)
 
+                            global CURRENT_GRAPHIC_INDEX
+                            CURRENT_GRAPHIC_INDEX = -1
+
                             while True:
                                 # Scan the units for their graphics
                                 try:
@@ -4566,6 +5239,7 @@ def main():
                                             for key, value in graphic_set.items():
                                                 if DATA.civs[selected_civ_index + 1].units[test_unit].standing_graphic == ARCHITECTURE_SETS[value][test_unit].standing_graphic:
                                                     current_graphics[i] = key
+                                                    CURRENT_GRAPHIC_INDEX = value
                                                     break
                                         except Exception as e:
                                             etype, evalue, etb = sys.exc_info()
@@ -4590,6 +5264,7 @@ def main():
                                 if selection == '':
                                     if save == '*':
                                         with_real_progress(lambda progress: save_dat(progress, rf'{MOD_FOLDER}/resources/_common/dat/empires2_x2_p1.dat'), 'Saving Mod', total_steps=100)
+                                        update_hud_style(selected_civ_index, CURRENT_GRAPHIC_INDEX)
                                         print(f'Graphics for {selected_civ_name} saved.')
                                         time.sleep(1)
                                     break
@@ -4742,7 +5417,7 @@ def main():
                                 print('\033[2J\033[H', end='')
 
                             def current_scout_name():
-                                scout_bank = {'Scout Cavalry': 448, 'Eagle Scout': 751, 'Camel Scout': 1755}
+                                scout_bank = {'Scout Cavalry': 448, 'Eagle Scout': 751, 'Camel Scout': 1755}#, 'Cavalry Archer Scout': get_unit_id('cavalry archer scout', False)}
                                 cur_val = DATA.civs[selected_civ_index + 1].resources[263]
                                 for k, v in scout_bank.items():
                                     if v == cur_val:

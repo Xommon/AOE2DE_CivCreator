@@ -61,6 +61,7 @@ Celts               Cosmetic    Monk graphic set to Catholic
 Chinese             Gameplay    Dragon Ship disabled, Fast Fire Ship enabled
                     Gameplay    Trade Cog disabled, Junk enabled
                     Cosmetic    Monastery graphic set to "East Asian"
+                    Cosmetic    Castle graphic set to "Shu"
 Cumans              Gameplay    Farm disabled, Pasture enabled
                     Gameplay    Warships disabled, Canoes enabled
 Dravidians          Cosmetic    Trade Cart graphic set to Water Buffalo
@@ -74,6 +75,7 @@ Gurjaras            Cosmetic    Monk graphic set to Hindu
 Hindustanis         Text        Bonus Text Removed: "Can build Caravanserai in Imperial Age"
                     Cosmetic    Architecture set to Middle Eastern
                     Cosmetic    Trade Cart graphic set to Camel
+                    Gameplay    Scout Unit set to Camel Scout
 Huns                Gameplay    Farm disabled, Pasture enabled
                     Gameplay    Warships disabled, Canoes enabled
                     Audio       Language set to Chuvash
@@ -89,8 +91,11 @@ Khmer               Cosmetic    Monk graphic set to Hindu
                     Gameplay    Cavalry Archers disabled, Elephant Archers enabled
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
                     Gameplay    Trade Cog disabled, Junk enabled
-Khitans             Text        Bonus Text Removed: "Pastures replace Farms"
+Khitans             Gameplay    Mounted Trebuchet disabled
+                    Text        Bonus Text Removed: "Pastures replace Farms"
                     Audio       Language set to Khitan
+                    Cosmetic    Castle graphic set to "Wei"
+                    Cosmetic    Wonder graphic set to "Wei"
 Koreans             Cosmetic    Monastery graphic set to "East Asian"
 Lithuanians         Cosmetic    Architecture set to Central European
                     Cosmetic    Monk graphic set to Pagan
@@ -113,7 +118,7 @@ Poles               Cosmetic    Architecture set to Central European
 Portuguese          ---
 Romans              ---
 Saracens            Gameplay    Scout Unit set to Camel Scout
-Shu                 Gameplay    Trade Cog disabled, Junk enabled
+Shu (REPLACED)                  Shu replaced with Tanguts
 Sicilians           ---
 Slavs               ---
 Spanish             ---
@@ -127,6 +132,5 @@ Vietnamese          Cosmetic    Ship graphic set to Southeast Asian
 Vikings             Cosmetic    Monk graphic set to Pagan
                     Cosmetic    Monastery graphic set to Pagan
                     Gameplay    Cannon Galleons disabled, Dromon enabled
-Wei                 Gameplay    Trade Cog disabled, Junk enabled
-Wu                  Audio       Language set to Cantonese
-                    Gameplay    Trade Cog disabled, Junk enabled
+Wei (REPLACED)                  Wei replaced with Tibetans
+Wu  (REPLACED)                  Wu replaced with Bai
