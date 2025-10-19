@@ -11,6 +11,9 @@ wine /home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/T
 # .DAT File
 /home/xommon/snap/steam/common/.local/share/Steam/steamapps/compatdata/813780/pfx/drive_c/users/steamuser/Games/Age of Empires 2 DE/76561198021486964/mods/local/Test/resources/_common/dat/empires2_x2_p1.dat
 
+# Original AOE2DE Foler
+/home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE
+
 # Real World Map Folder
 /home/xommon/snap/steam/common/.local/share/Steam/steamapps/common/AoE2DE/resources/_common/drs/gamedata_x2
 
@@ -2046,6 +2049,10 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     for tech_id in [1066, 1038, 1083]:
         DATA.techs[tech_id].effect_id = -1
 
+    # Edit Fortified Church upgrade requirements
+    for i in range(943, 947):
+        DATA.techs[i].required_techs = (929, DATA.techs[i].required_techs[0], -1, -1, -1, -1)
+
     '''# Make the Imperial Skirmisher potentially available to all civs
     DATA.techs[656].effect_id = -1
     DATA.techs[655].research_locations[0].button_id = 7
@@ -2831,13 +2838,9 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
             qizilbash_warrior = DATA.civs[i].units[1817]
             qizilbash_warrior.type_50.max_range = 1
             qizilbash_warrior.type_50.displayed_range = 1
-            qizilbash_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(30, 2))
-            qizilbash_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(27, 2))
             elite_qizilbash_warrior = DATA.civs[i].units[1829]
             elite_qizilbash_warrior.type_50.max_range = 1
             elite_qizilbash_warrior.type_50.displayed_range = 1
-            elite_qizilbash_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(30, 2))
-            elite_qizilbash_warrior.type_50.attacks.append(genieutils.unit.AttackOrArmor(27, 2))
 
         # Cavalry Archer Scout
         '''cavalry_archer_scout = copy.deepcopy(DATA.civs[1].units[448])
@@ -3212,7 +3215,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         'Central European': 4, 'East Asian': 5, 'Eastern European': 23,# 'Islander': 25,
         'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15,
         'South Asian': 20, 'Southeast Asian': 28, 'Southeast European': 47, 'Western European': 1,
-        'Mespotamian': 46,
+        'Mesopotamian': 46, 'Caucasian': 54, 'South Indian': 55
     }
     monk_sets = {
         'Christian': 0, 'Mesoamerican': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40,
@@ -3222,7 +3225,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 6,
         'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15,
         'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25,
-        'Southeast European': 7, 'Tengri': 12, 'Pagan': 35, 'Mespotamian': 46, 'Shinto': 5
+        'Southeast European': 7, 'Tengri': 12, 'Pagan': 35, 'Mesopotamian': 46, 'Shinto': 5
     }
     trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
     ship_sets = {"West African": 25, "Central Asian": 33, "Central European": 4, "East Asian": 5,
@@ -3291,7 +3294,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         17: [-1, -1, -1, -1, -1, 1, -1],
         18: [-1, -1, -1, -1, -1, -1, -1],
         19: [-1, -1, -1, -1, -1, -1, -1],
-        20: [9, -1, -1, -1, 9, 9, 9],
+        20: [9, -1, -1, -1, 9, 9, 9], # Hindustanis
         21: [-1, -1, -1, -1, -1, -1, -1],
         22: [4, -1, -1, -1, 4, -1, 4],
         23: [-1, -1, -1, -1, -1, -1, -1],
@@ -3302,7 +3305,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         28: [-1, -1, -1, 40, -1, -1, -1],
         29: [-1, -1, -1, 9, -1, -1, -1],
         30: [-1, -1, -1, 5, -1, -1, -1],
-        31: [-1, -1, -1, 5, -1, -1, 28],
+        31: [54, -1, -1, 5, -1, -1, 28], # Bulgarians
         32: [-1, -1, -1, -1, -1, -1, -1],
         33: [-1, -1, -1, -1, -1, 1, -1],
         34: [-1, -1, -1, -1, -1, 1, -1],
@@ -3311,32 +3314,35 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         37: [-1, -1, -1, -1, -1, -1, -1],
         38: [4, -1, -1, -1, 4, -1, 4],
         39: [-1, -1, -1, -1, -1, -1, -1],
-        40: [-1, -1, -1, -1, -1, 6, -1], # Dravidians
-        41: [-1, -1, -1, 9, -1, -1, -1],
-        42: [-1, -1, -1, 40, -1, 9, -1],
-        43: [-1, -1, -1, -1, -1, -1, -1],
-        44: [47, -1, -1, -1, -1, -1, -1],
-        45: [47, -1, -1, -1, -1, -1, -1],
+        40: [55, -1, -1, -1, -1, 6, -1], # Dravidians
+        41: [55, -1, -1, 9, -1, -1, -1], # Bengalis
+        42: [-1, -1, -1, 40, -1, 9, -1], # Gurjaras
+        43: [-1, -1, -1, -1, -1, -1, -1], # Romans
+        44: [54, -1, -1, -1, -1, -1, -1], # Armenians
+        45: [54, -1, -1, -1, -1, -1, -1], # Georgians
         49: [-1, 53, 53, -1, 6, 1, -1], # Tanguts (Wei)
         50: [-1, 6, 50, 6, 6, 6, -1], # Bai (Wu)
         51: [40, 50, 49, 6, 6, 6, 6], # Tibetans (Shu)
-        52: [-1, -1, -1, -1, -1, 1, -1], # Jurchens
+        52: [-1, -1, -1, -1, 6, 1, -1], # Jurchens
         53: [-1, 51, 51, -1, -1, 1, -1], # Khitans
+        # (General, Castle, Wonder, Monk, Monastery, Trade Cart, Ships)
     }
 
     # Define the special units
     special_unit_ids = [uid for key, ids in unit_banks.items() if 1 <= key <= 6 for uid in ids]
 
     for civ_id, presets in civ_presets.items():
-        # Replace graphics
         for key, unit_bank in unit_banks.items():
-            for unit_id in unit_bank:
-                if presets[key] == -1:
-                    break
+            source_civ = presets[key]
+            if source_civ == -1:
+                continue  # skip this whole architecture group
 
+            for unit_id in unit_bank:
+                # Apply only if:
+                # - General group (key 0) and unit is NOT a special unit, OR
+                # - Any other key (>0)
                 if (key == 0 and unit_id not in special_unit_ids) or key > 0:
-                    # General units: apply to all except special units
-                    DATA.civs[civ_id].units[unit_id] = ARCHITECTURE_SETS[civ_id][unit_id]
+                    DATA.civs[civ_id].units[unit_id] = ARCHITECTURE_SETS[source_civ][unit_id]
 
     # Edit tech trees for rebalancing/realism
     def edit_tech_tree(tech_tree_id, effect_ids):
@@ -5199,7 +5205,7 @@ def main():
                         elif selection == '5':
                             save = ''
                             # Gather all graphics
-                            general_architecture_sets = {'Southeast European': 47, 'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1, 'Mesopotamian': 46}
+                            general_architecture_sets = {'Caucasian': 54, 'South Indian': 55, 'Southeast European': 47, 'West African': 26, 'Austronesian': 29, 'Central Asian': 33, 'Central European': 4, 'East Asian': 5, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 20, 'Southeast Asian': 28, 'Western European': 1, 'Mesopotamian': 46}
                             monk_sets = {'Christian': 0, 'Mesoamerican': 15, 'Catholic': 14, 'Buddhist': 5, 'Hindu': 40, 'Muslim': 9, 'Tengri': 12, 'African': 25, 'Orthodox': 23, 'Pagan': 35}
                             monastery_sets = {'Shinto': 5, 'West African': 26, 'Central Asian': 33, 'Central European': 4, 'East Asian': 6, 'Eastern European': 23, 'Mediterranean': 14, 'Middle Eastern': 9, 'Mesoamerican': 15, 'South Asian': 40, 'Southeast Asian': 28, 'Western European': 1, 'Eastern African': 25, 'Southeast European': 7, 'Tengri': 12, 'Pagan': 35, 'Mesopotamian': 46}
                             trade_cart_sets = {'Horse': 1, 'Human': 15, 'Camel': 9, 'Water Buffalo': 5, 'Ox': 25}
