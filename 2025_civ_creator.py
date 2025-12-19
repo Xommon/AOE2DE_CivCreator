@@ -1350,7 +1350,7 @@ def create_bonus(bonus_string, civ_id):
             bonus_response = build_modifiers(bonus_string, unit_lines, categories)
 
         # Create the final techs and the final effects
-        final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), research_locations=[ResearchLocation(0, 0, 0, 0)], resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, research_location=-1, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=len(DATA.effects), type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', repeatable=1)]
+        final_techs = [genieutils.tech.Tech(required_techs=(0, 0, 0, 0, 0, 0), research_locations=[ResearchLocation(0, 0, 0, 0)], resource_costs=(ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0), ResearchResourceCost(type=0, amount=0, flag=0)), required_tech_count=0, civ=civ_id + 1, full_tech_mode=0, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=len(DATA.effects), type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, hot_key=-1, name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', repeatable=1)]
         final_effects = [genieutils.effect.Effect(name=f'{DATA.civs[civ_id + 1].name.upper()}: {bonus_string}', effect_commands=[])]
 
         # Error out if bonus text is invalid
@@ -2053,14 +2053,6 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     for i in range(943, 947):
         DATA.techs[i].required_techs = (929, DATA.techs[i].required_techs[0], -1, -1, -1, -1)
 
-    '''# Make the Imperial Skirmisher potentially available to all civs
-    DATA.techs[656].effect_id = -1
-    DATA.techs[655].research_locations[0].button_id = 7
-    for civ in DATA.civs:
-        for effect in DATA.effects:
-            if effect.name.lower() == f'{civ.name.lower()} tech tree' and 'vietnamese' not in effect.name.lower():
-                effect.effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 655))'''
-
     # Make other unique units potentially available to all civs
     tech_tree_indexes = []
     for civ in DATA.civs:
@@ -2126,7 +2118,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     DATA.civs[9].resources[263] = 1755
     DATA.civs[20].resources[263] = 1755
 
-    # Enable Dromon for Vikings and Bulgarians
+    '''# Enable Dromon for Vikings and Bulgarians
     for tech_tree in [276, 706]:
         DATA.effects[tech_tree].effect_commands.remove(genieutils.effect.EffectCommand(102, -1, -1, -1, 886))
         DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 37))
@@ -2136,7 +2128,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
     for tech_tree in [652]:
         DATA.effects[tech_tree].effect_commands.remove(genieutils.effect.EffectCommand(102, -1, -1, -1, 1034))
         DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 37))
-        DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 376))
+        DATA.effects[tech_tree].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 376))'''
 
     # Replace unit graphics
     def replace_graphics_for_civs(civ_ids, unit_ids, replacement_ids):
@@ -2393,10 +2385,18 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         canoe.creatable.train_locations[0].unit_id = 45
         canoe.creatable.train_locations[0].button_id = 4
         canoe.type_50.attacks[0].amount = 8
+        canoe.type_50.attacks[2].amount = 5
+        canoe.type_50.displayed_attack = 5
         canoe.type_50.reload_time = 2
         canoe.type_50.displayed_reload_time = 2
-        canoe.line_of_sight = 7
-        canoe.bird.search_radius = 7
+        canoe.type_50.max_range = 6
+        canoe.type_50.displayed_range = 6
+        canoe.line_of_sight = canoe.type_50.max_range + 2
+        canoe.bird.search_radius = canoe.line_of_sight
+        canoe.creatable.max_charge = 20
+        canoe.creatable.recharge_rate = 3.2e+18
+        canoe.creatable.charge_event = -2
+        canoe.creatable.charge_target = 191
         civ.units.append(canoe)
 
         # 1: War Canoe
@@ -2414,16 +2414,17 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         war_canoe.type_50.attack_graphic = civ.units[1302].type_50.attack_graphic
         war_canoe.type_50.attack_graphic_2 = civ.units[1302].type_50.attack_graphic_2
         war_canoe.icon_id = civ.units[1302].icon_id
-        war_canoe.type_50.max_range = 7
-        war_canoe.type_50.displayed_range = 7
-        war_canoe.line_of_sight = 9
-        war_canoe.bird.search_radius = 9
-        war_canoe.type_50.attacks[2].amount = 8
-        war_canoe.type_50.displayed_attack = 8
+        war_canoe.type_50.max_range = 8
+        war_canoe.type_50.displayed_range = 8
+        war_canoe.line_of_sight = war_canoe.type_50.max_range + 2
+        war_canoe.bird.search_radius = war_canoe.line_of_sight
+        war_canoe.type_50.attacks[2].amount = 6
+        war_canoe.type_50.displayed_attack = 6
         war_canoe.hit_points = 90
         war_canoe.type_50.attacks[0].amount = 12
         war_canoe.type_50.reload_time = 2
         war_canoe.type_50.displayed_reload_time = 2
+        war_canoe.creatable.charge_event = -3
         civ.units.append(war_canoe)
 
         # 2: Elite War Canoe
@@ -2441,18 +2442,19 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         elite_war_canoe.type_50.attack_graphic = civ.units[1302].type_50.attack_graphic
         elite_war_canoe.type_50.attack_graphic_2 = civ.units[1302].type_50.attack_graphic_2
         elite_war_canoe.icon_id = civ.units[1302].icon_id
-        elite_war_canoe.type_50.max_range = 9
-        elite_war_canoe.type_50.displayed_range = 9
-        elite_war_canoe.line_of_sight = 11
-        elite_war_canoe.bird.search_radius = 11
-        elite_war_canoe.type_50.attacks[2].amount = 9
-        elite_war_canoe.type_50.displayed_attack = 9
+        elite_war_canoe.type_50.max_range = 10
+        elite_war_canoe.type_50.displayed_range = 10
+        elite_war_canoe.line_of_sight = elite_war_canoe.type_50.max_range + 2
+        elite_war_canoe.bird.search_radius = elite_war_canoe.line_of_sight
+        elite_war_canoe.type_50.attacks[2].amount = 7
+        elite_war_canoe.type_50.displayed_attack = 7
         elite_war_canoe.creatable.total_projectiles = 3
         elite_war_canoe.creatable.max_total_projectiles = 3
         elite_war_canoe.hit_points = 110
         elite_war_canoe.type_50.attacks[0].amount = 16
         elite_war_canoe.type_50.reload_time = 2
         elite_war_canoe.type_50.displayed_reload_time = 2
+        elite_war_canoe.creatable.charge_event = -4
         civ.units.append(elite_war_canoe)
 
         # 3: Naasiri
@@ -3045,18 +3047,14 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         required_tech_count=0,
         civ=civ_id + 1,
         full_tech_mode=0,
-        research_location=-1,
         language_dll_name=7000,
         language_dll_description=8000,
-        research_time=0,
         effect_id=-1,
         type=0,
         icon_id=-1,
-        button_id=0,
         language_dll_help=107000,
         language_dll_tech_tree=157000,
         research_locations=[ResearchLocation(0, 0, 0, 0)],
-        hot_key=-1,
         name='',
         repeatable=1
     )
@@ -3150,7 +3148,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         DATA.effects[DATA.techs[key].effect_id].name = value
 
     # Add bonuses techs and effects that didn't previously exist
-    base_tech = genieutils.tech.Tech(name='', required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(0, 0, 0), ResearchResourceCost(0, 0, 0), ResearchResourceCost(0, 0, 0)), required_tech_count=0, civ=0, full_tech_mode=0, research_location=0, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, research_locations=[ResearchLocation(0, 0, 0, 0)], hot_key=-1, repeatable=1)
+    base_tech = genieutils.tech.Tech(name='', required_techs=(0, 0, 0, 0, 0, 0), resource_costs=(ResearchResourceCost(0, 0, 0), ResearchResourceCost(0, 0, 0), ResearchResourceCost(0, 0, 0)), required_tech_count=0, civ=0, full_tech_mode=0, language_dll_name=7000, language_dll_description=8000, research_time=0, effect_id=-1, type=0, icon_id=-1, button_id=0, language_dll_help=107000, language_dll_tech_tree=157000, research_locations=[ResearchLocation(0, 0, 0, 0)], hot_key=-1, repeatable=1)
     base_effect = genieutils.effect.Effect(name='', effect_commands=[])
 
     for i, civ in enumerate(DATA.civs):
@@ -3570,7 +3568,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
                 set_research_time(itech, imperial_tech_config["research_time"])
 
     # Replace the Shu with Tanguts
-    replace_civ(
+    '''replace_civ(
         old_civ_id=49,
         new_civ_id=49,
         new_name="Tanguts",
@@ -3999,7 +3997,7 @@ def new_mod(_mod_folder, _aoe2_folder, _mod_name, revert):
         ],
         string_indexes=[10320, 120199],
         disabled_techs = [35, 37, 54, 64, 84, 85, 166, 188, 194, 209, 218, 235, 236, 237, 244, 246, 255, 265, 272, 320, 373, 375, 376, 377, 384, 433, 434, 437, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 837, 838, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1005, 1025, 1037, 1065, 436, 264, 192, 428, 318, 714, 715, 631, 435, 39, 96, 219, 80, 240, 34, 604, 243, 605, 316, 233, 1008, 1014, 1013, 1012, custom_tech_starting_index, custom_tech_starting_index+1, custom_tech_starting_index+2]
-    )
+    )'''
 
     # Reorder tech trees
     for civ in DATA.civs:
@@ -4030,10 +4028,8 @@ def main():
     try:
         with open('settings.pkl', 'rb') as file:
             previous_mod_folder = pickle.load(file)
-            print(previous_mod_folder)
             previous_mod_name = previous_mod_folder.split('/')[-1]
     except Exception as e:
-        print(str(e))
         pass
 
     # Switch emoji based on the month
@@ -4048,10 +4044,13 @@ def main():
         import os
         print(colour(Back.BLUE, Style.BRIGHT, f'{title_emoji} Talofa - Age of Empires II Civilization Editor {title_emoji}'))
         global MOD_FOLDER
-        if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
-            print(colour(Fore.WHITE ,f'0️⃣  Open "{previous_mod_name}"'))
-        else:
-            print(colour(Fore.LIGHTBLACK_EX ,f'0️⃣  Open Previous Mod'))
+        try:
+            if os.path.exists(previous_mod_folder + '/' + previous_mod_name + '.pkl'):
+                print(colour(Fore.WHITE ,f'0️⃣  Open "{previous_mod_name}"'))
+            else:
+                print(colour(Fore.LIGHTBLACK_EX ,f'0️⃣  Open Previous Mod'))
+        except:
+            pass
         print(colour(Fore.WHITE ,f'1️⃣  Open Mod...'))
         print(colour(Fore.WHITE ,f'2️⃣  New Mod...'))
         selection = input(colour(Fore.CYAN, 'Selection: '))

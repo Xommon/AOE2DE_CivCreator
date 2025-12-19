@@ -154,7 +154,7 @@ class Ui_NewMod(object):
         self.toolButton_2.setText(_translate("NewMod", "..."))
         self.replace_3kingdoms_checkbox.setText(_translate("NewMod", "Replace Wei/Wu/Shu with Tanguts/Tibetans/Bai"))
         self.canoes_mesoamericans_checkbox.setText(_translate("NewMod", "Enable Canoes for Aztecs/Maya/Inca"))
-        self.canoes_sea_checkbox.setText(_translate("NewMod", "Enable Canoes for Khmer/Malay"))
+        self.canoes_sea_checkbox.setText(_translate("NewMod", "Enable Canoes for Khmer/Malay/Bai"))
         self.canoes_other_checkbox.setText(_translate("NewMod", "Enable Canoes for Cumans/Malians/Huns"))
         self.create_mod_button.setText(_translate("NewMod", "Create Mod"))
 

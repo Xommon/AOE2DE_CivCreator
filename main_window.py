@@ -606,7 +606,7 @@ class Ui_MainWindow(object):
         self.actionNew_Mod.setShortcut(_translate("MainWindow", "Ctrl+N"))
         self.actionSave_Mod.setText(_translate("MainWindow", "Save Mod"))
         self.actionSave_Mod.setShortcut(_translate("MainWindow", "Ctrl+S"))
-        self.actionOpen_Mod.setText(_translate("MainWindow", "Open Mod"))
+        self.actionOpen_Mod.setText(_translate("MainWindow", "Open Mod..."))
         self.actionOpen_Mod.setShortcut(_translate("MainWindow", "Ctrl+O"))
         self.actionRevert_Mod.setText(_translate("MainWindow", "Revert Mod"))
         self.actionUndo.setText(_translate("MainWindow", "Undo"))

@@ -43,6 +43,7 @@ Civilisation        Type        Changes
 ------------------- ----------- ---------------------------------------------------------------------------
 Armenians           Cosmetic    Architecture set to Southeast European
 Aztecs              Gameplay    Warships disabled, Canoes enabled
+Bai                 NEW         Bai optionally replaces Wu
 Bengalis            Cosmetic    Monk graphic set to Muslim
 Berbers             Cosmetic    Architecture set to West African
                     Cosmetic    Trade Cart graphic set to Camel
@@ -118,12 +119,15 @@ Poles               Cosmetic    Architecture set to Central European
 Portuguese          ---
 Romans              ---
 Saracens            Gameplay    Scout Unit set to Camel Scout
-Shu (REPLACED)                  Shu replaced with Tanguts
+Shu                 Gameplay    Trade Cog disabled, Junk enabled
+                    Cosmetic    Monastery graphic set to "East Asian"
 Sicilians           ---
 Slavs               ---
 Spanish             ---
+Tanguts             NEW         Tanguts optionally replace Shu
 Tatars              ---
 Teutons             ---
+Tibetans            NEW         Tibetans optionally replace Wei
 Turks               ---
 Vietnamese          Cosmetic    Ship graphic set to Southeast Asian
                     Gameplay    Battering Rams disabled, Armored/Siege Elephants enabled
@@ -132,5 +136,8 @@ Vietnamese          Cosmetic    Ship graphic set to Southeast Asian
 Vikings             Cosmetic    Monk graphic set to Pagan
                     Cosmetic    Monastery graphic set to Pagan
                     Gameplay    Cannon Galleons disabled, Dromon enabled
-Wei (REPLACED)                  Wei replaced with Tibetans
-Wu  (REPLACED)                  Wu replaced with Bai
+Wei                 Gameplay    Trade Cog disabled, Junk enabled
+                    Cosmetic    Monastery graphic set to "East Asian"
+Wu                  Gameplay    Trade Cog disabled, Junk enabled
+                    Cosmetic    Monastery graphic set to "East Asian"
+                    Audio       Language set to Cantonese
