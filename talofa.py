@@ -1503,6 +1503,17 @@ class MyApp(QtWidgets.QMainWindow):
             for civ_id, civ in enumerate(DATA.civs):
                 if (REPLACE_3KINGDOMS and civ_id in [12, 17, 27, 34, 49, 51, 53]) or (not REPLACE_3KINGDOMS and civ_id in [12, 17, 27, 34, 53]):
                     DATA.effects[int(civ.resources[571])].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1008))
+                    
+                    # Disable farm upgrades if farm is disabled
+                    DATA.effects[int(civ.resources[571])].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 14))
+                    DATA.effects[int(civ.resources[571])].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 13))
+                    DATA.effects[int(civ.resources[571])].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 12))
+                else:
+                    # Disable pasture upgrades if pasture is disabled
+                    print(f"Disabled for {civ.name}.")
+                    DATA.effects[int(civ.resources[571])].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1014))
+                    DATA.effects[int(civ.resources[571])].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1013))
+                    DATA.effects[int(civ.resources[571])].effect_commands.append(genieutils.effect.EffectCommand(102, -1, -1, -1, 1012))
 
             # 4: Imperial Steppe Lancer
             '''imperial_steppe_lancer_tech = copy.deepcopy(DATA.techs[715])
@@ -2134,7 +2145,7 @@ class MyApp(QtWidgets.QMainWindow):
             )
 
             # Replace the Wu with Bai
-            replace_civ(
+            '''replace_civ(
                 old_civ_id=50,
                 new_civ_id=50,
                 new_name="Bai",
@@ -2242,7 +2253,7 @@ class MyApp(QtWidgets.QMainWindow):
                 ],
                 string_indexes=[10320, 120199],
                 disabled_techs = [35, 37, 54, 64, 84, 85, 166, 188, 194, 209, 218, 235, 236, 237, 244, 246, 255, 265, 272, 320, 373, 375, 376, 377, 384, 433, 434, 437, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 837, 838, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1005, 1025, 1037, 1065, 436, 264, 192, 428, 318, 714, 715, 631, 435, 39, 96, 219, 80, 240, 34, 604, 243, 605, 316, 233, 1008, 1014, 1013, 1012, CUSTOM_TECH_STARTING_INDEX, CUSTOM_TECH_STARTING_INDEX+1, CUSTOM_TECH_STARTING_INDEX+2]
-            )
+            )'''
 
             # Replace the Shu with Tibetans
             replace_civ(
@@ -2376,7 +2387,6 @@ class MyApp(QtWidgets.QMainWindow):
         try:
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.pkl"), 'rb') as file:
                 talofa_settings = pickle.load(file)
-                print(talofa_settings)
                 ui.local_mods_folder_input.setText(talofa_settings.get('LOCAL_MODS_FOLDER', ''))
                 ui.aoe2_folder_input.setText(talofa_settings.get('AOE2_FOLDER', ''))
         except:
