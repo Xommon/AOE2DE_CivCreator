@@ -2013,6 +2013,217 @@ class MyApp(QtWidgets.QMainWindow):
                     if "research_time" in imperial_tech_config:
                         set_research_time(itech, imperial_tech_config["research_time"])
 
+            # Replace the Shu with Tibetans
+            replace_civ(
+                old_civ_id=49,
+                new_civ_id=49,
+                new_name="Tibetans",
+                new_description=(
+                    r"Monk civilization\n\n"
+                    r"• Pastures +45 food per animal\n"
+                    r"• Armor upgrades add +5 hit points to affected units\n"
+                    r"• Monks +2 range and armor; garrisoned Monks fire arrows\n\n"
+                    r"<b>Unique Units:<b>\n"
+                    r"Qizilbash Warrior (Cavalry)\n\n"
+                    r"<b>Unique Techs:<b>\n"
+                    r"• Brog-pa (Pastures provide +5 population space; Scout Cavalry-line can be trained at Pastures)\n"
+                    r"• Stod Mkhar (Units and Buildings deal +15% and receive -10% damage when fighting from higher elevation; Buildings +2 line of sight)\n\n"
+                    r"<b>Team Bonus:<b>\n"
+                    "Monks regenerate 15 HP per second"
+                ),
+                unique_unit_ids=(1817, 1829),
+                new_unique_techs=[
+                    {
+                        "id": 1061,
+                        "name": "Brog-pa",
+                        "costs": {0: 350, 1: 350},
+                        "research_time": 35,
+                        "desc": r"Research Brog-pa (Pastures provide 5 population; Scout Cavalry-line can be trained at Pastures)",
+                        "help": r"Research <b>Brog-pa<b> (<cost>)\nPastures provide 5 population; Scout Cavalry-line can be trained at Pastures.",
+                        "commands": [
+                            genieutils.effect.EffectCommand(3, 448, get_unit_id('scout cavalry', True)[1], -1, -1),
+                            genieutils.effect.EffectCommand(3, 546, get_unit_id('light cavalry', True)[0], -1, -1),
+                            genieutils.effect.EffectCommand(3, 441, get_unit_id('hussar', True)[0], -1, -1),
+                            genieutils.effect.EffectCommand(0, 1890, -1, 21, 5),
+                        ],
+                    },
+                    {
+                        "id": 1062,
+                        "name": "Stod Mkhar",
+                        "costs": {0: 500, 2: 750},
+                        "research_time": 50,
+                        "desc": r"Research Stod Mkhar (Units and Buildings deal +15% and receive -10% damage when fighting from higher elevation; Buildings +2 line of sight)",
+                        "help": r"Research <b>Stod Mkhar<b> (<cost>)\nUnits and Buildings deal +15% and receive -10% damage when fighting from higher elevation; Buildings +2 line of sight.",
+                        "commands": [
+                            genieutils.effect.EffectCommand(1, 272, 1, -1, 0.15),
+                            genieutils.effect.EffectCommand(1, 273, 1, -1, -0.1),
+                            genieutils.effect.EffectCommand(4, -1, 3, 1, 2),
+                            genieutils.effect.EffectCommand(4, -1, 3, 23, 2),
+                        ],
+                    },
+                ],
+                team_bonus_commands=[
+                    genieutils.effect.EffectCommand(4, -1, 18, 109, 15)
+                ],
+                new_bonuses=[
+                    {
+                        "name": "First Barracks provides +175 food",
+                        "required_techs": (122, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(1, 0, 1, -1, 175),
+                        ],
+                    },
+                    {
+                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
+                        "required_techs": (101, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
+                        ],
+                    },
+                    {
+                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
+                        "required_techs": (102, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
+                        ],
+                    },
+                    {
+                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
+                        "required_techs": (103, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
+                        ],
+                    },
+                    {
+                        "name": "Infantry +4 armor vs. siege",
+                        "required_techs": (-1, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(4, -1, 6, 8, 5124),
+                        ],
+                    },
+                    {
+                        "name": "Relics generate stone in addition to gold",
+                        "required_techs": (-1, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(1, 265, -1, -1, 15),
+                        ],
+                    }
+                ],
+                string_indexes=[10319, 120198],
+                disabled_techs = [35, 37, 54, 64, 84, 85, 166, 188, 194, 209, 218, 235, 236, 237, 244, 246, 255, 265, 272, 320, 373, 375, 376, 377, 384, 433, 434, 437, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 837, 838, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1005, 1025, 1037, 1065, 436, 264, 192, 428, 318, 714, 715, 631, 435, 39, 96, 219, 80, 240, 34, 604, 243, 605, 316, 233, 1008, 1014, 1013, 1012, CUSTOM_TECH_STARTING_INDEX, CUSTOM_TECH_STARTING_INDEX+1, CUSTOM_TECH_STARTING_INDEX+2]
+            )
+
+            # Replace the Wu with Bai
+            '''replace_civ(
+                old_civ_id=50,
+                new_civ_id=50,
+                new_name="Bai",
+                new_description=(
+                    r"Infantry and Monk civilization\n\n"
+                    r"• First Barracks provides +175 food\n"
+                    r"• Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age\n"
+                    r"• Infantry +4 armor and pierce armor vs. siege\n"
+                    r"• Relics generate stone in addition to gold\n\n"
+                    r"<b>Unique Units:<b>\n"
+                    r"Fire Archer (Foot Archer), Jian Swordsman (Infantry)\n\n"
+                    r"<b>Unique Techs:<b>\n"
+                    r"• Great Siege (Fire Archers deal fire damage to ships and buildings)\n"
+                    r"• Dharma Protection (Buildings +20% HP; Monks gold cost replaced with food)\n\n"
+                    r"<b>Team Bonus:<b>\n"
+                    "Houses built +100% faster"
+                ),
+                unique_unit_ids=(1968, 1970),
+                new_unique_techs=[
+                    {
+                        "id": 1080,
+                        "name": "Great Siege",
+                        "costs": {0: 350, 1: 350},
+                        "research_time": 35,
+                        "desc": r"Research Great Siege (Fire Archers deal fire damage to ships and buildings)",
+                        "help": r"Research <b>Great Siege<b> (<cost>)\nFire Archers deal fire damage to ships and buildings.",
+                        "commands": [
+                            genieutils.effect.EffectCommand(0, 1968, -1, 63, 128),
+                            genieutils.effect.EffectCommand(0, 1970, -1, 63, 128),
+                            genieutils.effect.EffectCommand(0, 1968, -1, 16, 1972),
+                            genieutils.effect.EffectCommand(0, 1970, -1, 16, 1972),
+                        ],
+                    },
+                    {
+                        "id": 1081,
+                        "name": "Dharma Protection",
+                        "costs": {0: 500, 2: 750},
+                        "research_time": 50,
+                        "desc": r"Research Dharma Protection (Buildings +20% HP; Monks gold cost replaced with food)",
+                        "help": r"Research <b>Dharma Protection<b> (<cost>)\nBuildings +20% HP; Monks gold cost replaced with food.",
+                        "commands": [
+                            genieutils.effect.EffectCommand(5, -1, 3, 0, 1.2),
+                            genieutils.effect.EffectCommand(0, 125, -1, 105, 0),
+                            genieutils.effect.EffectCommand(0, 125, -1, 103, 100),
+                        ],
+                    },
+                ],
+                team_bonus_commands=[
+                    genieutils.effect.EffectCommand(4, 70, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 463, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 465, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 464, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 712, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 713, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 714, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 715, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 716, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 717, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 718, -1, 101, 2),
+                    genieutils.effect.EffectCommand(4, 719, -1, 101, 2),
+                ],
+                new_bonuses=[
+                    {
+                        "name": "First Barracks provides +175 food",
+                        "required_techs": (122, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(1, 0, 1, -1, 175),
+                        ],
+                    },
+                    {
+                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
+                        "required_techs": (101, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
+                        ],
+                    },
+                    {
+                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
+                        "required_techs": (102, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
+                        ],
+                    },
+                    {
+                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
+                        "required_techs": (103, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
+                        ],
+                    },
+                    {
+                        "name": "Infantry +4 armor vs. siege",
+                        "required_techs": (-1, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(4, -1, 6, 8, 5124),
+                        ],
+                    },
+                    {
+                        "name": "Relics generate stone in addition to gold",
+                        "required_techs": (-1, -1, -1, -1, -1, -1),
+                        "commands": [
+                            genieutils.effect.EffectCommand(1, 265, -1, -1, 15),
+                        ],
+                    }
+                ],
+                string_indexes=[10320, 120199],
+                disabled_techs = [35, 37, 54, 64, 84, 85, 166, 188, 194, 209, 218, 235, 236, 237, 244, 246, 255, 265, 272, 320, 373, 375, 376, 377, 384, 433, 434, 437, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 837, 838, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1005, 1025, 1037, 1065, 436, 264, 192, 428, 318, 714, 715, 631, 435, 39, 96, 219, 80, 240, 34, 604, 243, 605, 316, 233, 1008, 1014, 1013, 1012, CUSTOM_TECH_STARTING_INDEX, CUSTOM_TECH_STARTING_INDEX+1, CUSTOM_TECH_STARTING_INDEX+2]
+            )
+
             # Replace the Wei with Tanguts
             replace_civ(
                 old_civ_id=51,
@@ -2142,218 +2353,7 @@ class MyApp(QtWidgets.QMainWindow):
                 ],
                 string_indexes=[10321, 120200],
                 disabled_techs = [15, 37, 64, 84, 85, 188, 221, 237, 244, 264, 265, 272, 316, 320, 321, 373, 376, 384, 433, 434, 439, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 630, 631, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1008, 1065, 1075, 1037, 429, 602, 166, 209, 255, 219, 377, 35, 1014, 1013, 1012, 1025, 182, 45, 231, 233, 438, CUSTOM_TECH_STARTING_INDEX, CUSTOM_TECH_STARTING_INDEX+1, CUSTOM_TECH_STARTING_INDEX+2]
-            )
-
-            # Replace the Wu with Bai
-            '''replace_civ(
-                old_civ_id=50,
-                new_civ_id=50,
-                new_name="Bai",
-                new_description=(
-                    r"Infantry and Monk civilization\n\n"
-                    r"• First Barracks provides +175 food\n"
-                    r"• Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age\n"
-                    r"• Infantry +4 armor and pierce armor vs. siege\n"
-                    r"• Relics generate stone in addition to gold\n\n"
-                    r"<b>Unique Units:<b>\n"
-                    r"Fire Archer (Foot Archer), Jian Swordsman (Infantry)\n\n"
-                    r"<b>Unique Techs:<b>\n"
-                    r"• Great Siege (Fire Archers deal fire damage to ships and buildings)\n"
-                    r"• Dharma Protection (Buildings +20% HP; Monks gold cost replaced with food)\n\n"
-                    r"<b>Team Bonus:<b>\n"
-                    "Houses built +100% faster"
-                ),
-                unique_unit_ids=(1968, 1970),
-                new_unique_techs=[
-                    {
-                        "id": 1080,
-                        "name": "Great Siege",
-                        "costs": {0: 350, 1: 350},
-                        "research_time": 35,
-                        "desc": r"Research Great Siege (Fire Archers deal fire damage to ships and buildings)",
-                        "help": r"Research <b>Great Siege<b> (<cost>)\nFire Archers deal fire damage to ships and buildings.",
-                        "commands": [
-                            genieutils.effect.EffectCommand(0, 1968, -1, 63, 128),
-                            genieutils.effect.EffectCommand(0, 1970, -1, 63, 128),
-                            genieutils.effect.EffectCommand(0, 1968, -1, 16, 1972),
-                            genieutils.effect.EffectCommand(0, 1970, -1, 16, 1972),
-                        ],
-                    },
-                    {
-                        "id": 1081,
-                        "name": "Dharma Protection",
-                        "costs": {0: 500, 2: 750},
-                        "research_time": 50,
-                        "desc": r"Research Dharma Protection (Buildings +20% HP; Monks gold cost replaced with food)",
-                        "help": r"Research <b>Dharma Protection<b> (<cost>)\nBuildings +20% HP; Monks gold cost replaced with food.",
-                        "commands": [
-                            genieutils.effect.EffectCommand(5, -1, 3, 0, 1.2),
-                            genieutils.effect.EffectCommand(0, 125, -1, 105, 0),
-                            genieutils.effect.EffectCommand(0, 125, -1, 103, 100),
-                        ],
-                    },
-                ],
-                team_bonus_commands=[
-                    genieutils.effect.EffectCommand(4, 70, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 463, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 465, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 464, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 712, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 713, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 714, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 715, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 716, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 717, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 718, -1, 101, 2),
-                    genieutils.effect.EffectCommand(4, 719, -1, 101, 2),
-                ],
-                new_bonuses=[
-                    {
-                        "name": "First Barracks provides +175 food",
-                        "required_techs": (122, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(1, 0, 1, -1, 175),
-                        ],
-                    },
-                    {
-                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
-                        "required_techs": (101, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
-                        ],
-                    },
-                    {
-                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
-                        "required_techs": (102, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
-                        ],
-                    },
-                    {
-                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
-                        "required_techs": (103, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
-                        ],
-                    },
-                    {
-                        "name": "Infantry +4 armor vs. siege",
-                        "required_techs": (-1, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(4, -1, 6, 8, 5124),
-                        ],
-                    },
-                    {
-                        "name": "Relics generate stone in addition to gold",
-                        "required_techs": (-1, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(1, 265, -1, -1, 15),
-                        ],
-                    }
-                ],
-                string_indexes=[10320, 120199],
-                disabled_techs = [35, 37, 54, 64, 84, 85, 166, 188, 194, 209, 218, 235, 236, 237, 244, 246, 255, 265, 272, 320, 373, 375, 376, 377, 384, 433, 434, 437, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 837, 838, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1005, 1025, 1037, 1065, 436, 264, 192, 428, 318, 714, 715, 631, 435, 39, 96, 219, 80, 240, 34, 604, 243, 605, 316, 233, 1008, 1014, 1013, 1012, CUSTOM_TECH_STARTING_INDEX, CUSTOM_TECH_STARTING_INDEX+1, CUSTOM_TECH_STARTING_INDEX+2]
             )'''
-
-            # Replace the Shu with Tibetans
-            replace_civ(
-                old_civ_id=49,
-                new_civ_id=49,
-                new_name="Tibetans",
-                new_description=(
-                    r"Monk civilization\n\n"
-                    r"• Pastures +45 food per animal\n"
-                    r"• Armor upgrades add +5 hit points to affected units\n"
-                    r"• Monks +2 range and armor; garrisoned Monks fire arrows\n\n"
-                    r"<b>Unique Units:<b>\n"
-                    r"Qizilbash Warrior (Cavalry)\n\n"
-                    r"<b>Unique Techs:<b>\n"
-                    r"• Brog-pa (Pastures provide +5 population space; Scout Cavalry-line can be trained at Pastures)\n"
-                    r"• Stod Mkhar (Units and Buildings deal +15% and receive -10% damage when fighting from higher elevation; Buildings +2 line of sight)\n\n"
-                    r"<b>Team Bonus:<b>\n"
-                    "Monks regenerate 15 HP per second"
-                ),
-                unique_unit_ids=(1817, 1829),
-                new_unique_techs=[
-                    {
-                        "id": 1061,
-                        "name": "Brog-pa",
-                        "costs": {0: 350, 1: 350},
-                        "research_time": 35,
-                        "desc": r"Research Brog-pa (Pastures provide 5 population; Scout Cavalry-line can be trained at Pastures)",
-                        "help": r"Research <b>Brog-pa<b> (<cost>)\nPastures provide 5 population; Scout Cavalry-line can be trained at Pastures.",
-                        "commands": [
-                            genieutils.effect.EffectCommand(3, 448, get_unit_id('scout cavalry', True)[1], -1, -1),
-                            genieutils.effect.EffectCommand(3, 546, get_unit_id('light cavalry', True)[0], -1, -1),
-                            genieutils.effect.EffectCommand(3, 441, get_unit_id('hussar', True)[0], -1, -1),
-                            genieutils.effect.EffectCommand(0, 1890, -1, 21, 5),
-                        ],
-                    },
-                    {
-                        "id": 1062,
-                        "name": "Stod Mkhar",
-                        "costs": {0: 500, 2: 750},
-                        "research_time": 50,
-                        "desc": r"Research Stod Mkhar (Units and Buildings deal +15% and receive -10% damage when fighting from higher elevation; Buildings +2 line of sight)",
-                        "help": r"Research <b>Stod Mkhar<b> (<cost>)\nUnits and Buildings deal +15% and receive -10% damage when fighting from higher elevation; Buildings +2 line of sight.",
-                        "commands": [
-                            genieutils.effect.EffectCommand(1, 272, 1, -1, 0.15),
-                            genieutils.effect.EffectCommand(1, 273, 1, -1, -0.1),
-                            genieutils.effect.EffectCommand(4, -1, 3, 1, 2),
-                            genieutils.effect.EffectCommand(4, -1, 3, 23, 2),
-                        ],
-                    },
-                ],
-                team_bonus_commands=[
-                    genieutils.effect.EffectCommand(4, -1, 18, 109, 15)
-                ],
-                new_bonuses=[
-                    {
-                        "name": "First Barracks provides +175 food",
-                        "required_techs": (122, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(1, 0, 1, -1, 175),
-                        ],
-                    },
-                    {
-                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
-                        "required_techs": (101, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
-                        ],
-                    },
-                    {
-                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
-                        "required_techs": (102, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
-                        ],
-                    },
-                    {
-                        "name": "Infantry regenerates 10/20/30 HP per minute in Feudal/Castle/Imperial Age",
-                        "required_techs": (103, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(4, -1, 6, 109, 10),
-                        ],
-                    },
-                    {
-                        "name": "Infantry +4 armor vs. siege",
-                        "required_techs": (-1, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(4, -1, 6, 8, 5124),
-                        ],
-                    },
-                    {
-                        "name": "Relics generate stone in addition to gold",
-                        "required_techs": (-1, -1, -1, -1, -1, -1),
-                        "commands": [
-                            genieutils.effect.EffectCommand(1, 265, -1, -1, 15),
-                        ],
-                    }
-                ],
-                string_indexes=[10319, 120198],
-                disabled_techs = [35, 37, 54, 64, 84, 85, 166, 188, 194, 209, 218, 235, 236, 237, 244, 246, 255, 265, 272, 320, 373, 375, 376, 377, 384, 433, 434, 437, 447, 448, 480, 481, 518, 521, 522, 526, 528, 570, 596, 597, 598, 599, 655, 695, 703, 716, 773, 775, 786, 787, 790, 793, 837, 838, 841, 842, 843, 885, 886, 929, 930, 932, 941, 948, 979, 980, 981, 982, 992, 1005, 1025, 1037, 1065, 436, 264, 192, 428, 318, 714, 715, 631, 435, 39, 96, 219, 80, 240, 34, 604, 243, 605, 316, 233, 1008, 1014, 1013, 1012, CUSTOM_TECH_STARTING_INDEX, CUSTOM_TECH_STARTING_INDEX+1, CUSTOM_TECH_STARTING_INDEX+2]
-            )
         
         def reorder_tech_trees(self):
             # Reorder tech trees
