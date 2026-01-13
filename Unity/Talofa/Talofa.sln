@@ -1,14 +1,24 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unity.Scripting.Python.Samples.PySide", "Unity.Scripting.Python.Samples.PySide.csproj", "{2F83E329-EA3A-2DD2-388A-8C4B7B5C87D9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assembly-CSharp", "Assembly-CSharp.csproj", "{CEFDE61A-6CA7-4E7D-90DA-EDE9D7943F29}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-
+		{2F83E329-EA3A-2DD2-388A-8C4B7B5C87D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F83E329-EA3A-2DD2-388A-8C4B7B5C87D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F83E329-EA3A-2DD2-388A-8C4B7B5C87D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F83E329-EA3A-2DD2-388A-8C4B7B5C87D9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CEFDE61A-6CA7-4E7D-90DA-EDE9D7943F29}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CEFDE61A-6CA7-4E7D-90DA-EDE9D7943F29}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CEFDE61A-6CA7-4E7D-90DA-EDE9D7943F29}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CEFDE61A-6CA7-4E7D-90DA-EDE9D7943F29}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
