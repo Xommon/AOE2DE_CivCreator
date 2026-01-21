@@ -202,7 +202,9 @@ class ChangeGraphicsCommand(QtWidgets.QUndoCommand):
 class MyApp(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        uic.loadUi("main_window.ui", self)
+        here = os.path.dirname(os.path.abspath(__file__))
+        ui_path = os.path.join(here, "main_window.ui")
+        uic.loadUi(ui_path, self)
         self.setWindowTitle("Talofa")
         self.centralwidget.setEnabled(False)
 

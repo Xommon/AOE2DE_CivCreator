@@ -11,8 +11,7 @@ public class GameManager : MonoBehaviour
     public Transform graphicButtonsHolder;
     private Sprite[] loadedGraphics;
     public TextMeshProUGUI title;
-    [HideInInspector]
-    public string[] graphicsTitles = {"Architecture", "Castle", "Wonder", "Monk", "Monastery", "Trade Cart", "Ship"};
+    public string[] graphicsTitles = {"Architecture", "Castle", "Wonder", "Monk", "Monastery", "Trade Cart", "Ship", "King"};
 
     public void RepopulateGraphicButtons()
     {
