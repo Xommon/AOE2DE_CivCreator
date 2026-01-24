@@ -2,18 +2,15 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
+using UnityEngine.EventSystems;
 
 [ExecuteAlways]
-public class Node : MonoBehaviour
+public class Node : MonoBehaviour, IPointerClickHandler
 {
-    [HideInInspector]
-    public Image background;
-    [HideInInspector]
-    public Image icon;
-    [HideInInspector]
-    public TextMeshProUGUI label;
-    [HideInInspector]
-    public GameObject disabledDisplay; // red X overlay (visual only)
+    [HideInInspector] public Image background;
+    [HideInInspector] public Image icon;
+    [HideInInspector] public TextMeshProUGUI label;
+    [HideInInspector] public GameObject disabledDisplay;
 
     [Header("Data")]
     public string nodeName;
@@ -23,30 +20,76 @@ public class Node : MonoBehaviour
     public enum NodeType { Neutral, Unit, RegionalUnit, UniqueUnit, Tech, Building }
     public NodeType nodeType;
 
-    // Visual-only flag. Does NOT deactivate the GameObject.
     public bool isEnabled = true;
 
     [Header("Child Layout")]
-    public float siblingSpacingX = 45f;  // 0, +45, +90...
-    public float slotStep = 46.875f;     // distance between top & bottom slot centers within an age
-    public float ageStep = 97.5f;        // distance between age zones
+    public float siblingSpacingX = 45f;
+    public float slotStep = 46.875f;
+    public float ageStep = 97.5f;
 
     private GameManager gameManager;
     public Node[] substitutions;
     public GameObject specialBorder;
 
-    // Cache to avoid allocations every Update
     private readonly List<Node> _nodeChildren = new List<Node>(8);
 
-    // Detect transitions
     private bool _lastIsEnabled;
-
-    // Prevent recursive ping-pong in ExecuteAlways
     private static bool s_propagating = false;
+
+    // ---------- NEW: deferred active switching ----------
+    private struct PendingActive
+    {
+        public GameObject go;
+        public bool active;
+    }
+
+    private static readonly List<PendingActive> s_pending = new List<PendingActive>(128);
+    private static bool s_processingPending = false;
+
+    private static void QueueSetActive(GameObject go, bool active)
+    {
+        if (go == null) return;
+        if (go.activeSelf == active) return;
+
+        // avoid duplicates (last write wins)
+        for (int i = s_pending.Count - 1; i >= 0; i--)
+        {
+            if (s_pending[i].go == go)
+            {
+                s_pending[i] = new PendingActive { go = go, active = active };
+                return;
+            }
+        }
+
+        s_pending.Add(new PendingActive { go = go, active = active });
+    }
+
+    private static void FlushPending()
+    {
+        if (s_processingPending) return;
+        if (s_pending.Count == 0) return;
+
+        s_processingPending = true;
+        try
+        {
+            for (int i = 0; i < s_pending.Count; i++)
+            {
+                var p = s_pending[i];
+                if (p.go == null) continue;
+                if (p.go.activeSelf != p.active)
+                    p.go.SetActive(p.active);
+            }
+        }
+        finally
+        {
+            s_pending.Clear();
+            s_processingPending = false;
+        }
+    }
+    // ----------------------------------------------------
 
     void Update()
     {
-        // Find GameManager (works in edit mode too)
         if (gameManager == null)
         {
 #if UNITY_2022_2_OR_NEWER
@@ -56,7 +99,6 @@ public class Node : MonoBehaviour
 #endif
         }
 
-        // ---------- UI ----------
         if (gameManager != null && background != null && gameManager.techTreeColours != null)
         {
             int idx = (int)nodeType;
@@ -72,47 +114,63 @@ public class Node : MonoBehaviour
         if (disabledDisplay != null)
             disabledDisplay.SetActive(!isEnabled);
 
-        // ---------- Propagation on change ----------
         if (!s_propagating && isEnabled != _lastIsEnabled)
         {
             s_propagating = true;
             try
             {
-                if (!isEnabled)
-                {
-                    // If I became disabled -> disable ALL descendants
-                    SetDescendantsIsEnabled(false);
-                }
-                else
-                {
-                    // If I became enabled -> enable ALL ancestors
-                    SetAncestorsIsEnabled(true);
-                }
+                if (!isEnabled) SetDescendantsIsEnabled(false);
+                else SetAncestorsIsEnabled(true);
             }
-            finally
-            {
-                s_propagating = false;
-            }
+            finally { s_propagating = false; }
         }
         _lastIsEnabled = isEnabled;
 
-        // ---------- Position children ----------
         RepositionNodeChildren();
 
-        // Change substitution UI
-        specialBorder.SetActive(substitutions.Length > 0);
+        if (specialBorder != null)
+            specialBorder.SetActive(substitutions != null && substitutions.Length > 0);
+
+        // Apply deferred SetActive safely after UI has settled this frame
+        FlushPending();
+    }
+
+    // If you want it even safer, move FlushPending() to LateUpdate instead.
+    void LateUpdate()
+    {
+        FlushPending();
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData == null) return;
+
+        if (eventData.button == PointerEventData.InputButton.Left)
+        {
+            ToggleIsEnabled();
+        }
+        else if (eventData.button == PointerEventData.InputButton.Right)
+        {
+            if (substitutions != null && substitutions.Length > 0)
+            {
+                Node[] subs = gameObject.GetComponent<Node>().substitutions;
+                foreach (Node sub in subs)
+                {
+                    sub.gameObject.SetActive(true);
+                }
+                gameObject.SetActive(false);
+            }
+        }
     }
 
     private void SetDescendantsIsEnabled(bool value)
     {
-        // Walk transform hierarchy and set isEnabled on Nodes (children, grandchildren, ...)
         var stack = new Stack<Transform>();
         stack.Push(transform);
 
         while (stack.Count > 0)
         {
             var t = stack.Pop();
-
             for (int i = 0; i < t.childCount; i++)
             {
                 var c = t.GetChild(i);
@@ -130,7 +188,6 @@ public class Node : MonoBehaviour
 
     private void SetAncestorsIsEnabled(bool value)
     {
-        // Walk upward through parents and set isEnabled on Nodes
         Transform t = transform.parent;
         while (t != null)
         {
@@ -149,11 +206,8 @@ public class Node : MonoBehaviour
     {
         var parentRt = GetComponent<RectTransform>();
         if (parentRt == null) return;
-
-        // If this node is logically disabled, don't reposition its children.
         if (!isEnabled) return;
 
-        // If this node has a Node parent in the same age, treat it as bottom-slot.
         bool thisIsBottomSlot = false;
         if (transform.parent != null)
         {
@@ -164,15 +218,11 @@ public class Node : MonoBehaviour
 
         _nodeChildren.Clear();
 
-        // ONLY direct children that have Node and are active in hierarchy
         for (int i = 0; i < transform.childCount; i++)
         {
             var childNode = transform.GetChild(i).GetComponent<Node>();
             if (childNode == null) continue;
             if (!childNode.gameObject.activeInHierarchy) continue;
-
-            // NOTE: we do NOT skip based on childNode.isEnabled,
-            // so disabled nodes still occupy their slot and don't cause overlaps.
             _nodeChildren.Add(childNode);
         }
 
@@ -185,30 +235,21 @@ public class Node : MonoBehaviour
             Node ch = _nodeChildren[i];
             if (ch == null) continue;
 
-            // Force child age up if needed
-            if (ch.age < age)
-                ch.age = age;
+            if (ch.age < age) ch.age = age;
 
             var chRt = ch.GetComponent<RectTransform>();
             if (chRt == null) continue;
 
             float targetY;
 
-            if (ch.age == age)
-            {
-                // Same age: directly below in the next slot
-                targetY = parentY - slotStep;
-            }
+            if (ch.age == age) targetY = parentY - slotStep;
             else
             {
-                // Later age: top slot of that age zone
-                // If THIS node is already in the bottom slot, compensate by one slotStep
                 int ageDelta = Mathf.Clamp(ch.age - age, 1, 3);
                 float bottomComp = thisIsBottomSlot ? slotStep : 0f;
                 targetY = parentY - (ageDelta * ageStep) + bottomComp;
             }
 
-            // Subsequent children go to the right of the first
             float localX = siblingSpacingX * i;
             float localY = targetY - parentY;
 
@@ -216,7 +257,6 @@ public class Node : MonoBehaviour
         }
     }
 
-    // Optional helper if you still want a click hook elsewhere:
     public void ToggleIsEnabled()
     {
         isEnabled = !isEnabled;
@@ -226,28 +266,50 @@ public class Node : MonoBehaviour
 
     private void OnEnable()
     {
-        // When this node is active in hierarchy, force all substitutions OFF
-        if (substitutions == null) return;
+        // When THIS node becomes active:
+        // 1) ensure all descendants are active (deferred)
+        EnableAllDescendantsActive();
+
+        // 2) force substitutions OFF (deferred)
+        /*if (substitutions == null) return;
         for (int i = 0; i < substitutions.Length; i++)
         {
             var sub = substitutions[i];
             if (sub == null) continue;
-            if (sub.gameObject.activeSelf) sub.gameObject.SetActive(false);
+            QueueSetActive(sub.gameObject, false);
+        }*/
+    }
+
+    private void EnableAllDescendantsActive()
+    {
+        // Activate everything under this transform (children, grandchildren, etc.)
+        // Uses deferred QueueSetActive to avoid Selectable.OnEnable timing issues.
+        var stack = new Stack<Transform>();
+        stack.Push(transform);
+
+        while (stack.Count > 0)
+        {
+            var t = stack.Pop();
+            for (int i = 0; i < t.childCount; i++)
+            {
+                var c = t.GetChild(i);
+                stack.Push(c);
+
+                // Turn on the whole child object
+                QueueSetActive(c.gameObject, true);
+            }
         }
     }
 
     private void OnDisable()
     {
-        // When this node becomes inactive in hierarchy, enable ALL substitutions
+        /*// When inactive: enable ALL substitutions (deferred)
         if (substitutions == null || substitutions.Length == 0) return;
-
         for (int i = 0; i < substitutions.Length; i++)
         {
             var sub = substitutions[i];
             if (sub == null) continue;
-
-            if (!sub.gameObject.activeSelf)
-                sub.gameObject.SetActive(true);
-        }
+            QueueSetActive(sub.gameObject, true);
+        }*/
     }
 }
