@@ -14,15 +14,22 @@ public class CustomDropdown : MonoBehaviour
     public TMP_Text headerLabel;
 
     public RectTransform panel;          // dropdown list panel
-    public GameObject overlay;           // full-screen overlay (inactive by default)
-    public Button overlayButton;         // button on overlay (click outside to close)
 
     [Header("Option UI")]
-    public Toggle togglePrefab;          // template toggle (can be prefab asset OR inactive scene object)
+    public Toggle togglePrefab;          // template toggle (prefab asset OR inactive scene object)
     public Transform toggleParent;       // where toggles are created
 
     [Header("Options (auto rebuilds when changed)")]
     [SerializeField] public string[] options = Array.Empty<string>();
+
+    // ---------------- NEW: Auto width ----------------
+    [Header("Auto Width")]
+    public bool autoWidth = true;
+    public float widthPadding = 24f;         // extra padding added to the widest child
+    public float minWidth = 0f;              // 0 = no minimum
+    public float maxWidth = 0f;              // 0 = no maximum
+    public bool matchHeaderWidthToo = true;  // also apply to headerButton/headerLabel parent if desired
+    // -------------------------------------------------
 
     // Single-choice state
     [SerializeField] private int selectedIndex = -1;
@@ -35,45 +42,50 @@ public class CustomDropdown : MonoBehaviour
     private ToggleGroup singleGroup;
     private int optionsHash;
 
+    // Runtime overlay + panel reparenting
+    private GameObject runtimeOverlayGO;
+    private Transform panelOriginalParent;
+    private int panelOriginalSiblingIndex;
+    private bool panelWasActive;
+
     void Awake()
     {
-        if (overlay != null) overlay.SetActive(false);
         if (panel != null) panel.gameObject.SetActive(false);
 
         if (headerButton != null) headerButton.onClick.AddListener(ToggleDropdown);
-        if (overlayButton != null) overlayButton.onClick.AddListener(CloseDropdown);
 
         Rebuild(force: true);
         UpdateHeader();
+        UpdatePanelWidthFromChildren(); // NEW
     }
 
     void OnEnable()
     {
-        // Editor + playmode safety
         Rebuild(force: true);
         UpdateHeader();
+        UpdatePanelWidthFromChildren(); // NEW
     }
 
 #if UNITY_EDITOR
     void OnValidate()
     {
-        // Automatically rebuild in-editor when you edit the options array or toggle multiChoice
         if (!UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode)
         {
             Rebuild(force: true);
             UpdateHeader();
+            UpdatePanelWidthFromChildren(); // NEW
         }
     }
 #endif
 
     void Update()
     {
-        // Auto rebuild at runtime if someone replaces/modifies the options array in code
         int h = ComputeOptionsHash(options);
         if (h != optionsHash)
         {
             Rebuild(force: true);
             UpdateHeader();
+            UpdatePanelWidthFromChildren(); // NEW
         }
     }
 
@@ -86,18 +98,107 @@ public class CustomDropdown : MonoBehaviour
 
     public void OpenDropdown()
     {
-        if (overlay != null) overlay.SetActive(true);
-        if (panel != null) panel.gameObject.SetActive(true);
+        if (panel == null) return;
 
-        // Overlay behind panel
-        if (overlay != null) overlay.transform.SetAsLastSibling();
-        if (panel != null) panel.transform.SetAsLastSibling();
+        EnsureRuntimeOverlay();
+        BringPanelToFront();
+
+        panel.gameObject.SetActive(true);
+
+        // NEW: after it becomes active, rebuild layout and set width from children
+        UpdatePanelWidthFromChildren();
     }
 
     public void CloseDropdown()
     {
         if (panel != null) panel.gameObject.SetActive(false);
-        if (overlay != null) overlay.SetActive(false);
+
+        RestorePanelParentAndOrder();
+        DestroyRuntimeOverlay();
+    }
+
+    private void EnsureRuntimeOverlay()
+    {
+        if (runtimeOverlayGO != null) return;
+
+        Transform canvasRoot = GetCanvasRoot();
+        if (canvasRoot == null)
+        {
+            Debug.LogError("CustomDropdown: Could not find a parent Canvas. Overlay cannot be created.");
+            return;
+        }
+
+        runtimeOverlayGO = new GameObject("DropdownOverlay_Runtime", typeof(RectTransform), typeof(Image), typeof(Button));
+        runtimeOverlayGO.transform.SetParent(canvasRoot, false);
+
+        var rt = runtimeOverlayGO.GetComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        var img = runtimeOverlayGO.GetComponent<Image>();
+        img.color = new Color(0f, 0f, 0f, 0f);
+        img.raycastTarget = true;
+
+        var btn = runtimeOverlayGO.GetComponent<Button>();
+        btn.onClick.RemoveAllListeners();
+        btn.onClick.AddListener(CloseDropdown);
+
+        runtimeOverlayGO.transform.SetAsLastSibling();
+    }
+
+    private void DestroyRuntimeOverlay()
+    {
+        if (runtimeOverlayGO == null) return;
+        Destroy(runtimeOverlayGO);
+        runtimeOverlayGO = null;
+    }
+
+    private void BringPanelToFront()
+    {
+        if (panel == null) return;
+
+        Transform canvasRoot = GetCanvasRoot();
+        if (canvasRoot == null) return;
+
+        if (panelOriginalParent == null)
+        {
+            panelOriginalParent = panel.transform.parent;
+            panelOriginalSiblingIndex = panel.transform.GetSiblingIndex();
+            panelWasActive = panel.gameObject.activeSelf;
+        }
+
+        panel.transform.SetParent(canvasRoot, worldPositionStays: true);
+        panel.transform.SetAsLastSibling();
+    }
+
+    private void RestorePanelParentAndOrder()
+    {
+        if (panel == null) return;
+        if (panelOriginalParent == null) return;
+
+        panel.transform.SetParent(panelOriginalParent, worldPositionStays: true);
+
+        int maxIndex = panelOriginalParent.childCount - 1;
+        int clampedIndex = Mathf.Clamp(panelOriginalSiblingIndex, 0, maxIndex);
+        panel.transform.SetSiblingIndex(clampedIndex);
+
+        panelOriginalParent = null;
+        panelOriginalSiblingIndex = 0;
+    }
+
+    private Transform GetCanvasRoot()
+    {
+        Canvas c = null;
+
+        if (panel != null) c = panel.GetComponentInParent<Canvas>();
+        if (c == null) c = GetComponentInParent<Canvas>();
+
+        if (c == null) return null;
+
+        var root = c.rootCanvas != null ? c.rootCanvas : c;
+        return root.transform;
     }
 
     public void Rebuild(bool force)
@@ -106,23 +207,27 @@ public class CustomDropdown : MonoBehaviour
         if (!force && h == optionsHash) return;
         optionsHash = h;
 
-        // Clear existing toggles
+        if (toggleParent == null || togglePrefab == null)
+        {
+            builtToggles.Clear();
+            return;
+        }
+
         for (int i = toggleParent.childCount - 1; i >= 0; i--)
         {
             var child = toggleParent.GetChild(i);
-            // If the template toggle lives under toggleParent, keep it (inactive) instead of destroying it.
-            if (togglePrefab != null && child == togglePrefab.transform) continue;
+            if (child == togglePrefab.transform) continue;
             DestroyImmediateOrRuntime(child.gameObject);
         }
 
         builtToggles.Clear();
 
-        // Ensure we have/clear ToggleGroup depending on mode
         if (!multiChoice)
         {
             singleGroup = toggleParent.GetComponent<ToggleGroup>();
             if (singleGroup == null) singleGroup = toggleParent.gameObject.AddComponent<ToggleGroup>();
             singleGroup.allowSwitchOff = true;
+            singleGroup.enabled = true;
         }
         else
         {
@@ -130,7 +235,6 @@ public class CustomDropdown : MonoBehaviour
             if (singleGroup != null) singleGroup.enabled = false;
         }
 
-        // Re-create toggles
         int count = options != null ? options.Length : 0;
         for (int i = 0; i < count; i++)
         {
@@ -139,28 +243,19 @@ public class CustomDropdown : MonoBehaviour
             Toggle t = Instantiate(togglePrefab, toggleParent);
             t.gameObject.SetActive(true);
 
-            // Assign/clear group
             if (!multiChoice)
-            {
-                if (singleGroup != null) singleGroup.enabled = true;
                 t.group = singleGroup;
-            }
             else
-            {
                 t.group = null;
-            }
 
-            // Label
             var tmp = t.GetComponentInChildren<TMP_Text>();
             if (tmp != null) tmp.text = options[i];
 
-            // Initial state
             if (multiChoice)
                 t.isOn = selectedSet.Contains(idx);
             else
                 t.isOn = (selectedIndex == idx);
 
-            // Listener
             t.onValueChanged.RemoveAllListeners();
             t.onValueChanged.AddListener(on =>
             {
@@ -170,13 +265,13 @@ public class CustomDropdown : MonoBehaviour
                     else selectedSet.Remove(idx);
 
                     UpdateHeader();
+                    UpdatePanelWidthFromChildren(); // NEW (text can change, e.g. localization)
                 }
                 else
                 {
                     if (on) selectedIndex = idx;
                     else if (selectedIndex == idx) selectedIndex = -1;
 
-                    // Enforce radio behavior (ToggleGroup helps, but this is extra safety)
                     if (on)
                     {
                         for (int k = 0; k < builtToggles.Count; k++)
@@ -187,16 +282,19 @@ public class CustomDropdown : MonoBehaviour
                     }
 
                     UpdateHeader();
-                    CloseDropdown(); // normal dropdown behavior
+                    UpdatePanelWidthFromChildren(); // NEW
+                    CloseDropdown();
                 }
             });
 
             builtToggles.Add(t);
         }
 
-        // If template toggle is an in-scene object, keep it hidden
         if (togglePrefab != null && togglePrefab.transform.parent == toggleParent)
             togglePrefab.gameObject.SetActive(false);
+
+        // NEW
+        UpdatePanelWidthFromChildren();
     }
 
     private void UpdateHeader()
@@ -229,7 +327,6 @@ public class CustomDropdown : MonoBehaviour
         }
     }
 
-    // Optional helpers
     public int GetSelectedIndex() => selectedIndex;
 
     public List<int> GetSelectedIndices()
@@ -251,13 +348,74 @@ public class CustomDropdown : MonoBehaviour
         return list;
     }
 
-    // If you change options via code, prefer this (guaranteed rebuild)
     public void SetOptions(string[] newOptions)
     {
         options = newOptions ?? Array.Empty<string>();
         Rebuild(force: true);
         UpdateHeader();
+        UpdatePanelWidthFromChildren(); // NEW
     }
+
+    // ---------------- NEW: Width-from-children logic ----------------
+    private void UpdatePanelWidthFromChildren()
+    {
+        if (!autoWidth) return;
+        if (panel == null) return;
+        if (toggleParent == null) return;
+
+        // Ensure layout/text sizes are up-to-date before measuring
+        Canvas.ForceUpdateCanvases();
+        if (toggleParent is RectTransform tprt)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(tprt);
+
+        float max = 0f;
+
+        // Measure preferred width from TMP text where possible, otherwise RectTransform width
+        foreach (var t in builtToggles)
+        {
+            if (t == null) continue;
+
+            float w = 0f;
+
+            var tmp = t.GetComponentInChildren<TMP_Text>();
+            if (tmp != null)
+            {
+                // preferredWidth is great for TMP labels
+                w = tmp.preferredWidth;
+                // include toggle padding by reading toggle rect width as baseline
+                var trt = t.GetComponent<RectTransform>();
+                if (trt != null) w = Mathf.Max(w, trt.rect.width);
+            }
+            else
+            {
+                var trt = t.GetComponent<RectTransform>();
+                if (trt != null) w = trt.rect.width;
+            }
+
+            max = Mathf.Max(max, w);
+        }
+
+        // If no toggles, fallback to parent width
+        if (max <= 0.01f && toggleParent is RectTransform tp)
+            max = tp.rect.width;
+
+        float target = max + widthPadding;
+
+        if (minWidth > 0f) target = Mathf.Max(minWidth, target);
+        if (maxWidth > 0f) target = Mathf.Min(maxWidth, target);
+
+        // Set ONLY width on panel
+        panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, target);
+
+        // Optionally also set header container width to match
+        if (matchHeaderWidthToo)
+        {
+            var headerRt = headerButton != null ? headerButton.GetComponent<RectTransform>() : null;
+            if (headerRt != null)
+                headerRt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, target);
+        }
+    }
+    // ----------------------------------------------------------------
 
     private static int ComputeOptionsHash(string[] arr)
     {
@@ -268,9 +426,8 @@ public class CustomDropdown : MonoBehaviour
 
             h = h * 31 + arr.Length;
             for (int i = 0; i < arr.Length; i++)
-            {
                 h = h * 31 + (arr[i]?.GetHashCode() ?? 0);
-            }
+
             return h;
         }
     }
